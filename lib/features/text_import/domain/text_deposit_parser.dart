@@ -124,37 +124,58 @@ final class TextDepositParser {
   ) {
     final labeledPattern = RegExp(
       r'(?:联系电话|手机号码|手机号|手机|电话)\s*[:：]?\s*'
-      r'([A-Za-z0-9]+(?:[ -][A-Za-z0-9]+)*)',
+      r'([A-Za-z0-9 -]+?)'
+      r'(?=\s*(?:(?:金额|银行|年利率|利率|存期|期限|到期|存入|产品|备注|姓名|客户)|$)'
+      r'|[,，。；;\r\n])',
     );
     for (final match in labeledPattern.allMatches(normalized)) {
       final token = match.group(1)!;
-      final allowedCharacters = RegExp(r'^[0-9 -]+$').hasMatch(token);
-      final value = token.replaceAll(RegExp(r'[ -]'), '');
-      final valid = allowedCharacters && RegExp(r'^1\d{10}$').hasMatch(value);
+      final value = _normalizeValidMobile(token);
       _add(
         output,
         source,
         match.start,
         match.end,
         ParseField.phone,
-        valid ? value : null,
-        valid ? 1 : 0,
-        error: valid
+        value,
+        value == null ? 0 : 1,
+        error: value != null
             ? null
             : '无效手机号：${source.substring(match.start, match.end).trim()}',
       );
     }
 
-    final unlabelledPattern = RegExp(r'1[3-9]\d(?:[ -]?\d){8}');
+    final unlabelledPattern = RegExp(r'1\d(?:[ -]?\d){9}');
     for (final match in unlabelledPattern.allMatches(normalized)) {
       if (_overlapsAny(match.start, match.end, output) ||
           _hasAsciiAlphaNumericAt(normalized, match.start - 1) ||
           _hasAsciiAlphaNumericAt(normalized, match.end)) {
         continue;
       }
-      final value = match.group(0)!.replaceAll(RegExp(r'[ -]'), '');
-      _add(output, source, match.start, match.end, ParseField.phone, value, 1);
+      final token = match.group(0)!;
+      final value = _normalizeValidMobile(token);
+      _add(
+        output,
+        source,
+        match.start,
+        match.end,
+        ParseField.phone,
+        value,
+        value == null ? 0 : 1,
+        error: value == null
+            ? '无效手机号：${source.substring(match.start, match.end).trim()}'
+            : null,
+      );
     }
+  }
+
+  static String? _normalizeValidMobile(String token) {
+    final validGrouping = RegExp(
+      r'^(?:\d+|\d+(?: \d+)+|\d+(?:-\d+)+)$',
+    ).hasMatch(token);
+    if (!validGrouping) return null;
+    final normalized = token.replaceAll(RegExp(r'[ -]'), '');
+    return RegExp(r'^1[3-9]\d{9}$').hasMatch(normalized) ? normalized : null;
   }
 
   static bool _isDigit(int codeUnit) => codeUnit >= 0x30 && codeUnit <= 0x39;

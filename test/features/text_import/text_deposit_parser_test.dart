@@ -275,6 +275,33 @@ void main() {
         expect(candidate.source, source, reason: source);
       }
     });
+
+    test('uses the same mobile prefix rule for labeled and bare tokens', () {
+      for (final source in ['手机11000000000', '12000000000']) {
+        final candidate = parser
+            .parse(source)
+            .candidates
+            .singleWhere((item) => item.field == ParseField.phone);
+        expect(candidate.value, isNull, reason: source);
+        expect(candidate.error, contains('无效手机号'), reason: source);
+        expect(candidate.source, source, reason: source);
+      }
+    });
+
+    test(
+      'preserves repeated separators in the complete labeled phone token',
+      () {
+        for (final source in ['手机138--0013-8000', '手机138  0013 8000']) {
+          final candidate = parser
+              .parse(source)
+              .candidates
+              .singleWhere((item) => item.field == ParseField.phone);
+          expect(candidate.value, isNull, reason: source);
+          expect(candidate.error, contains('无效手机号'), reason: source);
+          expect(candidate.source, source, reason: source);
+        }
+      },
+    );
   });
 
   test('product phrases never produce invalid term candidates', () {
