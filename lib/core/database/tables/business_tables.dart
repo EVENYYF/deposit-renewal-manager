@@ -2,22 +2,30 @@ import 'package:drift/drift.dart';
 
 Expression<bool> isoDateTextCheck(String column) => CustomExpression<bool>(
   "length($column) = 10 AND "
-  "$column GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'",
+  "$column GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' AND "
+  "CAST(substr($column, 6, 2) AS INTEGER) BETWEEN 1 AND 12 AND "
+  "CAST(substr($column, 9, 2) AS INTEGER) BETWEEN 1 AND "
+  "CASE "
+  "WHEN CAST(substr($column, 6, 2) AS INTEGER) IN (4, 6, 9, 11) THEN 30 "
+  "WHEN CAST(substr($column, 6, 2) AS INTEGER) = 2 THEN "
+  "CASE WHEN (CAST(substr($column, 1, 4) AS INTEGER) % 4 = 0 AND "
+  "CAST(substr($column, 1, 4) AS INTEGER) % 100 != 0) OR "
+  "CAST(substr($column, 1, 4) AS INTEGER) % 400 = 0 THEN 29 ELSE 28 END "
+  "ELSE 31 END",
 );
 
-Expression<bool> utcIsoTextCheck(String column) => CustomExpression<bool>(
-  "length($column) >= 20 AND substr($column, -1, 1) = 'Z'",
-);
+Expression<bool> utcEpochCheck(String column) =>
+    CustomExpression<bool>("typeof($column) = 'integer' AND $column > 0");
 
 class Customers extends Table {
   TextColumn get id => text()();
   TextColumn get name => text().check(name.length.isBiggerThanValue(0))();
   TextColumn get phone => text().nullable()();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
-  TextColumn get createdAtUtc =>
-      text().check(utcIsoTextCheck('created_at_utc'))();
-  TextColumn get updatedAtUtc =>
-      text().check(utcIsoTextCheck('updated_at_utc'))();
+  IntColumn get createdAtUtc =>
+      integer().check(utcEpochCheck('created_at_utc'))();
+  IntColumn get updatedAtUtc =>
+      integer().check(utcEpochCheck('updated_at_utc'))();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -45,10 +53,10 @@ class Deposits extends Table {
       "lifecycle IN ('active', 'renewed', 'stopped')",
     ),
   )();
-  TextColumn get createdAtUtc =>
-      text().check(utcIsoTextCheck('created_at_utc'))();
-  TextColumn get updatedAtUtc =>
-      text().check(utcIsoTextCheck('updated_at_utc'))();
+  IntColumn get createdAtUtc =>
+      integer().check(utcEpochCheck('created_at_utc'))();
+  IntColumn get updatedAtUtc =>
+      integer().check(utcEpochCheck('updated_at_utc'))();
   TextColumn get sourceDeviceId => text()();
 
   @override
@@ -63,8 +71,8 @@ class Renewals extends Table {
   @ReferenceName('targetRenewal')
   TextColumn get targetDepositId =>
       text().unique().references(Deposits, #id, onDelete: KeyAction.restrict)();
-  TextColumn get renewedAtUtc =>
-      text().check(utcIsoTextCheck('renewed_at_utc'))();
+  IntColumn get renewedAtUtc =>
+      integer().check(utcEpochCheck('renewed_at_utc'))();
   TextColumn get sourceDeviceId => text()();
 
   @override
@@ -78,8 +86,8 @@ class AuditHistory extends Table {
   TextColumn get operation => text()();
   TextColumn get beforeJson => text().nullable()();
   TextColumn get afterJson => text().nullable()();
-  TextColumn get occurredAtUtc =>
-      text().check(utcIsoTextCheck('occurred_at_utc'))();
+  IntColumn get occurredAtUtc =>
+      integer().check(utcEpochCheck('occurred_at_utc'))();
   TextColumn get sourceDeviceId => text()();
   IntColumn get businessRevision =>
       integer().check(const CustomExpression<bool>('business_revision > 0'))();
@@ -93,10 +101,10 @@ class MessageTemplates extends Table {
   TextColumn get name => text()();
   TextColumn get content => text()();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
-  TextColumn get createdAtUtc =>
-      text().check(utcIsoTextCheck('created_at_utc'))();
-  TextColumn get updatedAtUtc =>
-      text().check(utcIsoTextCheck('updated_at_utc'))();
+  IntColumn get createdAtUtc =>
+      integer().check(utcEpochCheck('created_at_utc'))();
+  IntColumn get updatedAtUtc =>
+      integer().check(utcEpochCheck('updated_at_utc'))();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -108,8 +116,8 @@ class ImportBatches extends Table {
   TextColumn get contentHash => text()();
   IntColumn get importedRows => integer().withDefault(const Constant(0))();
   IntColumn get rejectedRows => integer().withDefault(const Constant(0))();
-  TextColumn get importedAtUtc =>
-      text().check(utcIsoTextCheck('imported_at_utc'))();
+  IntColumn get importedAtUtc =>
+      integer().check(utcEpochCheck('imported_at_utc'))();
   TextColumn get sourceDeviceId => text()();
 
   @override
@@ -130,8 +138,8 @@ class BusinessSettings extends Table {
 class NotificationIdMappings extends Table {
   TextColumn get entityId => text()();
   IntColumn get notificationId => integer().unique()();
-  TextColumn get createdAtUtc =>
-      text().check(utcIsoTextCheck('created_at_utc'))();
+  IntColumn get createdAtUtc =>
+      integer().check(utcEpochCheck('created_at_utc'))();
 
   @override
   Set<Column<Object>> get primaryKey => {entityId};

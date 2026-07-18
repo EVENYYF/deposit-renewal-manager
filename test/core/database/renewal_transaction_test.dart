@@ -123,6 +123,16 @@ void main() {
       throwsA(isA<Exception>()),
     );
 
+    expect(
+      (await repository.get('target'))!.deposit.lifecycle,
+      DepositLifecycle.active,
+    );
+    expect(await repository.renewalSourceOf('target'), 'source');
+    expect(await repository.renewalSourceOf('source'), isNull);
+    final renewalCount = await database
+        .customSelect('SELECT count(*) AS value FROM renewals')
+        .getSingle();
+    expect(renewalCount.read<int>('value'), 1);
     expect(await database.businessRevision(), revisionBefore);
     expect(await database.auditEntryCount(), auditCountBefore);
   });

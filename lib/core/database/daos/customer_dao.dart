@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:clock/clock.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
@@ -14,7 +15,7 @@ final class CustomerDao implements CustomerRepository {
     required this.sourceDeviceId,
     UtcNow? nowUtc,
     Uuid? uuid,
-  }) : _nowUtc = nowUtc ?? DateTime.now,
+  }) : _nowUtc = nowUtc ?? clock.now,
        _uuid = uuid ?? const Uuid();
 
   final db.AppDatabase _db;
@@ -195,5 +196,5 @@ final class CustomerDao implements CustomerRepository {
         );
   }
 
-  String _timestamp() => _nowUtc().toUtc().toIso8601String();
+  int _timestamp() => _nowUtc().toUtc().microsecondsSinceEpoch;
 }

@@ -56,24 +56,24 @@ class $CustomersTable extends Customers
     'createdAtUtc',
   );
   @override
-  late final GeneratedColumn<String> createdAtUtc = GeneratedColumn<String>(
+  late final GeneratedColumn<int> createdAtUtc = GeneratedColumn<int>(
     'created_at_utc',
     aliasedName,
     false,
-    check: () => utcIsoTextCheck('created_at_utc'),
-    type: DriftSqlType.string,
+    check: () => utcEpochCheck('created_at_utc'),
+    type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
   static const VerificationMeta _updatedAtUtcMeta = const VerificationMeta(
     'updatedAtUtc',
   );
   @override
-  late final GeneratedColumn<String> updatedAtUtc = GeneratedColumn<String>(
+  late final GeneratedColumn<int> updatedAtUtc = GeneratedColumn<int>(
     'updated_at_utc',
     aliasedName,
     false,
-    check: () => utcIsoTextCheck('updated_at_utc'),
-    type: DriftSqlType.string,
+    check: () => utcEpochCheck('updated_at_utc'),
+    type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
   @override
@@ -170,11 +170,11 @@ class $CustomersTable extends Customers
         data['${effectivePrefix}is_active'],
       )!,
       createdAtUtc: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
+        DriftSqlType.int,
         data['${effectivePrefix}created_at_utc'],
       )!,
       updatedAtUtc: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
+        DriftSqlType.int,
         data['${effectivePrefix}updated_at_utc'],
       )!,
     );
@@ -191,8 +191,8 @@ class Customer extends DataClass implements Insertable<Customer> {
   final String name;
   final String? phone;
   final bool isActive;
-  final String createdAtUtc;
-  final String updatedAtUtc;
+  final int createdAtUtc;
+  final int updatedAtUtc;
   const Customer({
     required this.id,
     required this.name,
@@ -210,8 +210,8 @@ class Customer extends DataClass implements Insertable<Customer> {
       map['phone'] = Variable<String>(phone);
     }
     map['is_active'] = Variable<bool>(isActive);
-    map['created_at_utc'] = Variable<String>(createdAtUtc);
-    map['updated_at_utc'] = Variable<String>(updatedAtUtc);
+    map['created_at_utc'] = Variable<int>(createdAtUtc);
+    map['updated_at_utc'] = Variable<int>(updatedAtUtc);
     return map;
   }
 
@@ -238,8 +238,8 @@ class Customer extends DataClass implements Insertable<Customer> {
       name: serializer.fromJson<String>(json['name']),
       phone: serializer.fromJson<String?>(json['phone']),
       isActive: serializer.fromJson<bool>(json['isActive']),
-      createdAtUtc: serializer.fromJson<String>(json['createdAtUtc']),
-      updatedAtUtc: serializer.fromJson<String>(json['updatedAtUtc']),
+      createdAtUtc: serializer.fromJson<int>(json['createdAtUtc']),
+      updatedAtUtc: serializer.fromJson<int>(json['updatedAtUtc']),
     );
   }
   @override
@@ -250,8 +250,8 @@ class Customer extends DataClass implements Insertable<Customer> {
       'name': serializer.toJson<String>(name),
       'phone': serializer.toJson<String?>(phone),
       'isActive': serializer.toJson<bool>(isActive),
-      'createdAtUtc': serializer.toJson<String>(createdAtUtc),
-      'updatedAtUtc': serializer.toJson<String>(updatedAtUtc),
+      'createdAtUtc': serializer.toJson<int>(createdAtUtc),
+      'updatedAtUtc': serializer.toJson<int>(updatedAtUtc),
     };
   }
 
@@ -260,8 +260,8 @@ class Customer extends DataClass implements Insertable<Customer> {
     String? name,
     Value<String?> phone = const Value.absent(),
     bool? isActive,
-    String? createdAtUtc,
-    String? updatedAtUtc,
+    int? createdAtUtc,
+    int? updatedAtUtc,
   }) => Customer(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -318,8 +318,8 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
   final Value<String> name;
   final Value<String?> phone;
   final Value<bool> isActive;
-  final Value<String> createdAtUtc;
-  final Value<String> updatedAtUtc;
+  final Value<int> createdAtUtc;
+  final Value<int> updatedAtUtc;
   final Value<int> rowid;
   const CustomersCompanion({
     this.id = const Value.absent(),
@@ -335,8 +335,8 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     required String name,
     this.phone = const Value.absent(),
     this.isActive = const Value.absent(),
-    required String createdAtUtc,
-    required String updatedAtUtc,
+    required int createdAtUtc,
+    required int updatedAtUtc,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -347,8 +347,8 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     Expression<String>? name,
     Expression<String>? phone,
     Expression<bool>? isActive,
-    Expression<String>? createdAtUtc,
-    Expression<String>? updatedAtUtc,
+    Expression<int>? createdAtUtc,
+    Expression<int>? updatedAtUtc,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -367,8 +367,8 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     Value<String>? name,
     Value<String?>? phone,
     Value<bool>? isActive,
-    Value<String>? createdAtUtc,
-    Value<String>? updatedAtUtc,
+    Value<int>? createdAtUtc,
+    Value<int>? updatedAtUtc,
     Value<int>? rowid,
   }) {
     return CustomersCompanion(
@@ -398,10 +398,10 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
       map['is_active'] = Variable<bool>(isActive.value);
     }
     if (createdAtUtc.present) {
-      map['created_at_utc'] = Variable<String>(createdAtUtc.value);
+      map['created_at_utc'] = Variable<int>(createdAtUtc.value);
     }
     if (updatedAtUtc.present) {
-      map['updated_at_utc'] = Variable<String>(updatedAtUtc.value);
+      map['updated_at_utc'] = Variable<int>(updatedAtUtc.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -541,24 +541,24 @@ class $DepositsTable extends Deposits with TableInfo<$DepositsTable, Deposit> {
     'createdAtUtc',
   );
   @override
-  late final GeneratedColumn<String> createdAtUtc = GeneratedColumn<String>(
+  late final GeneratedColumn<int> createdAtUtc = GeneratedColumn<int>(
     'created_at_utc',
     aliasedName,
     false,
-    check: () => utcIsoTextCheck('created_at_utc'),
-    type: DriftSqlType.string,
+    check: () => utcEpochCheck('created_at_utc'),
+    type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
   static const VerificationMeta _updatedAtUtcMeta = const VerificationMeta(
     'updatedAtUtc',
   );
   @override
-  late final GeneratedColumn<String> updatedAtUtc = GeneratedColumn<String>(
+  late final GeneratedColumn<int> updatedAtUtc = GeneratedColumn<int>(
     'updated_at_utc',
     aliasedName,
     false,
-    check: () => utcIsoTextCheck('updated_at_utc'),
-    type: DriftSqlType.string,
+    check: () => utcEpochCheck('updated_at_utc'),
+    type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
   static const VerificationMeta _sourceDeviceIdMeta = const VerificationMeta(
@@ -760,11 +760,11 @@ class $DepositsTable extends Deposits with TableInfo<$DepositsTable, Deposit> {
         data['${effectivePrefix}lifecycle'],
       )!,
       createdAtUtc: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
+        DriftSqlType.int,
         data['${effectivePrefix}created_at_utc'],
       )!,
       updatedAtUtc: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
+        DriftSqlType.int,
         data['${effectivePrefix}updated_at_utc'],
       )!,
       sourceDeviceId: attachedDatabase.typeMapping.read(
@@ -790,8 +790,8 @@ class Deposit extends DataClass implements Insertable<Deposit> {
   final String? calculatedExpiryDate;
   final String finalExpiryDate;
   final String lifecycle;
-  final String createdAtUtc;
-  final String updatedAtUtc;
+  final int createdAtUtc;
+  final int updatedAtUtc;
   final String sourceDeviceId;
   const Deposit({
     required this.id,
@@ -821,8 +821,8 @@ class Deposit extends DataClass implements Insertable<Deposit> {
     }
     map['final_expiry_date'] = Variable<String>(finalExpiryDate);
     map['lifecycle'] = Variable<String>(lifecycle);
-    map['created_at_utc'] = Variable<String>(createdAtUtc);
-    map['updated_at_utc'] = Variable<String>(updatedAtUtc);
+    map['created_at_utc'] = Variable<int>(createdAtUtc);
+    map['updated_at_utc'] = Variable<int>(updatedAtUtc);
     map['source_device_id'] = Variable<String>(sourceDeviceId);
     return map;
   }
@@ -863,8 +863,8 @@ class Deposit extends DataClass implements Insertable<Deposit> {
       ),
       finalExpiryDate: serializer.fromJson<String>(json['finalExpiryDate']),
       lifecycle: serializer.fromJson<String>(json['lifecycle']),
-      createdAtUtc: serializer.fromJson<String>(json['createdAtUtc']),
-      updatedAtUtc: serializer.fromJson<String>(json['updatedAtUtc']),
+      createdAtUtc: serializer.fromJson<int>(json['createdAtUtc']),
+      updatedAtUtc: serializer.fromJson<int>(json['updatedAtUtc']),
       sourceDeviceId: serializer.fromJson<String>(json['sourceDeviceId']),
     );
   }
@@ -881,8 +881,8 @@ class Deposit extends DataClass implements Insertable<Deposit> {
       'calculatedExpiryDate': serializer.toJson<String?>(calculatedExpiryDate),
       'finalExpiryDate': serializer.toJson<String>(finalExpiryDate),
       'lifecycle': serializer.toJson<String>(lifecycle),
-      'createdAtUtc': serializer.toJson<String>(createdAtUtc),
-      'updatedAtUtc': serializer.toJson<String>(updatedAtUtc),
+      'createdAtUtc': serializer.toJson<int>(createdAtUtc),
+      'updatedAtUtc': serializer.toJson<int>(updatedAtUtc),
       'sourceDeviceId': serializer.toJson<String>(sourceDeviceId),
     };
   }
@@ -897,8 +897,8 @@ class Deposit extends DataClass implements Insertable<Deposit> {
     Value<String?> calculatedExpiryDate = const Value.absent(),
     String? finalExpiryDate,
     String? lifecycle,
-    String? createdAtUtc,
-    String? updatedAtUtc,
+    int? createdAtUtc,
+    int? updatedAtUtc,
     String? sourceDeviceId,
   }) => Deposit(
     id: id ?? this.id,
@@ -1013,8 +1013,8 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
   final Value<String?> calculatedExpiryDate;
   final Value<String> finalExpiryDate;
   final Value<String> lifecycle;
-  final Value<String> createdAtUtc;
-  final Value<String> updatedAtUtc;
+  final Value<int> createdAtUtc;
+  final Value<int> updatedAtUtc;
   final Value<String> sourceDeviceId;
   final Value<int> rowid;
   const DepositsCompanion({
@@ -1042,8 +1042,8 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
     this.calculatedExpiryDate = const Value.absent(),
     required String finalExpiryDate,
     required String lifecycle,
-    required String createdAtUtc,
-    required String updatedAtUtc,
+    required int createdAtUtc,
+    required int updatedAtUtc,
     required String sourceDeviceId,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -1067,8 +1067,8 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
     Expression<String>? calculatedExpiryDate,
     Expression<String>? finalExpiryDate,
     Expression<String>? lifecycle,
-    Expression<String>? createdAtUtc,
-    Expression<String>? updatedAtUtc,
+    Expression<int>? createdAtUtc,
+    Expression<int>? updatedAtUtc,
     Expression<String>? sourceDeviceId,
     Expression<int>? rowid,
   }) {
@@ -1101,8 +1101,8 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
     Value<String?>? calculatedExpiryDate,
     Value<String>? finalExpiryDate,
     Value<String>? lifecycle,
-    Value<String>? createdAtUtc,
-    Value<String>? updatedAtUtc,
+    Value<int>? createdAtUtc,
+    Value<int>? updatedAtUtc,
     Value<String>? sourceDeviceId,
     Value<int>? rowid,
   }) {
@@ -1156,10 +1156,10 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
       map['lifecycle'] = Variable<String>(lifecycle.value);
     }
     if (createdAtUtc.present) {
-      map['created_at_utc'] = Variable<String>(createdAtUtc.value);
+      map['created_at_utc'] = Variable<int>(createdAtUtc.value);
     }
     if (updatedAtUtc.present) {
-      map['updated_at_utc'] = Variable<String>(updatedAtUtc.value);
+      map['updated_at_utc'] = Variable<int>(updatedAtUtc.value);
     }
     if (sourceDeviceId.present) {
       map['source_device_id'] = Variable<String>(sourceDeviceId.value);
@@ -1237,12 +1237,12 @@ class $RenewalsTable extends Renewals with TableInfo<$RenewalsTable, Renewal> {
     'renewedAtUtc',
   );
   @override
-  late final GeneratedColumn<String> renewedAtUtc = GeneratedColumn<String>(
+  late final GeneratedColumn<int> renewedAtUtc = GeneratedColumn<int>(
     'renewed_at_utc',
     aliasedName,
     false,
-    check: () => utcIsoTextCheck('renewed_at_utc'),
-    type: DriftSqlType.string,
+    check: () => utcEpochCheck('renewed_at_utc'),
+    type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
   static const VerificationMeta _sourceDeviceIdMeta = const VerificationMeta(
@@ -1347,7 +1347,7 @@ class $RenewalsTable extends Renewals with TableInfo<$RenewalsTable, Renewal> {
         data['${effectivePrefix}target_deposit_id'],
       )!,
       renewedAtUtc: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
+        DriftSqlType.int,
         data['${effectivePrefix}renewed_at_utc'],
       )!,
       sourceDeviceId: attachedDatabase.typeMapping.read(
@@ -1367,7 +1367,7 @@ class Renewal extends DataClass implements Insertable<Renewal> {
   final String id;
   final String sourceDepositId;
   final String targetDepositId;
-  final String renewedAtUtc;
+  final int renewedAtUtc;
   final String sourceDeviceId;
   const Renewal({
     required this.id,
@@ -1382,7 +1382,7 @@ class Renewal extends DataClass implements Insertable<Renewal> {
     map['id'] = Variable<String>(id);
     map['source_deposit_id'] = Variable<String>(sourceDepositId);
     map['target_deposit_id'] = Variable<String>(targetDepositId);
-    map['renewed_at_utc'] = Variable<String>(renewedAtUtc);
+    map['renewed_at_utc'] = Variable<int>(renewedAtUtc);
     map['source_device_id'] = Variable<String>(sourceDeviceId);
     return map;
   }
@@ -1406,7 +1406,7 @@ class Renewal extends DataClass implements Insertable<Renewal> {
       id: serializer.fromJson<String>(json['id']),
       sourceDepositId: serializer.fromJson<String>(json['sourceDepositId']),
       targetDepositId: serializer.fromJson<String>(json['targetDepositId']),
-      renewedAtUtc: serializer.fromJson<String>(json['renewedAtUtc']),
+      renewedAtUtc: serializer.fromJson<int>(json['renewedAtUtc']),
       sourceDeviceId: serializer.fromJson<String>(json['sourceDeviceId']),
     );
   }
@@ -1417,7 +1417,7 @@ class Renewal extends DataClass implements Insertable<Renewal> {
       'id': serializer.toJson<String>(id),
       'sourceDepositId': serializer.toJson<String>(sourceDepositId),
       'targetDepositId': serializer.toJson<String>(targetDepositId),
-      'renewedAtUtc': serializer.toJson<String>(renewedAtUtc),
+      'renewedAtUtc': serializer.toJson<int>(renewedAtUtc),
       'sourceDeviceId': serializer.toJson<String>(sourceDeviceId),
     };
   }
@@ -1426,7 +1426,7 @@ class Renewal extends DataClass implements Insertable<Renewal> {
     String? id,
     String? sourceDepositId,
     String? targetDepositId,
-    String? renewedAtUtc,
+    int? renewedAtUtc,
     String? sourceDeviceId,
   }) => Renewal(
     id: id ?? this.id,
@@ -1488,7 +1488,7 @@ class RenewalsCompanion extends UpdateCompanion<Renewal> {
   final Value<String> id;
   final Value<String> sourceDepositId;
   final Value<String> targetDepositId;
-  final Value<String> renewedAtUtc;
+  final Value<int> renewedAtUtc;
   final Value<String> sourceDeviceId;
   final Value<int> rowid;
   const RenewalsCompanion({
@@ -1503,7 +1503,7 @@ class RenewalsCompanion extends UpdateCompanion<Renewal> {
     required String id,
     required String sourceDepositId,
     required String targetDepositId,
-    required String renewedAtUtc,
+    required int renewedAtUtc,
     required String sourceDeviceId,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -1515,7 +1515,7 @@ class RenewalsCompanion extends UpdateCompanion<Renewal> {
     Expression<String>? id,
     Expression<String>? sourceDepositId,
     Expression<String>? targetDepositId,
-    Expression<String>? renewedAtUtc,
+    Expression<int>? renewedAtUtc,
     Expression<String>? sourceDeviceId,
     Expression<int>? rowid,
   }) {
@@ -1533,7 +1533,7 @@ class RenewalsCompanion extends UpdateCompanion<Renewal> {
     Value<String>? id,
     Value<String>? sourceDepositId,
     Value<String>? targetDepositId,
-    Value<String>? renewedAtUtc,
+    Value<int>? renewedAtUtc,
     Value<String>? sourceDeviceId,
     Value<int>? rowid,
   }) {
@@ -1560,7 +1560,7 @@ class RenewalsCompanion extends UpdateCompanion<Renewal> {
       map['target_deposit_id'] = Variable<String>(targetDepositId.value);
     }
     if (renewedAtUtc.present) {
-      map['renewed_at_utc'] = Variable<String>(renewedAtUtc.value);
+      map['renewed_at_utc'] = Variable<int>(renewedAtUtc.value);
     }
     if (sourceDeviceId.present) {
       map['source_device_id'] = Variable<String>(sourceDeviceId.value);
@@ -1659,12 +1659,12 @@ class $AuditHistoryTable extends AuditHistory
     'occurredAtUtc',
   );
   @override
-  late final GeneratedColumn<String> occurredAtUtc = GeneratedColumn<String>(
+  late final GeneratedColumn<int> occurredAtUtc = GeneratedColumn<int>(
     'occurred_at_utc',
     aliasedName,
     false,
-    check: () => utcIsoTextCheck('occurred_at_utc'),
-    type: DriftSqlType.string,
+    check: () => utcEpochCheck('occurred_at_utc'),
+    type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
   static const VerificationMeta _sourceDeviceIdMeta = const VerificationMeta(
@@ -1822,7 +1822,7 @@ class $AuditHistoryTable extends AuditHistory
         data['${effectivePrefix}after_json'],
       ),
       occurredAtUtc: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
+        DriftSqlType.int,
         data['${effectivePrefix}occurred_at_utc'],
       )!,
       sourceDeviceId: attachedDatabase.typeMapping.read(
@@ -1850,7 +1850,7 @@ class AuditHistoryData extends DataClass
   final String operation;
   final String? beforeJson;
   final String? afterJson;
-  final String occurredAtUtc;
+  final int occurredAtUtc;
   final String sourceDeviceId;
   final int businessRevision;
   const AuditHistoryData({
@@ -1877,7 +1877,7 @@ class AuditHistoryData extends DataClass
     if (!nullToAbsent || afterJson != null) {
       map['after_json'] = Variable<String>(afterJson);
     }
-    map['occurred_at_utc'] = Variable<String>(occurredAtUtc);
+    map['occurred_at_utc'] = Variable<int>(occurredAtUtc);
     map['source_device_id'] = Variable<String>(sourceDeviceId);
     map['business_revision'] = Variable<int>(businessRevision);
     return map;
@@ -1913,7 +1913,7 @@ class AuditHistoryData extends DataClass
       operation: serializer.fromJson<String>(json['operation']),
       beforeJson: serializer.fromJson<String?>(json['beforeJson']),
       afterJson: serializer.fromJson<String?>(json['afterJson']),
-      occurredAtUtc: serializer.fromJson<String>(json['occurredAtUtc']),
+      occurredAtUtc: serializer.fromJson<int>(json['occurredAtUtc']),
       sourceDeviceId: serializer.fromJson<String>(json['sourceDeviceId']),
       businessRevision: serializer.fromJson<int>(json['businessRevision']),
     );
@@ -1928,7 +1928,7 @@ class AuditHistoryData extends DataClass
       'operation': serializer.toJson<String>(operation),
       'beforeJson': serializer.toJson<String?>(beforeJson),
       'afterJson': serializer.toJson<String?>(afterJson),
-      'occurredAtUtc': serializer.toJson<String>(occurredAtUtc),
+      'occurredAtUtc': serializer.toJson<int>(occurredAtUtc),
       'sourceDeviceId': serializer.toJson<String>(sourceDeviceId),
       'businessRevision': serializer.toJson<int>(businessRevision),
     };
@@ -1941,7 +1941,7 @@ class AuditHistoryData extends DataClass
     String? operation,
     Value<String?> beforeJson = const Value.absent(),
     Value<String?> afterJson = const Value.absent(),
-    String? occurredAtUtc,
+    int? occurredAtUtc,
     String? sourceDeviceId,
     int? businessRevision,
   }) => AuditHistoryData(
@@ -2029,7 +2029,7 @@ class AuditHistoryCompanion extends UpdateCompanion<AuditHistoryData> {
   final Value<String> operation;
   final Value<String?> beforeJson;
   final Value<String?> afterJson;
-  final Value<String> occurredAtUtc;
+  final Value<int> occurredAtUtc;
   final Value<String> sourceDeviceId;
   final Value<int> businessRevision;
   final Value<int> rowid;
@@ -2052,7 +2052,7 @@ class AuditHistoryCompanion extends UpdateCompanion<AuditHistoryData> {
     required String operation,
     this.beforeJson = const Value.absent(),
     this.afterJson = const Value.absent(),
-    required String occurredAtUtc,
+    required int occurredAtUtc,
     required String sourceDeviceId,
     required int businessRevision,
     this.rowid = const Value.absent(),
@@ -2070,7 +2070,7 @@ class AuditHistoryCompanion extends UpdateCompanion<AuditHistoryData> {
     Expression<String>? operation,
     Expression<String>? beforeJson,
     Expression<String>? afterJson,
-    Expression<String>? occurredAtUtc,
+    Expression<int>? occurredAtUtc,
     Expression<String>? sourceDeviceId,
     Expression<int>? businessRevision,
     Expression<int>? rowid,
@@ -2096,7 +2096,7 @@ class AuditHistoryCompanion extends UpdateCompanion<AuditHistoryData> {
     Value<String>? operation,
     Value<String?>? beforeJson,
     Value<String?>? afterJson,
-    Value<String>? occurredAtUtc,
+    Value<int>? occurredAtUtc,
     Value<String>? sourceDeviceId,
     Value<int>? businessRevision,
     Value<int>? rowid,
@@ -2137,7 +2137,7 @@ class AuditHistoryCompanion extends UpdateCompanion<AuditHistoryData> {
       map['after_json'] = Variable<String>(afterJson.value);
     }
     if (occurredAtUtc.present) {
-      map['occurred_at_utc'] = Variable<String>(occurredAtUtc.value);
+      map['occurred_at_utc'] = Variable<int>(occurredAtUtc.value);
     }
     if (sourceDeviceId.present) {
       map['source_device_id'] = Variable<String>(sourceDeviceId.value);
@@ -2223,24 +2223,24 @@ class $MessageTemplatesTable extends MessageTemplates
     'createdAtUtc',
   );
   @override
-  late final GeneratedColumn<String> createdAtUtc = GeneratedColumn<String>(
+  late final GeneratedColumn<int> createdAtUtc = GeneratedColumn<int>(
     'created_at_utc',
     aliasedName,
     false,
-    check: () => utcIsoTextCheck('created_at_utc'),
-    type: DriftSqlType.string,
+    check: () => utcEpochCheck('created_at_utc'),
+    type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
   static const VerificationMeta _updatedAtUtcMeta = const VerificationMeta(
     'updatedAtUtc',
   );
   @override
-  late final GeneratedColumn<String> updatedAtUtc = GeneratedColumn<String>(
+  late final GeneratedColumn<int> updatedAtUtc = GeneratedColumn<int>(
     'updated_at_utc',
     aliasedName,
     false,
-    check: () => utcIsoTextCheck('updated_at_utc'),
-    type: DriftSqlType.string,
+    check: () => utcEpochCheck('updated_at_utc'),
+    type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
   @override
@@ -2339,11 +2339,11 @@ class $MessageTemplatesTable extends MessageTemplates
         data['${effectivePrefix}is_active'],
       )!,
       createdAtUtc: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
+        DriftSqlType.int,
         data['${effectivePrefix}created_at_utc'],
       )!,
       updatedAtUtc: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
+        DriftSqlType.int,
         data['${effectivePrefix}updated_at_utc'],
       )!,
     );
@@ -2360,8 +2360,8 @@ class MessageTemplate extends DataClass implements Insertable<MessageTemplate> {
   final String name;
   final String content;
   final bool isActive;
-  final String createdAtUtc;
-  final String updatedAtUtc;
+  final int createdAtUtc;
+  final int updatedAtUtc;
   const MessageTemplate({
     required this.id,
     required this.name,
@@ -2377,8 +2377,8 @@ class MessageTemplate extends DataClass implements Insertable<MessageTemplate> {
     map['name'] = Variable<String>(name);
     map['content'] = Variable<String>(content);
     map['is_active'] = Variable<bool>(isActive);
-    map['created_at_utc'] = Variable<String>(createdAtUtc);
-    map['updated_at_utc'] = Variable<String>(updatedAtUtc);
+    map['created_at_utc'] = Variable<int>(createdAtUtc);
+    map['updated_at_utc'] = Variable<int>(updatedAtUtc);
     return map;
   }
 
@@ -2403,8 +2403,8 @@ class MessageTemplate extends DataClass implements Insertable<MessageTemplate> {
       name: serializer.fromJson<String>(json['name']),
       content: serializer.fromJson<String>(json['content']),
       isActive: serializer.fromJson<bool>(json['isActive']),
-      createdAtUtc: serializer.fromJson<String>(json['createdAtUtc']),
-      updatedAtUtc: serializer.fromJson<String>(json['updatedAtUtc']),
+      createdAtUtc: serializer.fromJson<int>(json['createdAtUtc']),
+      updatedAtUtc: serializer.fromJson<int>(json['updatedAtUtc']),
     );
   }
   @override
@@ -2415,8 +2415,8 @@ class MessageTemplate extends DataClass implements Insertable<MessageTemplate> {
       'name': serializer.toJson<String>(name),
       'content': serializer.toJson<String>(content),
       'isActive': serializer.toJson<bool>(isActive),
-      'createdAtUtc': serializer.toJson<String>(createdAtUtc),
-      'updatedAtUtc': serializer.toJson<String>(updatedAtUtc),
+      'createdAtUtc': serializer.toJson<int>(createdAtUtc),
+      'updatedAtUtc': serializer.toJson<int>(updatedAtUtc),
     };
   }
 
@@ -2425,8 +2425,8 @@ class MessageTemplate extends DataClass implements Insertable<MessageTemplate> {
     String? name,
     String? content,
     bool? isActive,
-    String? createdAtUtc,
-    String? updatedAtUtc,
+    int? createdAtUtc,
+    int? updatedAtUtc,
   }) => MessageTemplate(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -2483,8 +2483,8 @@ class MessageTemplatesCompanion extends UpdateCompanion<MessageTemplate> {
   final Value<String> name;
   final Value<String> content;
   final Value<bool> isActive;
-  final Value<String> createdAtUtc;
-  final Value<String> updatedAtUtc;
+  final Value<int> createdAtUtc;
+  final Value<int> updatedAtUtc;
   final Value<int> rowid;
   const MessageTemplatesCompanion({
     this.id = const Value.absent(),
@@ -2500,8 +2500,8 @@ class MessageTemplatesCompanion extends UpdateCompanion<MessageTemplate> {
     required String name,
     required String content,
     this.isActive = const Value.absent(),
-    required String createdAtUtc,
-    required String updatedAtUtc,
+    required int createdAtUtc,
+    required int updatedAtUtc,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -2513,8 +2513,8 @@ class MessageTemplatesCompanion extends UpdateCompanion<MessageTemplate> {
     Expression<String>? name,
     Expression<String>? content,
     Expression<bool>? isActive,
-    Expression<String>? createdAtUtc,
-    Expression<String>? updatedAtUtc,
+    Expression<int>? createdAtUtc,
+    Expression<int>? updatedAtUtc,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2533,8 +2533,8 @@ class MessageTemplatesCompanion extends UpdateCompanion<MessageTemplate> {
     Value<String>? name,
     Value<String>? content,
     Value<bool>? isActive,
-    Value<String>? createdAtUtc,
-    Value<String>? updatedAtUtc,
+    Value<int>? createdAtUtc,
+    Value<int>? updatedAtUtc,
     Value<int>? rowid,
   }) {
     return MessageTemplatesCompanion(
@@ -2564,10 +2564,10 @@ class MessageTemplatesCompanion extends UpdateCompanion<MessageTemplate> {
       map['is_active'] = Variable<bool>(isActive.value);
     }
     if (createdAtUtc.present) {
-      map['created_at_utc'] = Variable<String>(createdAtUtc.value);
+      map['created_at_utc'] = Variable<int>(createdAtUtc.value);
     }
     if (updatedAtUtc.present) {
-      map['updated_at_utc'] = Variable<String>(updatedAtUtc.value);
+      map['updated_at_utc'] = Variable<int>(updatedAtUtc.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -2655,12 +2655,12 @@ class $ImportBatchesTable extends ImportBatches
     'importedAtUtc',
   );
   @override
-  late final GeneratedColumn<String> importedAtUtc = GeneratedColumn<String>(
+  late final GeneratedColumn<int> importedAtUtc = GeneratedColumn<int>(
     'imported_at_utc',
     aliasedName,
     false,
-    check: () => utcIsoTextCheck('imported_at_utc'),
-    type: DriftSqlType.string,
+    check: () => utcEpochCheck('imported_at_utc'),
+    type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
   static const VerificationMeta _sourceDeviceIdMeta = const VerificationMeta(
@@ -2790,7 +2790,7 @@ class $ImportBatchesTable extends ImportBatches
         data['${effectivePrefix}rejected_rows'],
       )!,
       importedAtUtc: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
+        DriftSqlType.int,
         data['${effectivePrefix}imported_at_utc'],
       )!,
       sourceDeviceId: attachedDatabase.typeMapping.read(
@@ -2812,7 +2812,7 @@ class ImportBatche extends DataClass implements Insertable<ImportBatche> {
   final String contentHash;
   final int importedRows;
   final int rejectedRows;
-  final String importedAtUtc;
+  final int importedAtUtc;
   final String sourceDeviceId;
   const ImportBatche({
     required this.id,
@@ -2831,7 +2831,7 @@ class ImportBatche extends DataClass implements Insertable<ImportBatche> {
     map['content_hash'] = Variable<String>(contentHash);
     map['imported_rows'] = Variable<int>(importedRows);
     map['rejected_rows'] = Variable<int>(rejectedRows);
-    map['imported_at_utc'] = Variable<String>(importedAtUtc);
+    map['imported_at_utc'] = Variable<int>(importedAtUtc);
     map['source_device_id'] = Variable<String>(sourceDeviceId);
     return map;
   }
@@ -2859,7 +2859,7 @@ class ImportBatche extends DataClass implements Insertable<ImportBatche> {
       contentHash: serializer.fromJson<String>(json['contentHash']),
       importedRows: serializer.fromJson<int>(json['importedRows']),
       rejectedRows: serializer.fromJson<int>(json['rejectedRows']),
-      importedAtUtc: serializer.fromJson<String>(json['importedAtUtc']),
+      importedAtUtc: serializer.fromJson<int>(json['importedAtUtc']),
       sourceDeviceId: serializer.fromJson<String>(json['sourceDeviceId']),
     );
   }
@@ -2872,7 +2872,7 @@ class ImportBatche extends DataClass implements Insertable<ImportBatche> {
       'contentHash': serializer.toJson<String>(contentHash),
       'importedRows': serializer.toJson<int>(importedRows),
       'rejectedRows': serializer.toJson<int>(rejectedRows),
-      'importedAtUtc': serializer.toJson<String>(importedAtUtc),
+      'importedAtUtc': serializer.toJson<int>(importedAtUtc),
       'sourceDeviceId': serializer.toJson<String>(sourceDeviceId),
     };
   }
@@ -2883,7 +2883,7 @@ class ImportBatche extends DataClass implements Insertable<ImportBatche> {
     String? contentHash,
     int? importedRows,
     int? rejectedRows,
-    String? importedAtUtc,
+    int? importedAtUtc,
     String? sourceDeviceId,
   }) => ImportBatche(
     id: id ?? this.id,
@@ -2959,7 +2959,7 @@ class ImportBatchesCompanion extends UpdateCompanion<ImportBatche> {
   final Value<String> contentHash;
   final Value<int> importedRows;
   final Value<int> rejectedRows;
-  final Value<String> importedAtUtc;
+  final Value<int> importedAtUtc;
   final Value<String> sourceDeviceId;
   final Value<int> rowid;
   const ImportBatchesCompanion({
@@ -2978,7 +2978,7 @@ class ImportBatchesCompanion extends UpdateCompanion<ImportBatche> {
     required String contentHash,
     this.importedRows = const Value.absent(),
     this.rejectedRows = const Value.absent(),
-    required String importedAtUtc,
+    required int importedAtUtc,
     required String sourceDeviceId,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -2992,7 +2992,7 @@ class ImportBatchesCompanion extends UpdateCompanion<ImportBatche> {
     Expression<String>? contentHash,
     Expression<int>? importedRows,
     Expression<int>? rejectedRows,
-    Expression<String>? importedAtUtc,
+    Expression<int>? importedAtUtc,
     Expression<String>? sourceDeviceId,
     Expression<int>? rowid,
   }) {
@@ -3014,7 +3014,7 @@ class ImportBatchesCompanion extends UpdateCompanion<ImportBatche> {
     Value<String>? contentHash,
     Value<int>? importedRows,
     Value<int>? rejectedRows,
-    Value<String>? importedAtUtc,
+    Value<int>? importedAtUtc,
     Value<String>? sourceDeviceId,
     Value<int>? rowid,
   }) {
@@ -3049,7 +3049,7 @@ class ImportBatchesCompanion extends UpdateCompanion<ImportBatche> {
       map['rejected_rows'] = Variable<int>(rejectedRows.value);
     }
     if (importedAtUtc.present) {
-      map['imported_at_utc'] = Variable<String>(importedAtUtc.value);
+      map['imported_at_utc'] = Variable<int>(importedAtUtc.value);
     }
     if (sourceDeviceId.present) {
       map['source_device_id'] = Variable<String>(sourceDeviceId.value);
@@ -3327,12 +3327,12 @@ class $NotificationIdMappingsTable extends NotificationIdMappings
     'createdAtUtc',
   );
   @override
-  late final GeneratedColumn<String> createdAtUtc = GeneratedColumn<String>(
+  late final GeneratedColumn<int> createdAtUtc = GeneratedColumn<int>(
     'created_at_utc',
     aliasedName,
     false,
-    check: () => utcIsoTextCheck('created_at_utc'),
-    type: DriftSqlType.string,
+    check: () => utcEpochCheck('created_at_utc'),
+    type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
   @override
@@ -3401,7 +3401,7 @@ class $NotificationIdMappingsTable extends NotificationIdMappings
         data['${effectivePrefix}notification_id'],
       )!,
       createdAtUtc: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
+        DriftSqlType.int,
         data['${effectivePrefix}created_at_utc'],
       )!,
     );
@@ -3417,7 +3417,7 @@ class NotificationIdMapping extends DataClass
     implements Insertable<NotificationIdMapping> {
   final String entityId;
   final int notificationId;
-  final String createdAtUtc;
+  final int createdAtUtc;
   const NotificationIdMapping({
     required this.entityId,
     required this.notificationId,
@@ -3428,7 +3428,7 @@ class NotificationIdMapping extends DataClass
     final map = <String, Expression>{};
     map['entity_id'] = Variable<String>(entityId);
     map['notification_id'] = Variable<int>(notificationId);
-    map['created_at_utc'] = Variable<String>(createdAtUtc);
+    map['created_at_utc'] = Variable<int>(createdAtUtc);
     return map;
   }
 
@@ -3448,7 +3448,7 @@ class NotificationIdMapping extends DataClass
     return NotificationIdMapping(
       entityId: serializer.fromJson<String>(json['entityId']),
       notificationId: serializer.fromJson<int>(json['notificationId']),
-      createdAtUtc: serializer.fromJson<String>(json['createdAtUtc']),
+      createdAtUtc: serializer.fromJson<int>(json['createdAtUtc']),
     );
   }
   @override
@@ -3457,14 +3457,14 @@ class NotificationIdMapping extends DataClass
     return <String, dynamic>{
       'entityId': serializer.toJson<String>(entityId),
       'notificationId': serializer.toJson<int>(notificationId),
-      'createdAtUtc': serializer.toJson<String>(createdAtUtc),
+      'createdAtUtc': serializer.toJson<int>(createdAtUtc),
     };
   }
 
   NotificationIdMapping copyWith({
     String? entityId,
     int? notificationId,
-    String? createdAtUtc,
+    int? createdAtUtc,
   }) => NotificationIdMapping(
     entityId: entityId ?? this.entityId,
     notificationId: notificationId ?? this.notificationId,
@@ -3509,7 +3509,7 @@ class NotificationIdMappingsCompanion
     extends UpdateCompanion<NotificationIdMapping> {
   final Value<String> entityId;
   final Value<int> notificationId;
-  final Value<String> createdAtUtc;
+  final Value<int> createdAtUtc;
   final Value<int> rowid;
   const NotificationIdMappingsCompanion({
     this.entityId = const Value.absent(),
@@ -3520,7 +3520,7 @@ class NotificationIdMappingsCompanion
   NotificationIdMappingsCompanion.insert({
     required String entityId,
     required int notificationId,
-    required String createdAtUtc,
+    required int createdAtUtc,
     this.rowid = const Value.absent(),
   }) : entityId = Value(entityId),
        notificationId = Value(notificationId),
@@ -3528,7 +3528,7 @@ class NotificationIdMappingsCompanion
   static Insertable<NotificationIdMapping> custom({
     Expression<String>? entityId,
     Expression<int>? notificationId,
-    Expression<String>? createdAtUtc,
+    Expression<int>? createdAtUtc,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -3542,7 +3542,7 @@ class NotificationIdMappingsCompanion
   NotificationIdMappingsCompanion copyWith({
     Value<String>? entityId,
     Value<int>? notificationId,
-    Value<String>? createdAtUtc,
+    Value<int>? createdAtUtc,
     Value<int>? rowid,
   }) {
     return NotificationIdMappingsCompanion(
@@ -3563,7 +3563,7 @@ class NotificationIdMappingsCompanion
       map['notification_id'] = Variable<int>(notificationId.value);
     }
     if (createdAtUtc.present) {
-      map['created_at_utc'] = Variable<String>(createdAtUtc.value);
+      map['created_at_utc'] = Variable<int>(createdAtUtc.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -3621,8 +3621,8 @@ typedef $$CustomersTableCreateCompanionBuilder =
       required String name,
       Value<String?> phone,
       Value<bool> isActive,
-      required String createdAtUtc,
-      required String updatedAtUtc,
+      required int createdAtUtc,
+      required int updatedAtUtc,
       Value<int> rowid,
     });
 typedef $$CustomersTableUpdateCompanionBuilder =
@@ -3631,8 +3631,8 @@ typedef $$CustomersTableUpdateCompanionBuilder =
       Value<String> name,
       Value<String?> phone,
       Value<bool> isActive,
-      Value<String> createdAtUtc,
-      Value<String> updatedAtUtc,
+      Value<int> createdAtUtc,
+      Value<int> updatedAtUtc,
       Value<int> rowid,
     });
 
@@ -3689,12 +3689,12 @@ class $$CustomersTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get createdAtUtc => $composableBuilder(
+  ColumnFilters<int> get createdAtUtc => $composableBuilder(
     column: $table.createdAtUtc,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get updatedAtUtc => $composableBuilder(
+  ColumnFilters<int> get updatedAtUtc => $composableBuilder(
     column: $table.updatedAtUtc,
     builder: (column) => ColumnFilters(column),
   );
@@ -3754,12 +3754,12 @@ class $$CustomersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get createdAtUtc => $composableBuilder(
+  ColumnOrderings<int> get createdAtUtc => $composableBuilder(
     column: $table.createdAtUtc,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get updatedAtUtc => $composableBuilder(
+  ColumnOrderings<int> get updatedAtUtc => $composableBuilder(
     column: $table.updatedAtUtc,
     builder: (column) => ColumnOrderings(column),
   );
@@ -3786,12 +3786,12 @@ class $$CustomersTableAnnotationComposer
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
 
-  GeneratedColumn<String> get createdAtUtc => $composableBuilder(
+  GeneratedColumn<int> get createdAtUtc => $composableBuilder(
     column: $table.createdAtUtc,
     builder: (column) => column,
   );
 
-  GeneratedColumn<String> get updatedAtUtc => $composableBuilder(
+  GeneratedColumn<int> get updatedAtUtc => $composableBuilder(
     column: $table.updatedAtUtc,
     builder: (column) => column,
   );
@@ -3854,8 +3854,8 @@ class $$CustomersTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<String?> phone = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
-                Value<String> createdAtUtc = const Value.absent(),
-                Value<String> updatedAtUtc = const Value.absent(),
+                Value<int> createdAtUtc = const Value.absent(),
+                Value<int> updatedAtUtc = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CustomersCompanion(
                 id: id,
@@ -3872,8 +3872,8 @@ class $$CustomersTableTableManager
                 required String name,
                 Value<String?> phone = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
-                required String createdAtUtc,
-                required String updatedAtUtc,
+                required int createdAtUtc,
+                required int updatedAtUtc,
                 Value<int> rowid = const Value.absent(),
               }) => CustomersCompanion.insert(
                 id: id,
@@ -3951,8 +3951,8 @@ typedef $$DepositsTableCreateCompanionBuilder =
       Value<String?> calculatedExpiryDate,
       required String finalExpiryDate,
       required String lifecycle,
-      required String createdAtUtc,
-      required String updatedAtUtc,
+      required int createdAtUtc,
+      required int updatedAtUtc,
       required String sourceDeviceId,
       Value<int> rowid,
     });
@@ -3967,8 +3967,8 @@ typedef $$DepositsTableUpdateCompanionBuilder =
       Value<String?> calculatedExpiryDate,
       Value<String> finalExpiryDate,
       Value<String> lifecycle,
-      Value<String> createdAtUtc,
-      Value<String> updatedAtUtc,
+      Value<int> createdAtUtc,
+      Value<int> updatedAtUtc,
       Value<String> sourceDeviceId,
       Value<int> rowid,
     });
@@ -4087,12 +4087,12 @@ class $$DepositsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get createdAtUtc => $composableBuilder(
+  ColumnFilters<int> get createdAtUtc => $composableBuilder(
     column: $table.createdAtUtc,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get updatedAtUtc => $composableBuilder(
+  ColumnFilters<int> get updatedAtUtc => $composableBuilder(
     column: $table.updatedAtUtc,
     builder: (column) => ColumnFilters(column),
   );
@@ -4225,12 +4225,12 @@ class $$DepositsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get createdAtUtc => $composableBuilder(
+  ColumnOrderings<int> get createdAtUtc => $composableBuilder(
     column: $table.createdAtUtc,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get updatedAtUtc => $composableBuilder(
+  ColumnOrderings<int> get updatedAtUtc => $composableBuilder(
     column: $table.updatedAtUtc,
     builder: (column) => ColumnOrderings(column),
   );
@@ -4307,12 +4307,12 @@ class $$DepositsTableAnnotationComposer
   GeneratedColumn<String> get lifecycle =>
       $composableBuilder(column: $table.lifecycle, builder: (column) => column);
 
-  GeneratedColumn<String> get createdAtUtc => $composableBuilder(
+  GeneratedColumn<int> get createdAtUtc => $composableBuilder(
     column: $table.createdAtUtc,
     builder: (column) => column,
   );
 
-  GeneratedColumn<String> get updatedAtUtc => $composableBuilder(
+  GeneratedColumn<int> get updatedAtUtc => $composableBuilder(
     column: $table.updatedAtUtc,
     builder: (column) => column,
   );
@@ -4437,8 +4437,8 @@ class $$DepositsTableTableManager
                 Value<String?> calculatedExpiryDate = const Value.absent(),
                 Value<String> finalExpiryDate = const Value.absent(),
                 Value<String> lifecycle = const Value.absent(),
-                Value<String> createdAtUtc = const Value.absent(),
-                Value<String> updatedAtUtc = const Value.absent(),
+                Value<int> createdAtUtc = const Value.absent(),
+                Value<int> updatedAtUtc = const Value.absent(),
                 Value<String> sourceDeviceId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DepositsCompanion(
@@ -4467,8 +4467,8 @@ class $$DepositsTableTableManager
                 Value<String?> calculatedExpiryDate = const Value.absent(),
                 required String finalExpiryDate,
                 required String lifecycle,
-                required String createdAtUtc,
-                required String updatedAtUtc,
+                required int createdAtUtc,
+                required int updatedAtUtc,
                 required String sourceDeviceId,
                 Value<int> rowid = const Value.absent(),
               }) => DepositsCompanion.insert(
@@ -4613,7 +4613,7 @@ typedef $$RenewalsTableCreateCompanionBuilder =
       required String id,
       required String sourceDepositId,
       required String targetDepositId,
-      required String renewedAtUtc,
+      required int renewedAtUtc,
       required String sourceDeviceId,
       Value<int> rowid,
     });
@@ -4622,7 +4622,7 @@ typedef $$RenewalsTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> sourceDepositId,
       Value<String> targetDepositId,
-      Value<String> renewedAtUtc,
+      Value<int> renewedAtUtc,
       Value<String> sourceDeviceId,
       Value<int> rowid,
     });
@@ -4684,7 +4684,7 @@ class $$RenewalsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get renewedAtUtc => $composableBuilder(
+  ColumnFilters<int> get renewedAtUtc => $composableBuilder(
     column: $table.renewedAtUtc,
     builder: (column) => ColumnFilters(column),
   );
@@ -4755,7 +4755,7 @@ class $$RenewalsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get renewedAtUtc => $composableBuilder(
+  ColumnOrderings<int> get renewedAtUtc => $composableBuilder(
     column: $table.renewedAtUtc,
     builder: (column) => ColumnOrderings(column),
   );
@@ -4824,7 +4824,7 @@ class $$RenewalsTableAnnotationComposer
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
-  GeneratedColumn<String> get renewedAtUtc => $composableBuilder(
+  GeneratedColumn<int> get renewedAtUtc => $composableBuilder(
     column: $table.renewedAtUtc,
     builder: (column) => column,
   );
@@ -4912,7 +4912,7 @@ class $$RenewalsTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> sourceDepositId = const Value.absent(),
                 Value<String> targetDepositId = const Value.absent(),
-                Value<String> renewedAtUtc = const Value.absent(),
+                Value<int> renewedAtUtc = const Value.absent(),
                 Value<String> sourceDeviceId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => RenewalsCompanion(
@@ -4928,7 +4928,7 @@ class $$RenewalsTableTableManager
                 required String id,
                 required String sourceDepositId,
                 required String targetDepositId,
-                required String renewedAtUtc,
+                required int renewedAtUtc,
                 required String sourceDeviceId,
                 Value<int> rowid = const Value.absent(),
               }) => RenewalsCompanion.insert(
@@ -5028,7 +5028,7 @@ typedef $$AuditHistoryTableCreateCompanionBuilder =
       required String operation,
       Value<String?> beforeJson,
       Value<String?> afterJson,
-      required String occurredAtUtc,
+      required int occurredAtUtc,
       required String sourceDeviceId,
       required int businessRevision,
       Value<int> rowid,
@@ -5041,7 +5041,7 @@ typedef $$AuditHistoryTableUpdateCompanionBuilder =
       Value<String> operation,
       Value<String?> beforeJson,
       Value<String?> afterJson,
-      Value<String> occurredAtUtc,
+      Value<int> occurredAtUtc,
       Value<String> sourceDeviceId,
       Value<int> businessRevision,
       Value<int> rowid,
@@ -5086,7 +5086,7 @@ class $$AuditHistoryTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get occurredAtUtc => $composableBuilder(
+  ColumnFilters<int> get occurredAtUtc => $composableBuilder(
     column: $table.occurredAtUtc,
     builder: (column) => ColumnFilters(column),
   );
@@ -5141,7 +5141,7 @@ class $$AuditHistoryTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get occurredAtUtc => $composableBuilder(
+  ColumnOrderings<int> get occurredAtUtc => $composableBuilder(
     column: $table.occurredAtUtc,
     builder: (column) => ColumnOrderings(column),
   );
@@ -5188,7 +5188,7 @@ class $$AuditHistoryTableAnnotationComposer
   GeneratedColumn<String> get afterJson =>
       $composableBuilder(column: $table.afterJson, builder: (column) => column);
 
-  GeneratedColumn<String> get occurredAtUtc => $composableBuilder(
+  GeneratedColumn<int> get occurredAtUtc => $composableBuilder(
     column: $table.occurredAtUtc,
     builder: (column) => column,
   );
@@ -5241,7 +5241,7 @@ class $$AuditHistoryTableTableManager
                 Value<String> operation = const Value.absent(),
                 Value<String?> beforeJson = const Value.absent(),
                 Value<String?> afterJson = const Value.absent(),
-                Value<String> occurredAtUtc = const Value.absent(),
+                Value<int> occurredAtUtc = const Value.absent(),
                 Value<String> sourceDeviceId = const Value.absent(),
                 Value<int> businessRevision = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -5265,7 +5265,7 @@ class $$AuditHistoryTableTableManager
                 required String operation,
                 Value<String?> beforeJson = const Value.absent(),
                 Value<String?> afterJson = const Value.absent(),
-                required String occurredAtUtc,
+                required int occurredAtUtc,
                 required String sourceDeviceId,
                 required int businessRevision,
                 Value<int> rowid = const Value.absent(),
@@ -5312,8 +5312,8 @@ typedef $$MessageTemplatesTableCreateCompanionBuilder =
       required String name,
       required String content,
       Value<bool> isActive,
-      required String createdAtUtc,
-      required String updatedAtUtc,
+      required int createdAtUtc,
+      required int updatedAtUtc,
       Value<int> rowid,
     });
 typedef $$MessageTemplatesTableUpdateCompanionBuilder =
@@ -5322,8 +5322,8 @@ typedef $$MessageTemplatesTableUpdateCompanionBuilder =
       Value<String> name,
       Value<String> content,
       Value<bool> isActive,
-      Value<String> createdAtUtc,
-      Value<String> updatedAtUtc,
+      Value<int> createdAtUtc,
+      Value<int> updatedAtUtc,
       Value<int> rowid,
     });
 
@@ -5356,12 +5356,12 @@ class $$MessageTemplatesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get createdAtUtc => $composableBuilder(
+  ColumnFilters<int> get createdAtUtc => $composableBuilder(
     column: $table.createdAtUtc,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get updatedAtUtc => $composableBuilder(
+  ColumnFilters<int> get updatedAtUtc => $composableBuilder(
     column: $table.updatedAtUtc,
     builder: (column) => ColumnFilters(column),
   );
@@ -5396,12 +5396,12 @@ class $$MessageTemplatesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get createdAtUtc => $composableBuilder(
+  ColumnOrderings<int> get createdAtUtc => $composableBuilder(
     column: $table.createdAtUtc,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get updatedAtUtc => $composableBuilder(
+  ColumnOrderings<int> get updatedAtUtc => $composableBuilder(
     column: $table.updatedAtUtc,
     builder: (column) => ColumnOrderings(column),
   );
@@ -5428,12 +5428,12 @@ class $$MessageTemplatesTableAnnotationComposer
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
 
-  GeneratedColumn<String> get createdAtUtc => $composableBuilder(
+  GeneratedColumn<int> get createdAtUtc => $composableBuilder(
     column: $table.createdAtUtc,
     builder: (column) => column,
   );
 
-  GeneratedColumn<String> get updatedAtUtc => $composableBuilder(
+  GeneratedColumn<int> get updatedAtUtc => $composableBuilder(
     column: $table.updatedAtUtc,
     builder: (column) => column,
   );
@@ -5480,8 +5480,8 @@ class $$MessageTemplatesTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<String> content = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
-                Value<String> createdAtUtc = const Value.absent(),
-                Value<String> updatedAtUtc = const Value.absent(),
+                Value<int> createdAtUtc = const Value.absent(),
+                Value<int> updatedAtUtc = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MessageTemplatesCompanion(
                 id: id,
@@ -5498,8 +5498,8 @@ class $$MessageTemplatesTableTableManager
                 required String name,
                 required String content,
                 Value<bool> isActive = const Value.absent(),
-                required String createdAtUtc,
-                required String updatedAtUtc,
+                required int createdAtUtc,
+                required int updatedAtUtc,
                 Value<int> rowid = const Value.absent(),
               }) => MessageTemplatesCompanion.insert(
                 id: id,
@@ -5542,7 +5542,7 @@ typedef $$ImportBatchesTableCreateCompanionBuilder =
       required String contentHash,
       Value<int> importedRows,
       Value<int> rejectedRows,
-      required String importedAtUtc,
+      required int importedAtUtc,
       required String sourceDeviceId,
       Value<int> rowid,
     });
@@ -5553,7 +5553,7 @@ typedef $$ImportBatchesTableUpdateCompanionBuilder =
       Value<String> contentHash,
       Value<int> importedRows,
       Value<int> rejectedRows,
-      Value<String> importedAtUtc,
+      Value<int> importedAtUtc,
       Value<String> sourceDeviceId,
       Value<int> rowid,
     });
@@ -5592,7 +5592,7 @@ class $$ImportBatchesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get importedAtUtc => $composableBuilder(
+  ColumnFilters<int> get importedAtUtc => $composableBuilder(
     column: $table.importedAtUtc,
     builder: (column) => ColumnFilters(column),
   );
@@ -5637,7 +5637,7 @@ class $$ImportBatchesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get importedAtUtc => $composableBuilder(
+  ColumnOrderings<int> get importedAtUtc => $composableBuilder(
     column: $table.importedAtUtc,
     builder: (column) => ColumnOrderings(column),
   );
@@ -5678,7 +5678,7 @@ class $$ImportBatchesTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<String> get importedAtUtc => $composableBuilder(
+  GeneratedColumn<int> get importedAtUtc => $composableBuilder(
     column: $table.importedAtUtc,
     builder: (column) => column,
   );
@@ -5725,7 +5725,7 @@ class $$ImportBatchesTableTableManager
                 Value<String> contentHash = const Value.absent(),
                 Value<int> importedRows = const Value.absent(),
                 Value<int> rejectedRows = const Value.absent(),
-                Value<String> importedAtUtc = const Value.absent(),
+                Value<int> importedAtUtc = const Value.absent(),
                 Value<String> sourceDeviceId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ImportBatchesCompanion(
@@ -5745,7 +5745,7 @@ class $$ImportBatchesTableTableManager
                 required String contentHash,
                 Value<int> importedRows = const Value.absent(),
                 Value<int> rejectedRows = const Value.absent(),
-                required String importedAtUtc,
+                required int importedAtUtc,
                 required String sourceDeviceId,
                 Value<int> rowid = const Value.absent(),
               }) => ImportBatchesCompanion.insert(
@@ -5934,14 +5934,14 @@ typedef $$NotificationIdMappingsTableCreateCompanionBuilder =
     NotificationIdMappingsCompanion Function({
       required String entityId,
       required int notificationId,
-      required String createdAtUtc,
+      required int createdAtUtc,
       Value<int> rowid,
     });
 typedef $$NotificationIdMappingsTableUpdateCompanionBuilder =
     NotificationIdMappingsCompanion Function({
       Value<String> entityId,
       Value<int> notificationId,
-      Value<String> createdAtUtc,
+      Value<int> createdAtUtc,
       Value<int> rowid,
     });
 
@@ -5964,7 +5964,7 @@ class $$NotificationIdMappingsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get createdAtUtc => $composableBuilder(
+  ColumnFilters<int> get createdAtUtc => $composableBuilder(
     column: $table.createdAtUtc,
     builder: (column) => ColumnFilters(column),
   );
@@ -5989,7 +5989,7 @@ class $$NotificationIdMappingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get createdAtUtc => $composableBuilder(
+  ColumnOrderings<int> get createdAtUtc => $composableBuilder(
     column: $table.createdAtUtc,
     builder: (column) => ColumnOrderings(column),
   );
@@ -6012,7 +6012,7 @@ class $$NotificationIdMappingsTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<String> get createdAtUtc => $composableBuilder(
+  GeneratedColumn<int> get createdAtUtc => $composableBuilder(
     column: $table.createdAtUtc,
     builder: (column) => column,
   );
@@ -6066,7 +6066,7 @@ class $$NotificationIdMappingsTableTableManager
               ({
                 Value<String> entityId = const Value.absent(),
                 Value<int> notificationId = const Value.absent(),
-                Value<String> createdAtUtc = const Value.absent(),
+                Value<int> createdAtUtc = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NotificationIdMappingsCompanion(
                 entityId: entityId,
@@ -6078,7 +6078,7 @@ class $$NotificationIdMappingsTableTableManager
               ({
                 required String entityId,
                 required int notificationId,
-                required String createdAtUtc,
+                required int createdAtUtc,
                 Value<int> rowid = const Value.absent(),
               }) => NotificationIdMappingsCompanion.insert(
                 entityId: entityId,

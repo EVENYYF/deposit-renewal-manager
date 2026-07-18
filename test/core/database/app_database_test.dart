@@ -65,6 +65,31 @@ void main() {
     expect(await database.auditEntryCount(), 1);
   });
 
+  test('every persisted UTC field uses SQLite INTEGER storage', () async {
+    const utcColumns = <String, List<String>>{
+      'customers': ['created_at_utc', 'updated_at_utc'],
+      'deposits': ['created_at_utc', 'updated_at_utc'],
+      'renewals': ['renewed_at_utc'],
+      'audit_history': ['occurred_at_utc'],
+      'message_templates': ['created_at_utc', 'updated_at_utc'],
+      'import_batches': ['imported_at_utc'],
+      'notification_id_mappings': ['created_at_utc'],
+    };
+
+    for (final entry in utcColumns.entries) {
+      final columns = await database
+          .customSelect('PRAGMA table_info(${entry.key})')
+          .get();
+      final types = {
+        for (final column in columns)
+          column.read<String>('name'): column.read<String>('type'),
+      };
+      for (final column in entry.value) {
+        expect(types[column], 'INTEGER', reason: '${entry.key}.$column');
+      }
+    }
+  });
+
   test('schema enforces foreign keys and financial constraints', () async {
     await expectLater(
       database
@@ -80,8 +105,8 @@ void main() {
               calculatedExpiryDate: const Value(null),
               finalExpiryDate: '2027-07-18',
               lifecycle: 'active',
-              createdAtUtc: '2026-07-18T08:30:00.000Z',
-              updatedAtUtc: '2026-07-18T08:30:00.000Z',
+              createdAtUtc: _testEpoch,
+              updatedAtUtc: _testEpoch,
               sourceDeviceId: 'test',
             ),
           ),
@@ -164,7 +189,7 @@ void main() {
     },
   );
 
-  test('schema rejects malformed dates and non-UTC timestamps', () async {
+  test('schema rejects malformed date shapes', () async {
     await customers.create(
       const CustomerDraft(id: 'customer-1', name: 'Valid'),
     );
@@ -183,55 +208,87 @@ void main() {
               calculatedExpiryDate: const Value(null),
               finalExpiryDate: '2027-07-18',
               lifecycle: 'active',
-              createdAtUtc: '2026-07-18T08:30:00.000Z',
-              updatedAtUtc: '2026-07-18T08:30:00.000Z',
+              createdAtUtc: _testEpoch,
+              updatedAtUtc: _testEpoch,
               sourceDeviceId: 'test',
-            ),
-          ),
-      throwsA(isA<Exception>()),
-    );
-
-    await expectLater(
-      database
-          .into(database.customers)
-          .insert(
-            CustomersCompanion.insert(
-              id: 'bad-time',
-              name: 'Bad time',
-              createdAtUtc: '2026-07-18T08:30:00+08:00',
-              updatedAtUtc: '2026-07-18T08:30:00+08:00',
             ),
           ),
       throwsA(isA<Exception>()),
     );
   });
 
-  test('deposit reads still validate actual calendar dates', () async {
+  test('schema rejects invalid calendar dates at write time', () async {
     await customers.create(
       const CustomerDraft(id: 'customer-1', name: 'Valid'),
     );
-    await database
-        .into(database.deposits)
-        .insert(
-          DepositsCompanion.insert(
-            id: 'invalid-calendar-date',
-            customerId: 'customer-1',
-            amountCents: 100,
-            interestRateScaled: 1,
-            ratePrecision: 1,
-            startDate: '2026-02-31',
-            calculatedExpiryDate: const Value(null),
-            finalExpiryDate: '2027-07-18',
-            lifecycle: 'active',
-            createdAtUtc: '2026-07-18T08:30:00.000Z',
-            updatedAtUtc: '2026-07-18T08:30:00.000Z',
-            sourceDeviceId: 'test',
-          ),
-        );
+    for (final date in [
+      '2026-02-31',
+      '2025-02-29',
+      '2026-00-10',
+      '2026-13-01',
+      '2026-01-00',
+      '2026-01-32',
+    ]) {
+      await expectLater(
+        database
+            .into(database.deposits)
+            .insert(
+              DepositsCompanion.insert(
+                id: 'bad-$date',
+                customerId: 'customer-1',
+                amountCents: 100,
+                interestRateScaled: 1,
+                ratePrecision: 1,
+                startDate: date,
+                calculatedExpiryDate: const Value(null),
+                finalExpiryDate: '2027-07-18',
+                lifecycle: 'active',
+                createdAtUtc: _testEpoch,
+                updatedAtUtc: _testEpoch,
+                sourceDeviceId: 'test',
+              ),
+            ),
+        throwsA(isA<Exception>()),
+      );
+    }
+  });
+
+  test('schema accepts Gregorian leap day and rejects fake UTC text', () async {
+    await customers.create(
+      const CustomerDraft(id: 'customer-1', name: 'Valid'),
+    );
+    await deposits.create(
+      DepositDraft(
+        id: 'leap-day',
+        customerId: 'customer-1',
+        amountCents: 100,
+        interestRateScaled: 1,
+        ratePrecision: 1,
+        startDate: LocalDate(2024, 2, 29),
+        calculatedExpiryDate: LocalDate(2024, 2, 29),
+        finalExpiryDate: LocalDate(2024, 2, 29),
+      ),
+    );
+    expect((await deposits.get('leap-day'))!.startDate, LocalDate(2024, 2, 29));
 
     await expectLater(
-      deposits.get('invalid-calendar-date'),
-      throwsArgumentError,
+      database.customStatement(
+        "INSERT INTO customers (id, name, created_at_utc, updated_at_utc) VALUES ('fake-time', 'Fake', '2026-07-18T08:30:00.000Z', '2026-07-18T08:30:00.000Z')",
+      ),
+      throwsA(isA<Exception>()),
+    );
+    await expectLater(
+      database
+          .into(database.customers)
+          .insert(
+            CustomersCompanion.insert(
+              id: 'zero-time',
+              name: 'Zero',
+              createdAtUtc: 0,
+              updatedAtUtc: _testEpoch,
+            ),
+          ),
+      throwsA(isA<Exception>()),
     );
   });
 
@@ -301,11 +358,19 @@ void main() {
       expect(audit, hasLength(2));
       expect(audit.last.beforeJson, contains('100000'));
       expect(audit.last.afterJson, contains('250000'));
-      expect(audit.last.occurredAtUtc, '2026-07-18T08:30:00.000Z');
+      expect(
+        DateTime.fromMicrosecondsSinceEpoch(
+          audit.last.occurredAtUtc,
+          isUtc: true,
+        ),
+        DateTime.utc(2026, 7, 18, 8, 30),
+      );
       expect(audit.last.sourceDeviceId, 'device-test');
     },
   );
 }
+
+final int _testEpoch = DateTime.utc(2026, 7, 18, 8, 30).microsecondsSinceEpoch;
 
 DepositDraft _draft({
   required String id,

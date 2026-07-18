@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:clock/clock.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
@@ -26,7 +27,7 @@ final class DepositDao implements DepositRepository {
     UtcNow? nowUtc,
     Uuid? uuid,
     this.failureInjector,
-  }) : _nowUtc = nowUtc ?? DateTime.now,
+  }) : _nowUtc = nowUtc ?? clock.now,
        _uuid = uuid ?? const Uuid();
 
   final db.AppDatabase _db;
@@ -184,7 +185,7 @@ final class DepositDao implements DepositRepository {
     return row?.sourceDepositId;
   }
 
-  Future<void> _insertDraft(DepositDraft draft, String timestamp) {
+  Future<void> _insertDraft(DepositDraft draft, int timestamp) {
     if (draft.id.trim().isEmpty) {
       throw ArgumentError.value(draft.id, 'id', 'Must not be empty');
     }
@@ -303,5 +304,5 @@ final class DepositDao implements DepositRepository {
   LocalDate? _parseDateOrNull(String? value) =>
       value == null ? null : _parseDate(value);
 
-  String _timestamp() => _nowUtc().toUtc().toIso8601String();
+  int _timestamp() => _nowUtc().toUtc().microsecondsSinceEpoch;
 }
