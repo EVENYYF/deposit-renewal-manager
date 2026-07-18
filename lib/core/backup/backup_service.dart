@@ -10,6 +10,7 @@ import 'package:path/path.dart' as p;
 import '../database/app_database.dart';
 import 'backup_manifest.dart';
 import 'restore_service.dart';
+import 'safe_zip_reader.dart';
 import 'snapshot_store.dart';
 
 class InspectedBackup {
@@ -43,17 +44,12 @@ class InspectedBackup {
 }
 
 class BackupService {
-  static const maxArchiveBytes = 50 * 1024 * 1024;
-  static const maxEntryBytes = 100 * 1024 * 1024;
-  static const maxTotalJsonBytes = 100 * 1024 * 1024;
-  static const maxEntries = 2;
-  static const maxRowsPerTable = 100000;
-  static const maxJsonDepth = 32;
   BackupService({
     required this.database,
     required this.sourceDevice,
     Directory? snapshotsDirectory,
     DateTime Function()? nowUtc,
+    this.limits = const BackupLimits(),
   }) : _nowUtc = nowUtc ?? (() => clock.now().toUtc()),
        snapshots = SnapshotStore(
          snapshotsDirectory ??
@@ -66,6 +62,7 @@ class BackupService {
   final String sourceDevice;
   final DateTime Function() _nowUtc;
   final SnapshotStore snapshots;
+  final BackupLimits limits;
 
   Future<File> exportBackup({
     String? outputPath,
@@ -81,7 +78,13 @@ class BackupService {
             ),
           )
         : File(outputPath);
+    if (!automatic && snapshots.isInAutomaticDirectory(file)) {
+      throw const BackupIntegrityException(
+        'Manual backups cannot be written to the automatic snapshot directory',
+      );
+    }
     final data = await database.exportBusinessData();
+    _validateRows(data);
     final payload = utf8.encode(_encodeDeterministic(data));
     final counts = {
       for (final entry in data.entries) entry.key: entry.value.length,
@@ -94,6 +97,7 @@ class BackupService {
       counts: counts,
       payloadSha256: sha256.convert(payload).toString(),
     );
+    BackupManifest.fromJson(manifest.toJson());
     final archive = Archive()
       ..addFile(
         ArchiveFile(
@@ -104,54 +108,41 @@ class BackupService {
       )
       ..addFile(ArchiveFile('data.json', payload.length, payload));
     final encoded = ZipEncoder().encode(archive)!;
+    _inspectEncodedEntries(
+      SafeZipReader(limits).readBytes(encoded),
+      path: file.path,
+    );
     if (automatic) {
-      return snapshots.writeAutomatic(encoded, now, automaticOperation);
+      return snapshots.writeAutomatic(encoded, now, automaticOperation, (
+        temporary,
+      ) async {
+        await inspectBackup(temporary.path);
+      });
     }
     await _writeAtomically(file, encoded);
     return file;
   }
 
   Future<InspectedBackup> inspectBackup(String path) async {
-    final bytes = await File(path).readAsBytes();
-    if (bytes.length > maxArchiveBytes) {
-      throw const BackupIntegrityException('Archive too large');
-    }
     try {
-      final archive = ZipDecoder().decodeBytes(bytes);
-      if (archive.files.length != maxEntries ||
-          archive.files.any(
-            (file) =>
-                file.name != 'manifest.json' && file.name != 'data.json' ||
-                _unsafeEntryName(file.name) ||
-                file.size > maxEntryBytes ||
-                (file.rawContent?.length ?? 0) > maxEntryBytes,
-          )) {
-        throw const BackupIntegrityException('Unexpected archive entries');
-      }
-      if (archive.files.map((f) => f.name).toSet().length != 2) {
-        throw const BackupIntegrityException('Duplicate archive entries');
-      }
-      final declaredTotal = archive.files.fold<int>(
-        0,
-        (sum, f) => sum + f.size,
-      );
-      if (declaredTotal > maxTotalJsonBytes ||
-          archive.files.any((f) {
-            final compressed = f.rawContent?.length ?? f.size;
-            return compressed <= 0 || f.size > compressed * 1000;
-          })) {
-        throw const BackupIntegrityException(
-          'Archive expansion limit exceeded',
-        );
-      }
-      final manifestEntry = archive.files
-          .where((f) => f.name == 'manifest.json')
-          .single;
-      final dataEntry = archive.files
-          .where((f) => f.name == 'data.json')
-          .single;
+      final entries = await SafeZipReader(limits).read(File(path));
+      return _inspectEncodedEntries(entries, path: path);
+    } on BackupIntegrityException {
+      rethrow;
+    } catch (e) {
+      throw BackupIntegrityException('Invalid backup archive: $e');
+    }
+  }
+
+  InspectedBackup _inspectEncodedEntries(
+    Map<String, List<int>> entries, {
+    required String path,
+  }) {
+    try {
+      final manifestText = utf8.decode(entries['manifest.json']!);
+      _preflightJson(manifestText);
       final manifest = BackupManifest.fromJson(
-        jsonDecode(utf8.decode(manifestEntry.content)) as Map<String, dynamic>,
+        jsonDecode(manifestText) as Map<String, dynamic>,
       );
       if (manifest.formatVersion != 1) {
         throw const BackupIntegrityException('Unsupported format version');
@@ -159,15 +150,13 @@ class BackupService {
       if (manifest.schemaVersion != database.schemaVersion) {
         throw const BackupIntegrityException('Unsupported schema version');
       }
-      final payload = dataEntry.content;
+      final payload = entries['data.json']!;
       if (sha256.convert(payload).toString() != manifest.payloadSha256) {
         throw const BackupIntegrityException('Payload hash mismatch');
       }
-      if (payload.length > maxTotalJsonBytes) {
-        throw const BackupIntegrityException('Payload too large');
-      }
-      final decoded = jsonDecode(utf8.decode(payload));
-      _validateJsonLimits(decoded);
+      final payloadText = utf8.decode(payload);
+      _preflightJson(payloadText);
+      final decoded = jsonDecode(payloadText);
       if (decoded is! Map) {
         throw const BackupIntegrityException('Invalid payload structure');
       }
@@ -233,9 +222,14 @@ class BackupService {
     final temp = File(
       '${target.path}.${DateTime.now().microsecondsSinceEpoch}.tmp',
     );
-    await temp.writeAsBytes(bytes, flush: true);
-    if (await target.exists()) await target.delete();
-    await temp.rename(target.path);
+    try {
+      await temp.writeAsBytes(bytes, flush: true);
+      await inspectBackup(temp.path);
+      if (await target.exists()) await target.delete();
+      await temp.rename(target.path);
+    } finally {
+      if (await temp.exists()) await temp.delete();
+    }
   }
 
   void _validateRows(Map<String, List<Map<String, Object?>>> data) {
@@ -305,7 +299,7 @@ class BackupService {
       'business_settings': {'singleton_id', 'business_revision'},
     };
     for (final table in columns.entries) {
-      if (data[table.key]!.length > maxRowsPerTable) {
+      if (data[table.key]!.length > limits.maxRowsPerTable) {
         throw const BackupIntegrityException('Too many rows');
       }
       for (final row in data[table.key]!) {
@@ -317,6 +311,11 @@ class BackupService {
           );
         }
       }
+    }
+    if (data['business_settings']!.length != 1) {
+      throw const BackupIntegrityException(
+        'business_settings must contain exactly one row',
+      );
     }
   }
 
@@ -375,6 +374,9 @@ class BackupService {
         if (value != null && !_validDate(value as String)) return false;
       }
     }
+    if (table == 'customers' && ((row['name'] as String).trim().isEmpty)) {
+      return false;
+    }
     for (final key in [
       'id',
       'customer_id',
@@ -416,34 +418,47 @@ class BackupService {
     }
   }
 
-  static bool _unsafeEntryName(String name) {
-    final normalized = name.replaceAll('\\', '/');
-    return normalized.startsWith('/') ||
-        normalized.split('/').contains('..') ||
-        normalized != name;
-  }
-
-  static void _validateJsonLimits(Object? value, [int depth = 0]) {
-    if (depth > maxJsonDepth) {
-      throw const BackupIntegrityException('JSON too deep');
-    }
-    if (value is List) {
-      if (value.length > maxRowsPerTable) {
-        throw const BackupIntegrityException('JSON array too large');
-      }
-      for (final item in value) {
-        _validateJsonLimits(item, depth + 1);
-      }
-    } else if (value is Map) {
-      if (value.length > 10000) {
-        throw const BackupIntegrityException('JSON object too large');
-      }
-      for (final entry in value.entries) {
-        if (entry.key is! String) {
-          throw const BackupIntegrityException('JSON key invalid');
+  void _preflightJson(String source) {
+    var depth = 0;
+    var tokens = 0;
+    var inString = false;
+    var escaped = false;
+    for (var i = 0; i < source.length; i++) {
+      final code = source.codeUnitAt(i);
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (code == 0x5c) {
+          escaped = true;
+        } else if (code == 0x22) {
+          inString = false;
+          tokens++;
         }
-        _validateJsonLimits(entry.value, depth + 1);
+        continue;
       }
+      if (code == 0x22) {
+        inString = true;
+      } else if (code == 0x7b || code == 0x5b) {
+        depth++;
+        tokens++;
+        if (depth > limits.maxJsonDepth) {
+          throw const BackupIntegrityException('JSON too deep');
+        }
+      } else if (code == 0x7d || code == 0x5d) {
+        depth--;
+        tokens++;
+        if (depth < 0) {
+          throw const BackupIntegrityException('Invalid JSON structure');
+        }
+      } else if (code == 0x2c || code == 0x3a) {
+        tokens++;
+      }
+      if (tokens > limits.maxJsonTokens) {
+        throw const BackupIntegrityException('JSON token limit exceeded');
+      }
+    }
+    if (inString || escaped || depth != 0) {
+      throw const BackupIntegrityException('Invalid JSON structure');
     }
   }
 

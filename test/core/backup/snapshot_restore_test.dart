@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:deposit_renewal_manager/core/backup/backup_service.dart';
+import 'package:deposit_renewal_manager/core/backup/backup_manifest.dart';
 import 'package:deposit_renewal_manager/core/database/app_database.dart';
 import 'package:deposit_renewal_manager/core/database/daos/customer_dao.dart';
 import 'package:deposit_renewal_manager/features/customers/domain/customer_repository.dart';
@@ -96,14 +97,21 @@ void main() {
   test(
     'concurrent automatic snapshots have unique complete archives',
     () async {
-      final service = BackupService(
+      final serviceA = BackupService(
+        database: database,
+        sourceDevice: 'device',
+        snapshotsDirectory: temp,
+        nowUtc: () => DateTime.utc(2026, 7, 19, 10),
+      );
+      final serviceB = BackupService(
         database: database,
         sourceDevice: 'device',
         snapshotsDirectory: temp,
         nowUtc: () => DateTime.utc(2026, 7, 19, 10),
       );
       final files = await Future.wait([
-        for (var i = 0; i < 8; i++) service.exportBackup(automatic: true),
+        for (var i = 0; i < 8; i++)
+          (i.isEven ? serviceA : serviceB).exportBackup(automatic: true),
       ]);
       expect(files.map((f) => f.path).toSet(), hasLength(8));
       for (final file in files) {
@@ -113,4 +121,22 @@ void main() {
       }
     },
   );
+
+  test('manual export cannot target the private automatic directory', () async {
+    final service = BackupService(
+      database: database,
+      sourceDevice: 'device',
+      snapshotsDirectory: temp,
+    );
+    final path = [
+      temp.path,
+      'automatic',
+      'manual.drbackup',
+    ].join(Platform.pathSeparator);
+    await expectLater(
+      service.exportBackup(outputPath: path),
+      throwsA(isA<BackupIntegrityException>()),
+    );
+    expect(await File(path).exists(), isFalse);
+  });
 }
