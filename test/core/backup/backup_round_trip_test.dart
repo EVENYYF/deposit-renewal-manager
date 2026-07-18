@@ -139,6 +139,47 @@ void main() {
       throwsA(isA<BackupIntegrityException>()),
     );
   });
+
+  test('rejects unknown manifest fields and fractional counts', () async {
+    final service = BackupService(
+      database: source,
+      sourceDevice: 'Android',
+      snapshotsDirectory: temp,
+    );
+    for (final mutation in <void Function(Map<String, dynamic>)>[
+      (manifest) => manifest['unexpected'] = true,
+      (manifest) => (manifest['counts'] as Map)['customers'] = 0.5,
+    ]) {
+      final path = (await service.exportBackup(
+        outputPath:
+            '${temp.path}${Platform.pathSeparator}strict-${DateTime.now().microsecondsSinceEpoch}.drbackup',
+      )).path;
+      await _rewriteBackup(path, mutateManifest: mutation);
+      await expectLater(
+        service.inspectBackup(path),
+        throwsA(isA<BackupIntegrityException>()),
+      );
+    }
+  });
+
+  test('inspected data is deeply immutable', () async {
+    final service = BackupService(
+      database: source,
+      sourceDevice: 'Android',
+      snapshotsDirectory: temp,
+    );
+    final backup = await service.inspectBackup(
+      (await service.exportBackup(
+        outputPath: '${temp.path}${Platform.pathSeparator}immutable.drbackup',
+      )).path,
+    );
+    expect(() => backup.data['customers']!.clear(), throwsUnsupportedError);
+    expect(
+      () => backup.data['customers']!.single['name'] = 'tampered',
+      throwsUnsupportedError,
+    );
+    expect(() => backup.manifest.counts.clear(), throwsUnsupportedError);
+  });
 }
 
 Future<void> _rewriteBackup(

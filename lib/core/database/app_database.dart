@@ -157,16 +157,18 @@ class AppDatabase extends _$AppDatabase {
       'import_batches': 'id',
       'business_settings': 'singleton_id',
     };
-    final result = <String, List<Map<String, Object?>>>{};
-    for (final table in tables.entries) {
-      final rows = await customSelect(
-        'SELECT * FROM ${table.key} ORDER BY ${table.value}',
-      ).get();
-      result[table.key] = rows
-          .map((row) => row.data.map((k, v) => MapEntry(k, v)))
-          .toList();
-    }
-    return result;
+    return transaction(() async {
+      final result = <String, List<Map<String, Object?>>>{};
+      for (final table in tables.entries) {
+        final rows = await customSelect(
+          'SELECT * FROM ${table.key} ORDER BY ${table.value}',
+        ).get();
+        result[table.key] = rows
+            .map((row) => row.data.map((k, v) => MapEntry(k, v)))
+            .toList();
+      }
+      return result;
+    });
   }
 
   Future<void> replaceBusinessData(
