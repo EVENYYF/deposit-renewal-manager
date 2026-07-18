@@ -25,7 +25,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : this(executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -48,6 +48,29 @@ class AppDatabase extends _$AppDatabase {
           await migrator.addColumn(deposits, deposits.bankName);
           await _backfillCustomerSearchIndexes();
           await _createSearchIndexes();
+        });
+      }
+      if (from < 3) {
+        await transaction(() async {
+          final table = await customSelect(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' "
+            "AND name = 'import_batches'",
+          ).get();
+          if (table.isEmpty) return;
+          final duplicates = await customSelect(
+            'SELECT content_hash FROM import_batches '
+            'GROUP BY content_hash HAVING COUNT(*) > 1 LIMIT 1',
+          ).get();
+          if (duplicates.isNotEmpty) {
+            final hash = duplicates.single.read<String>('content_hash');
+            throw StateError(
+              'Cannot migrate import_batches: duplicate content_hash $hash',
+            );
+          }
+          await customStatement(
+            'CREATE UNIQUE INDEX import_batches_content_hash_idx '
+            'ON import_batches (content_hash)',
+          );
         });
       }
     },

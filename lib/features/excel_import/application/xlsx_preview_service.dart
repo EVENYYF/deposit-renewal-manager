@@ -5,6 +5,7 @@ import 'package:decimal/decimal.dart';
 import 'package:excel/excel.dart';
 
 import '../domain/import_models.dart';
+import 'duplicate_resolver.dart';
 
 class XlsxPreviewService {
   const XlsxPreviewService();
@@ -17,6 +18,7 @@ class XlsxPreviewService {
   Future<ImportPreview> preview(
     String path, {
     Map<String, ImportField>? mapping,
+    ExcelDateSystem dateSystem = ExcelDateSystem.excel1900,
   }) async {
     if (!path.toLowerCase().endsWith('.xlsx')) {
       throw const UnsupportedSpreadsheetException(
@@ -45,12 +47,28 @@ class XlsxPreviewService {
         'Unable to read the spreadsheet file',
       );
     }
-    return previewBytes(bytes, mapping: mapping);
+    return previewBytes(bytes, mapping: mapping, dateSystem: dateSystem);
+  }
+
+  /// Parses and runs duplicate resolution, making candidates part of the preview.
+  Future<ImportPreview> previewAndResolve(
+    String path, {
+    required DuplicateResolver resolver,
+    Map<String, ImportField>? mapping,
+    ExcelDateSystem dateSystem = ExcelDateSystem.excel1900,
+  }) async {
+    final parsed = await preview(
+      path,
+      mapping: mapping,
+      dateSystem: dateSystem,
+    );
+    return resolver.resolvePreview(parsed);
   }
 
   Future<ImportPreview> previewBytes(
     List<int> bytes, {
     Map<String, ImportField>? mapping,
+    ExcelDateSystem dateSystem = ExcelDateSystem.excel1900,
   }) {
     if (bytes.length > maxFileBytes) {
       throw const UnsupportedSpreadsheetException(
@@ -60,12 +78,27 @@ class XlsxPreviewService {
     final copiedMapping = mapping == null
         ? null
         : Map<String, ImportField>.from(mapping);
-    return Isolate.run(() => _parse(bytes, copiedMapping));
+    return Isolate.run(() => _parse(bytes, copiedMapping, dateSystem));
+  }
+
+  Future<ImportPreview> previewBytesAndResolve(
+    List<int> bytes, {
+    required DuplicateResolver resolver,
+    Map<String, ImportField>? mapping,
+    ExcelDateSystem dateSystem = ExcelDateSystem.excel1900,
+  }) async {
+    final parsed = await previewBytes(
+      bytes,
+      mapping: mapping,
+      dateSystem: dateSystem,
+    );
+    return resolver.resolvePreview(parsed);
   }
 
   static ImportPreview _parse(
     List<int> bytes,
     Map<String, ImportField>? supplied,
+    ExcelDateSystem dateSystem,
   ) {
     late final Excel excel;
     try {
@@ -108,7 +141,11 @@ class XlsxPreviewService {
       );
     }
     if (rows.isEmpty) {
-      return ImportPreview(rows: const [], mapping: supplied ?? const {});
+      return ImportPreview(
+        rows: const [],
+        mapping: supplied ?? const {},
+        dateSystem: dateSystem,
+      );
     }
 
     final headers = <String>[];
@@ -172,7 +209,10 @@ class XlsxPreviewService {
         normalized['amountCents'] = (amount * 100).round();
       }
 
-      final date = parseImportDate(normalized['startDate']);
+      final date = parseImportDate(
+        normalized['startDate'],
+        dateSystem: dateSystem,
+      );
       if (date == null) {
         errors.add('invalid start date');
       } else {
@@ -209,7 +249,12 @@ class XlsxPreviewService {
         ),
       );
     }
-    return ImportPreview(rows: parsed, mapping: mapping, headers: headers);
+    return ImportPreview(
+      rows: parsed,
+      mapping: mapping,
+      headers: headers,
+      dateSystem: dateSystem,
+    );
   }
 
   static void _validateHeaders(List<String> headers) {
@@ -285,7 +330,9 @@ class XlsxPreviewService {
   }
 
   static int? _parseRate(Object? value) {
-    final input = (value ?? '0').toString().trim();
+    if (value == null) return null;
+    final input = value.toString().trim();
+    if (input.isEmpty) return null;
     final rate = Decimal.tryParse(input);
     if (rate == null ||
         rate < Decimal.zero ||

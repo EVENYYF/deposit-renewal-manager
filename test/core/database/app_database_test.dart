@@ -30,7 +30,7 @@ void main() {
   tearDown(() => database.close());
 
   test('schema version, primary keys and foreign keys are enabled', () async {
-    expect(database.schemaVersion, 2);
+    expect(database.schemaVersion, 3);
     final pragma = await database
         .customSelect('PRAGMA foreign_keys')
         .getSingle();
@@ -63,6 +63,23 @@ void main() {
     );
     expect(await database.businessRevision(), 1);
     expect(await database.auditEntryCount(), 1);
+  });
+
+  test('import batch content hashes are unique', () async {
+    final first = ImportBatchesCompanion.insert(
+      id: 'batch-1',
+      fileName: 'a.xlsx',
+      contentHash: 'same-hash',
+      importedAtUtc: _testEpoch,
+      sourceDeviceId: 'test',
+    );
+    await database.into(database.importBatches).insert(first);
+    await expectLater(
+      database
+          .into(database.importBatches)
+          .insert(first.copyWith(id: const Value('batch-2'))),
+      throwsA(isA<Exception>()),
+    );
   });
 
   test('every persisted UTC field uses SQLite INTEGER storage', () async {

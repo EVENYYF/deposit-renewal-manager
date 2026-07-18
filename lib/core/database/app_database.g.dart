@@ -3871,6 +3871,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'deposits_expiry_lifecycle_customer_idx',
     'CREATE INDEX deposits_expiry_lifecycle_customer_idx ON deposits (final_expiry_date, lifecycle, customer_id)',
   );
+  late final Index importBatchesContentHashIdx = Index(
+    'import_batches_content_hash_idx',
+    'CREATE UNIQUE INDEX import_batches_content_hash_idx ON import_batches (content_hash)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3890,6 +3894,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     customersNormalizedPhoneIdx,
     depositsBankNameIdx,
     depositsExpiryLifecycleCustomerIdx,
+    importBatchesContentHashIdx,
   ];
 }
 

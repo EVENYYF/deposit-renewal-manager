@@ -23,3 +23,19 @@
   transaction before restoring the pre-import snapshot.
 - Verification: `flutter analyze` clean; full `flutter test` passed (109
   tests); `git diff --check` clean.
+## Task7 idempotency and decision closure (2026-07-19)
+
+- Preview preparation now resolves database duplicates into
+  `ImportPreview.candidates`, including field conflicts and per-row decisions.
+  Commit rejects previews that did not complete duplicate resolution and
+  re-checks candidate identity against the database.
+- Import content hashes are protected by a schema v3 unique index. Migration
+  detects legacy duplicate hashes and fails without advancing the schema.
+  Hash conflicts are reported as `DuplicateImportException`.
+- Duplicate rows require an explicit decision. Row numbers, nonduplicate
+  decisions, and field choices are validated before snapshot or database work.
+- Excel numeric dates carry an explicit 1900/1904 date-system setting through
+  preview metadata. Missing interest rates remain row errors rather than
+  becoming zero silently.
+- Verification: targeted migration/import tests passed (35 tests),
+  `flutter analyze` is clean, and the full suite passed (118 tests).

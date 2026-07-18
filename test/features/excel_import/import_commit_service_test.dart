@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:deposit_renewal_manager/core/database/app_database.dart';
@@ -49,7 +50,7 @@ void main() {
       await service.commit(
         fileName: 'attach.xlsx',
         fileBytes: [1],
-        preview: _preview(row),
+        preview: _preview(row, duplicate: true),
         decisions: {2: DuplicateDecision.attachToExisting},
       );
       var customer = await (database.select(
@@ -61,7 +62,7 @@ void main() {
       await service.commit(
         fileName: 'override.xlsx',
         fileBytes: [2],
-        preview: _preview(row),
+        preview: _preview(row, duplicate: true),
         decisions: {2: DuplicateDecision.attachToExisting},
         fieldChoices: {
           2: {'name': true, 'phone': true},
@@ -85,7 +86,7 @@ void main() {
       final skipped = await service.commit(
         fileName: 'skip.xlsx',
         fileBytes: [3],
-        preview: _preview(row),
+        preview: _preview(row, duplicate: true),
         decisions: {2: DuplicateDecision.skip},
       );
       expect(skipped.skippedRows, 1);
@@ -94,7 +95,7 @@ void main() {
       final created = await service.commit(
         fileName: 'separate.xlsx',
         fileBytes: [4],
-        preview: _preview(row),
+        preview: _preview(row, duplicate: true),
         decisions: {2: DuplicateDecision.createSeparate},
       );
       expect(created.importedRows, 1);
@@ -159,7 +160,7 @@ void main() {
           fileBytes: [8],
           preview: _preview(_row(name: 'Other', phone: '13700137000')),
         ),
-        throwsStateError,
+        throwsA(isA<DuplicateImportException>()),
       );
       expect(await database.select(database.importBatches).get(), hasLength(1));
     },
@@ -178,10 +179,131 @@ void main() {
     expect(audit.afterJson, contains('contentHash'));
     expect(audit.afterJson, contains(result.preSnapshotId));
   });
+
+  test('requires resolved preview and explicit duplicate decision', () async {
+    final row = _row(name: 'New', phone: '13900139000');
+    await expectLater(
+      service.commit(
+        fileName: 'unresolved.xlsx',
+        fileBytes: [10],
+        preview: ImportPreview(rows: [row], mapping: const {}),
+      ),
+      throwsStateError,
+    );
+    await expectLater(
+      service.commit(
+        fileName: 'missing-decision.xlsx',
+        fileBytes: [11],
+        preview: _preview(row, duplicate: true),
+      ),
+      throwsStateError,
+    );
+  });
+
+  test('rejects unknown rows and choices for non-attach decisions', () async {
+    final row = _row(name: 'New Name', phone: '13800138000');
+    final duplicate = _preview(row, duplicate: true);
+    await expectLater(
+      service.commit(
+        fileName: 'unknown-row.xlsx',
+        fileBytes: [12],
+        preview: duplicate,
+        decisions: {999: DuplicateDecision.skip},
+      ),
+      throwsStateError,
+    );
+    for (final decision in [
+      DuplicateDecision.skip,
+      DuplicateDecision.createSeparate,
+    ]) {
+      await expectLater(
+        service.commit(
+          fileName: 'choices-$decision.xlsx',
+          fileBytes: [13, decision.index],
+          preview: duplicate,
+          decisions: {2: decision},
+          fieldChoices: {
+            2: {'name': true},
+          },
+        ),
+        throwsStateError,
+      );
+    }
+    await expectLater(
+      service.commit(
+        fileName: 'not-conflict.xlsx',
+        fileBytes: [14],
+        preview: duplicate,
+        decisions: {2: DuplicateDecision.attachToExisting},
+        fieldChoices: {
+          2: {'bankName': true},
+        },
+      ),
+      throwsStateError,
+    );
+  });
+
+  test('concurrent commits with one content hash have one winner', () async {
+    final bothSnapshotsStarted = Completer<void>();
+    var snapshotCalls = 0;
+    Future<File> snapshot() async {
+      snapshotCalls++;
+      if (snapshotCalls == 2) bothSnapshotsStarted.complete();
+      await bothSnapshotsStarted.future;
+      return File('pre-import-$snapshotCalls.drbackup');
+    }
+
+    final first = ImportCommitService(
+      database: database,
+      sourceDeviceId: 'test-device',
+      createSnapshot: snapshot,
+    );
+    final second = ImportCommitService(
+      database: database,
+      sourceDeviceId: 'test-device',
+      createSnapshot: snapshot,
+    );
+    final preview = _preview(_row(name: 'Race', phone: '13900139000'));
+    final outcomes = await Future.wait<Object>([
+      first
+          .commit(fileName: 'race-a.xlsx', fileBytes: [99], preview: preview)
+          .then<Object>((value) => value, onError: (Object error) => error),
+      second
+          .commit(fileName: 'race-b.xlsx', fileBytes: [99], preview: preview)
+          .then<Object>((value) => value, onError: (Object error) => error),
+    ]);
+
+    expect(outcomes.whereType<ImportResult>(), hasLength(1));
+    expect(outcomes.whereType<DuplicateImportException>(), hasLength(1));
+    expect(await database.select(database.importBatches).get(), hasLength(1));
+    expect(await database.select(database.deposits).get(), hasLength(1));
+  });
 }
 
-ImportPreview _preview(ImportRow row) =>
-    ImportPreview(rows: [row], mapping: const {});
+ImportPreview _preview(ImportRow row, {bool duplicate = false}) =>
+    ImportPreview(
+      rows: [row],
+      mapping: const {},
+      duplicatesResolved: true,
+      candidates: duplicate
+          ? [
+              DuplicateCandidate(
+                row: row,
+                existingCustomerId: 'existing',
+                fieldConflicts: {
+                  'name': (
+                    oldValue: 'Old Name',
+                    newValue: row.normalized['name'],
+                  ),
+                  'phone': (
+                    oldValue: '13800138000',
+                    newValue: row.normalized['phone'],
+                  ),
+                },
+              ),
+            ]
+          : const [],
+    );
 
 ImportRow _row({required String name, required String phone}) => ImportRow(
   rowNumber: 2,

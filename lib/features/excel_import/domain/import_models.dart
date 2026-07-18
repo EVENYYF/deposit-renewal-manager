@@ -2,6 +2,18 @@ import '../../deposits/domain/local_date.dart';
 
 enum DuplicateDecision { attachToExisting, createSeparate, skip }
 
+/// Excel workbook date serial epoch.
+enum ExcelDateSystem {
+  excel1900,
+  excel1904;
+
+  static ExcelDateSystem parse(String value) => switch (value) {
+    'excel1900' => excel1900,
+    'excel1904' => excel1904,
+    _ => throw ArgumentError.value(value, 'value', 'Unknown Excel date system'),
+  };
+}
+
 enum ImportField {
   name,
   phone,
@@ -15,6 +27,13 @@ enum ImportField {
 
 class UnsupportedSpreadsheetException implements Exception {
   const UnsupportedSpreadsheetException(this.message);
+  final String message;
+  @override
+  String toString() => message;
+}
+
+class DuplicateImportException implements Exception {
+  const DuplicateImportException(this.message);
   final String message;
   @override
   String toString() => message;
@@ -48,12 +67,30 @@ class ImportPreview {
     required this.rows,
     required this.mapping,
     this.headers = const [],
+    this.candidates = const [],
+    this.duplicatesResolved = false,
+    this.dateSystem = ExcelDateSystem.excel1900,
   });
   final List<ImportRow> rows;
   final Map<String, ImportField> mapping;
   final List<String> headers;
+  final List<DuplicateCandidate> candidates;
+  final bool duplicatesResolved;
+  final ExcelDateSystem dateSystem;
   Iterable<ImportRow> get validRows => rows.where((r) => r.isValid);
   Iterable<ImportRow> get invalidRows => rows.where((r) => !r.isValid);
+
+  ImportPreview copyWith({
+    List<DuplicateCandidate>? candidates,
+    bool? duplicatesResolved,
+  }) => ImportPreview(
+    rows: rows,
+    mapping: mapping,
+    headers: headers,
+    candidates: candidates ?? this.candidates,
+    duplicatesResolved: duplicatesResolved ?? this.duplicatesResolved,
+    dateSystem: dateSystem,
+  );
 }
 
 class DuplicateCandidate {
@@ -90,17 +127,22 @@ class ImportResult {
   final List<String> warnings;
 }
 
-LocalDate? parseImportDate(Object? value) {
+LocalDate? parseImportDate(
+  Object? value, {
+  ExcelDateSystem dateSystem = ExcelDateSystem.excel1900,
+}) {
   if (value is DateTime) return LocalDate(value.year, value.month, value.day);
   if (value is num) {
     final serial = value.toDouble();
-    if (!serial.isFinite || serial < 1 || serial > 2958465) return null;
+    final minimum = dateSystem == ExcelDateSystem.excel1900 ? 1 : 0;
+    if (!serial.isFinite || serial < minimum || serial > 2958465) return null;
     try {
-      final d = DateTime.utc(
-        1899,
-        12,
-        30,
-      ).add(Duration(milliseconds: (serial * 86400000).round()));
+      final epoch = dateSystem == ExcelDateSystem.excel1900
+          ? DateTime.utc(1899, 12, 30)
+          : DateTime.utc(1904, 1, 1);
+      final d = epoch.add(
+        Duration(milliseconds: (serial * Duration.millisecondsPerDay).round()),
+      );
       if (d.year < 1900 || d.year > 9999) return null;
       return LocalDate(d.year, d.month, d.day);
     } catch (_) {

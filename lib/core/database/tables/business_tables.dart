@@ -127,6 +127,11 @@ class MessageTemplates extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+@TableIndex(
+  name: 'import_batches_content_hash_idx',
+  columns: {#contentHash},
+  unique: true,
+)
 class ImportBatches extends Table {
   TextColumn get id => text()();
   TextColumn get fileName => text()();

@@ -41,4 +41,11 @@ class DuplicateResolver {
     }
     return candidates;
   }
+
+  /// Resolves duplicates and returns a preview carrying the complete decision
+  /// surface. This is the preferred hand-off to import commit code.
+  Future<ImportPreview> resolvePreview(ImportPreview preview) async {
+    final candidates = await resolve(preview);
+    return preview.copyWith(candidates: candidates, duplicatesResolved: true);
+  }
 }

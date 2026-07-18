@@ -72,6 +72,84 @@ void main() {
     expect(columns.map((row) => row['name']), isNot(contains('full_pinyin')));
     expect(raw.select('PRAGMA user_version').single['user_version'], 1);
   });
+
+  test('migrates v2 import batches and creates a unique hash index', () async {
+    final file = await _createV2File();
+    addTearDown(() => _deleteDatabaseFiles(file));
+
+    final database = AppDatabase.forTesting(NativeDatabase(file));
+    addTearDown(database.close);
+    expect(
+      await database
+          .customSelect(
+            "SELECT name FROM sqlite_master "
+            "WHERE name = 'import_batches_content_hash_idx'",
+          )
+          .get(),
+      hasLength(1),
+    );
+    expect(
+      await database.customSelect('SELECT * FROM import_batches').get(),
+      hasLength(2),
+    );
+  });
+
+  test(
+    'v2 migration rejects duplicate hashes without changing version',
+    () async {
+      final file = await _createV2File(duplicateHash: true);
+      addTearDown(() => _deleteDatabaseFiles(file));
+
+      final database = AppDatabase.forTesting(NativeDatabase(file));
+      await expectLater(
+        database.customSelect('SELECT 1').get(),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            contains('duplicate content_hash'),
+          ),
+        ),
+      );
+      await database.close();
+
+      final raw = sqlite.sqlite3.open(file.path);
+      addTearDown(raw.dispose);
+      expect(raw.select('PRAGMA user_version').single['user_version'], 2);
+      expect(
+        raw.select(
+          "SELECT name FROM sqlite_master "
+          "WHERE name = 'import_batches_content_hash_idx'",
+        ),
+        isEmpty,
+      );
+    },
+  );
+}
+
+Future<File> _createV2File({bool duplicateHash = false}) async {
+  final file = File(
+    '${Directory.systemTemp.path}${Platform.pathSeparator}'
+    'deposit-v2-${const Uuid().v4()}.sqlite',
+  );
+  final raw = sqlite.sqlite3.open(file.path);
+  raw.execute('''
+CREATE TABLE import_batches (
+  id TEXT NOT NULL PRIMARY KEY,
+  file_name TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  imported_rows INTEGER NOT NULL DEFAULT 0,
+  rejected_rows INTEGER NOT NULL DEFAULT 0,
+  imported_at_utc INTEGER NOT NULL,
+  source_device_id TEXT NOT NULL
+);
+INSERT INTO import_batches VALUES
+  ('batch-1', 'a.xlsx', 'hash-a', 1, 0, 1, 'test'),
+  ('batch-2', 'b.xlsx', '${duplicateHash ? 'hash-a' : 'hash-b'}', 1, 0, 1, 'test');
+PRAGMA user_version = 2;
+''');
+  raw.dispose();
+  return file;
 }
 
 Future<File> _createV1File({bool conflictingIndex = false}) async {
