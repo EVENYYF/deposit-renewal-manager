@@ -41,7 +41,7 @@ void main() {
       '姓名：李四 手机：１３９００１３９０００ 金额：１０万元 '
       '存入日：２０２６／０７／１８ 到期日：２０２７．０７．１８',
     );
-    final commaAmount = parser.parse('王五 13700137000 建行 100,000元 12个月');
+    final commaAmount = parser.parse('王五 13700137000 建行 100,000元 存期12个月');
 
     expect(fullWidth.name, '李四');
     expect(fullWidth.phone, '13900139000');
@@ -62,7 +62,7 @@ void main() {
   });
 
   test('recognizes day, month, and year terms', () {
-    final days = parser.parse('30日存期');
+    final days = parser.parse('存期30日');
     final months = parser.parse('存期12个月');
     final years = parser.parse('期限1年');
 
@@ -120,5 +120,136 @@ void main() {
 
     expect(result.name, '赵六');
     expect(result.bank, '农业银行');
+  });
+
+  group('strict amount parsing', () {
+    test('converts yuan and ten-thousand-yuan decimals exactly', () {
+      expect(parser.parse('金额0.29元').amountCents, 29);
+      expect(parser.parse('存款0.29万元').amountCents, 290000);
+      expect(parser.parse('定期0.000001万元').amountCents, 1);
+    });
+
+    test('requires financial context and validates lexical boundaries', () {
+      expect(
+        parser
+            .parse('今天花了100元')
+            .candidates
+            .where((candidate) => candidate.field == ParseField.amount),
+        isEmpty,
+      );
+      expect(parser.parse('定期10万元').amountCents, 10000000);
+      expect(parser.parse('金额1,000元').amountCents, 100000);
+    });
+
+    test('preserves malformed grouping and fractional cents as errors', () {
+      for (final source in ['金额1,,000元', '金额10,00元', '金额0.001元']) {
+        final candidate = parser
+            .parse(source)
+            .candidates
+            .singleWhere((item) => item.field == ParseField.amount);
+        expect(candidate.value, isNull, reason: source);
+        expect(candidate.error, contains('无效金额'), reason: source);
+        expect(candidate.source, source, reason: source);
+      }
+    });
+  });
+
+  group('strict term parsing', () {
+    test('requires explicit term context', () {
+      for (final source in ['2026年计划', '7月回访', '2026年7月']) {
+        expect(
+          parser
+              .parse(source)
+              .candidates
+              .where((candidate) => candidate.field == ParseField.term),
+          isEmpty,
+          reason: source,
+        );
+      }
+
+      expect(parser.parse('存期3650日').term?.value, 3650);
+      expect(parser.parse('期限120个月').term?.value, 120);
+      expect(parser.parse('定期30日').term?.value, 30);
+      expect(parser.parse('存30年').term?.value, 30);
+    });
+
+    test('marks zero, excessive, and non-numeric labeled terms invalid', () {
+      for (final source in [
+        '存期0日',
+        '存期3651日',
+        '期限121个月',
+        '定期31年',
+        '存期一年',
+        '存期abc',
+      ]) {
+        final candidate = parser
+            .parse(source)
+            .candidates
+            .singleWhere((item) => item.field == ParseField.term);
+        expect(candidate.value, isNull, reason: source);
+        expect(candidate.error, contains('无效存期'), reason: source);
+        expect(candidate.source, source, reason: source);
+      }
+    });
+  });
+
+  group('strict identity and rate parsing', () {
+    test('extracts every labeled name without consuming the next label', () {
+      final result = parser.parse('姓名张三手机13800138000，客户李四电话13900139000');
+      final names = result.candidates
+          .where((candidate) => candidate.field == ParseField.name)
+          .map((candidate) => candidate.value)
+          .toList();
+
+      expect(names, ['张三', '李四']);
+      expect(result.name, isNull);
+      expect(
+        result.conflicts.map((conflict) => conflict.field),
+        contains(ParseField.name),
+      );
+    });
+
+    test(
+      'normalizes formatted phones and rejects embedded or invalid tokens',
+      () {
+        expect(parser.parse('手机138 0013 8000').phone, '13800138000');
+        expect(parser.parse('电话138-0013-8000').phone, '13800138000');
+        expect(
+          parser
+              .parse('A13800138000B')
+              .candidates
+              .where((candidate) => candidate.field == ParseField.phone),
+          isEmpty,
+        );
+
+        final invalid = parser
+            .parse('手机12345')
+            .candidates
+            .singleWhere((candidate) => candidate.field == ParseField.phone);
+        expect(invalid.value, isNull);
+        expect(invalid.error, contains('无效手机号'));
+        expect(invalid.source, '手机12345');
+
+        final nonNumeric = parser
+            .parse('手机abc')
+            .candidates
+            .singleWhere((candidate) => candidate.field == ParseField.phone);
+        expect(nonNumeric.value, isNull);
+        expect(nonNumeric.error, contains('无效手机号'));
+      },
+    );
+
+    test('validates every labeled interest rate token', () {
+      expect(parser.parse('利率0.29%').interestRatePercent, 0.29);
+      for (final source in ['年利率abc', '利率0%', '利率999%']) {
+        final candidate = parser
+            .parse(source)
+            .candidates
+            .singleWhere((item) => item.field == ParseField.interestRate);
+        expect(candidate.value, isNull, reason: source);
+        expect(candidate.error, contains('无效利率'), reason: source);
+        expect(candidate.source, source, reason: source);
+      }
+    });
   });
 }

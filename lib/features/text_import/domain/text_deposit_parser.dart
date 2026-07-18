@@ -1,5 +1,6 @@
 import '../../deposits/domain/expiry_calculator.dart';
 import '../../deposits/domain/local_date.dart';
+import 'package:decimal/decimal.dart';
 
 enum ParseField {
   name,
@@ -121,27 +122,54 @@ final class TextDepositParser {
     String normalized,
     List<_LocatedCandidate> output,
   ) {
-    for (final match in RegExp(r'1[3-9]\d{9}').allMatches(normalized)) {
-      if (_hasDigitAt(normalized, match.start - 1) ||
-          _hasDigitAt(normalized, match.end)) {
-        continue;
-      }
+    final labeledPattern = RegExp(
+      r'(?:联系电话|手机号码|手机号|手机|电话)\s*[:：]?\s*'
+      r'(1[3-9]\d(?:[ -]?\d){8})(?![ -]?\d)',
+    );
+    for (final match in labeledPattern.allMatches(normalized)) {
+      final value = match.group(1)!.replaceAll(RegExp(r'[\s-]'), '');
+      _add(output, source, match.start, match.end, ParseField.phone, value, 1);
+    }
+
+    final invalidLabeledPattern = RegExp(
+      r'(?:联系电话|手机号码|手机号|手机|电话)\s*[:：]?\s*'
+      r'([^\s，。；;]+)',
+    );
+    for (final match in invalidLabeledPattern.allMatches(normalized)) {
+      if (_overlapsAny(match.start, match.end, output)) continue;
       _add(
         output,
         source,
         match.start,
         match.end,
         ParseField.phone,
-        match.group(0),
-        1,
+        null,
+        0,
+        error: '无效手机号：${source.substring(match.start, match.end).trim()}',
       );
+    }
+
+    final unlabelledPattern = RegExp(r'1[3-9]\d(?:[ -]?\d){8}');
+    for (final match in unlabelledPattern.allMatches(normalized)) {
+      if (_overlapsAny(match.start, match.end, output) ||
+          _hasAsciiAlphaNumericAt(normalized, match.start - 1) ||
+          _hasAsciiAlphaNumericAt(normalized, match.end)) {
+        continue;
+      }
+      final value = match.group(0)!.replaceAll(RegExp(r'[ -]'), '');
+      _add(output, source, match.start, match.end, ParseField.phone, value, 1);
     }
   }
 
-  static bool _hasDigitAt(String value, int index) =>
-      index >= 0 && index < value.length && _isDigit(value.codeUnitAt(index));
-
   static bool _isDigit(int codeUnit) => codeUnit >= 0x30 && codeUnit <= 0x39;
+
+  static bool _hasAsciiAlphaNumericAt(String value, int index) {
+    if (index < 0 || index >= value.length) return false;
+    final codeUnit = value.codeUnitAt(index);
+    return _isDigit(codeUnit) ||
+        (codeUnit >= 0x41 && codeUnit <= 0x5a) ||
+        (codeUnit >= 0x61 && codeUnit <= 0x7a);
+  }
 
   static void _extractDates(
     String source,
@@ -187,44 +215,78 @@ final class TextDepositParser {
     String normalized,
     List<_LocatedCandidate> output,
   ) {
-    final validPattern = RegExp(
-      r'(?:(?:金额|本金)\s*[:：]?\s*)?(\d[\d,]*(?:\.\d+)?)\s*(万元|万|元)',
+    final contextualPattern = RegExp(
+      r'(?:金额|本金|存款|定期)\s*[:：]?\s*'
+      r'([^\s，。；;]+?)\s*(万元|万|元)',
     );
-    for (final match in validPattern.allMatches(normalized)) {
-      final number = double.parse(match.group(1)!.replaceAll(',', ''));
-      final multiplier = match.group(2)!.startsWith('万') ? 1000000 : 100;
-      final cents = number * multiplier;
-      final isValid = number > 0 && cents.isFinite && cents == cents.round();
-      _add(
-        output,
-        source,
-        match.start,
-        match.end,
-        ParseField.amount,
-        isValid ? cents.round() : null,
-        isValid ? 0.98 : 0,
-        error: isValid
-            ? null
-            : '无效金额：${source.substring(match.start, match.end).trim()}',
-      );
+    for (final match in contextualPattern.allMatches(normalized)) {
+      _addAmountCandidate(source, match, output);
     }
 
-    final invalidPattern = RegExp(
-      r'(?:金额|本金)\s*[:：]?\s*([^\s，,。；;]+(?:万元|万|元))',
-    );
-    for (final match in invalidPattern.allMatches(normalized)) {
+    final barePattern = RegExp(r'(\d[\d,]*(?:\.\d+)?)\s*(万元|万|元)');
+    for (final match in barePattern.allMatches(normalized)) {
       if (_overlapsAny(match.start, match.end, output)) continue;
-      _add(
-        output,
-        source,
-        match.start,
-        match.end,
-        ParseField.amount,
-        null,
-        0,
-        error: '无效金额：${source.substring(match.start, match.end).trim()}',
-      );
+      if (!_hasStrictTokenBoundary(normalized, match.start, match.end)) {
+        continue;
+      }
+      _addAmountCandidate(source, match, output);
     }
+  }
+
+  static void _addAmountCandidate(
+    String source,
+    RegExpMatch match,
+    List<_LocatedCandidate> output,
+  ) {
+    final numberToken = match.group(1)!;
+    final unit = match.group(2)!;
+    final cents = _parseAmountCents(numberToken, unit);
+    _add(
+      output,
+      source,
+      match.start,
+      match.end,
+      ParseField.amount,
+      cents,
+      cents == null ? 0 : 0.98,
+      error: cents == null
+          ? '无效金额：${source.substring(match.start, match.end).trim()}'
+          : null,
+    );
+  }
+
+  static int? _parseAmountCents(String token, String unit) {
+    final lexical = RegExp(
+      r'^(?:(?:0|[1-9]\d*)|(?:[1-9]\d{0,2}(?:,\d{3})+))'
+      r'(?:\.(\d+))?$',
+    ).firstMatch(token);
+    if (lexical == null) return null;
+
+    final scale = unit.startsWith('万') ? 6 : 2;
+    final pieces = token.replaceAll(',', '').split('.');
+    final whole = pieces.first;
+    final fraction = pieces.length == 1 ? '' : pieces[1];
+    if (fraction.length > scale &&
+        fraction.substring(scale).contains(RegExp('[1-9]'))) {
+      return null;
+    }
+    final scaledFraction = fraction.length >= scale
+        ? fraction.substring(0, scale)
+        : fraction.padRight(scale, '0');
+    final value = BigInt.parse('$whole$scaledFraction');
+    if (value <= BigInt.zero || value > BigInt.from(0x7fffffffffffffff)) {
+      return null;
+    }
+    return value.toInt();
+  }
+
+  static bool _hasStrictTokenBoundary(String value, int start, int end) {
+    bool isSeparatorAt(int index) {
+      if (index < 0 || index >= value.length) return true;
+      return RegExp(r'[\s,，。；;:：]').hasMatch(value[index]);
+    }
+
+    return isSeparatorAt(start - 1) && isSeparatorAt(end);
   }
 
   static void _extractInterestRates(
@@ -232,18 +294,49 @@ final class TextDepositParser {
     String normalized,
     List<_LocatedCandidate> output,
   ) {
-    final pattern = RegExp(r'(?:(?:利率|年利率)\s*[:：]?\s*)?(\d+(?:\.\d+)?)\s*%');
-    for (final match in pattern.allMatches(normalized)) {
-      _add(
-        output,
-        source,
-        match.start,
-        match.end,
-        ParseField.interestRate,
-        double.parse(match.group(1)!),
-        0.98,
-      );
+    final labeledPattern = RegExp(
+      r'(?:年利率|利率)\s*[:：]?\s*([A-Za-z]+|[0-9][0-9.,]*%?)',
+    );
+    for (final match in labeledPattern.allMatches(normalized)) {
+      _addInterestRateCandidate(source, match, output);
     }
+
+    final barePattern = RegExp(r'(\d+(?:\.\d+)?)%');
+    for (final match in barePattern.allMatches(normalized)) {
+      if (_overlapsAny(match.start, match.end, output) ||
+          !_hasStrictTokenBoundary(normalized, match.start, match.end)) {
+        continue;
+      }
+      _addInterestRateCandidate(source, match, output);
+    }
+  }
+
+  static void _addInterestRateCandidate(
+    String source,
+    RegExpMatch match,
+    List<_LocatedCandidate> output,
+  ) {
+    final token = match.group(1)!;
+    final numeric = token.endsWith('%')
+        ? token.substring(0, token.length - 1)
+        : token;
+    final decimal = Decimal.tryParse(numeric);
+    final valid =
+        decimal != null &&
+        decimal > Decimal.zero &&
+        decimal <= Decimal.fromInt(100);
+    _add(
+      output,
+      source,
+      match.start,
+      match.end,
+      ParseField.interestRate,
+      valid ? decimal.toDouble() : null,
+      valid ? 0.98 : 0,
+      error: valid
+          ? null
+          : '无效利率：${source.substring(match.start, match.end).trim()}',
+    );
   }
 
   static void _extractTerms(
@@ -252,19 +345,61 @@ final class TextDepositParser {
     List<_LocatedCandidate> output,
   ) {
     final pattern = RegExp(
-      r'(?:(?:存期|期限)\s*[:：]?\s*)?(\d+)\s*(天|日|个月|月|年)(?:存期)?',
+      r'(?:存期|期限|定期|存(?!入|款|期|日))\s*[:：]?\s*'
+      r'([^\s，。；;]+?)\s*(天|日|个月|月|年)(?:存期)?',
     );
     for (final match in pattern.allMatches(normalized)) {
-      if (_overlapsAny(match.start, match.end, output)) continue;
-      final count = int.parse(match.group(1)!);
-      if (count <= 0) continue;
+      final token = match.group(1)!;
       final unit = match.group(2)!;
-      final term = switch (unit) {
-        '天' || '日' => DepositTerm.days(count),
-        '个月' || '月' => DepositTerm.months(count),
-        _ => DepositTerm.years(count),
+      final count = RegExp(r'^\d+$').hasMatch(token)
+          ? int.tryParse(token)
+          : null;
+      final limit = switch (unit) {
+        '天' || '日' => 3650,
+        '个月' || '月' => 120,
+        _ => 30,
       };
-      _add(output, source, match.start, match.end, ParseField.term, term, 0.96);
+      final valid = count != null && count >= 1 && count <= limit;
+      final term = valid
+          ? switch (unit) {
+              '天' || '日' => DepositTerm.days(count),
+              '个月' || '月' => DepositTerm.months(count),
+              _ => DepositTerm.years(count),
+            }
+          : null;
+      _add(
+        output,
+        source,
+        match.start,
+        match.end,
+        ParseField.term,
+        term,
+        valid ? 0.96 : 0,
+        error: valid
+            ? null
+            : '无效存期：${source.substring(match.start, match.end).trim()}',
+      );
+    }
+
+    final invalidLabeledPattern = RegExp(
+      r'(?:存期|期限|定期|存(?!入|款|期|日))\s*[:：]?\s*'
+      r'([^\s，。；;]+)',
+    );
+    for (final match in invalidLabeledPattern.allMatches(normalized)) {
+      if (_overlapsField(match.start, match.end, output, ParseField.term) ||
+          _overlapsField(match.start, match.end, output, ParseField.amount)) {
+        continue;
+      }
+      _add(
+        output,
+        source,
+        match.start,
+        match.end,
+        ParseField.term,
+        null,
+        0,
+        error: '无效存期：${source.substring(match.start, match.end).trim()}',
+      );
     }
   }
 
@@ -353,10 +488,14 @@ final class TextDepositParser {
     String normalized,
     List<_LocatedCandidate> output,
   ) {
-    final labeled = RegExp(
-      r'(?:姓名|客户)\s*[:：]?\s*([\u4e00-\u9fff·]{2,8})',
-    ).firstMatch(normalized);
-    if (labeled != null) {
+    final labeledPattern = RegExp(
+      r'(?:姓名|客户)\s*[:：]?\s*([\u4e00-\u9fff·]{2,8}?)'
+      r'(?=\s*(?:联系电话|手机号|手机|电话|金额|本金|存款|年利率|利率|银行|产品|'
+      r'存入日|到期日|存期|期限|姓名|客户|[,，;；。]|\d|$))',
+    );
+    var hasLabeledName = false;
+    for (final labeled in labeledPattern.allMatches(normalized)) {
+      hasLabeledName = true;
       _add(
         output,
         source,
@@ -366,8 +505,8 @@ final class TextDepositParser {
         labeled.group(1),
         0.99,
       );
-      return;
     }
+    if (hasLabeledName) return;
 
     final reserved = RegExp(r'^(存入日|存款日|到期日|金额|本金|利率|存期|期限|备注|定期|活期|到期联系)$');
     final leading = RegExp(

@@ -90,4 +90,66 @@ void main() {
     expect(template.body, '{{customerName}}您好');
     expect(template.isDefault, isTrue);
   });
+
+  test('rejects every unescaped malformed closing brace sequence', () {
+    for (final body in ['多余 }', '多余 }}', '多余 }}}']) {
+      expect(
+        () => renderMessage(
+          MessageTemplate(name: '畸形模板', body: body),
+          const TemplateValues(),
+        ),
+        throwsA(
+          isA<TemplateRenderException>().having(
+            (error) => error.message,
+            'message',
+            contains('模板格式错误'),
+          ),
+        ),
+        reason: body,
+      );
+    }
+  });
+
+  test('rejects unclosed or isolated opening braces', () {
+    for (final body in ['未闭合 {{customerName', '孤立 {']) {
+      expect(
+        () => renderMessage(
+          MessageTemplate(name: '畸形模板', body: body),
+          const TemplateValues(customerName: '张三'),
+        ),
+        throwsA(
+          isA<TemplateRenderException>().having(
+            (error) => error.message,
+            'message',
+            contains('模板格式错误'),
+          ),
+        ),
+        reason: body,
+      );
+    }
+  });
+
+  test('escapes literal braces explicitly', () {
+    const template = MessageTemplate(
+      name: '大括号转义',
+      body: r'\{正文\} 与 \{\{customerName\}\}',
+    );
+
+    expect(
+      renderMessage(template, const TemplateValues()),
+      '{正文} 与 {{customerName}}',
+    );
+  });
+
+  test('renders repeated variables without recursively parsing values', () {
+    const template = MessageTemplate(
+      name: '重复变量',
+      body: '{{customerName}}/{{customerName}}',
+    );
+
+    expect(
+      renderMessage(template, const TemplateValues(customerName: '{{bank}}')),
+      '{{bank}}/{{bank}}',
+    );
+  });
 }
