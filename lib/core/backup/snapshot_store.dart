@@ -14,20 +14,37 @@ class SnapshotInfo {
   final String operation;
 }
 
+typedef RealPathResolver = Future<String> Function(String path);
+
 class SnapshotStore {
-  SnapshotStore(this.directory, {this.maxAutomaticSnapshots = 10});
+  SnapshotStore(
+    this.directory, {
+    this.maxAutomaticSnapshots = 10,
+    RealPathResolver? realPathResolver,
+  }) : _realPathResolver = realPathResolver ?? _resolveRealPath;
 
   final Directory directory;
   final int maxAutomaticSnapshots;
+  final RealPathResolver _realPathResolver;
   Future<void> _queue = Future.value();
   Directory get _automaticDirectory =>
       Directory(p.join(directory.path, 'automatic'));
 
-  bool isInAutomaticDirectory(File file) {
-    final root = p.canonicalize(_automaticDirectory.absolute.path);
-    final target = p.canonicalize(file.absolute.path);
+  Future<bool> isInAutomaticDirectory(File file) async {
+    await _automaticDirectory.create(recursive: true);
+    await file.parent.create(recursive: true);
+    final root = p.canonicalize(
+      await _realPathResolver(_automaticDirectory.absolute.path),
+    );
+    final realParent = p.canonicalize(
+      await _realPathResolver(file.parent.absolute.path),
+    );
+    final target = p.join(realParent, p.basename(file.path));
     return target == root || p.isWithin(root, target);
   }
+
+  static Future<String> _resolveRealPath(String path) =>
+      Directory(path).resolveSymbolicLinks();
 
   Future<T> _serialized<T>(Future<T> Function() action) {
     final result = _queue.then((_) => action());
@@ -81,12 +98,15 @@ class SnapshotStore {
       if (!p.isWithin(root, canonical)) continue;
       final stat = await entity.stat();
       final name = p.basenameWithoutExtension(entity.path).substring(5);
-      final split = name.lastIndexOf('_');
+      final firstSplit = name.indexOf('_');
+      final lastSplit = name.lastIndexOf('_');
       result.add(
         SnapshotInfo(
           file: entity,
           createdAtUtc: stat.modified.toUtc(),
-          operation: split < 0 ? 'unknown' : name.substring(split + 1),
+          operation: firstSplit < 0 || lastSplit <= firstSplit
+              ? 'unknown'
+              : name.substring(firstSplit + 1, lastSplit),
         ),
       );
     }

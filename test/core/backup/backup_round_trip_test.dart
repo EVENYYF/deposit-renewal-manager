@@ -239,6 +239,44 @@ void main() {
       service.inspectBackup(forgedPath),
       throwsA(isA<BackupIntegrityException>()),
     );
+
+    final descriptor = await original.readAsBytes();
+    _patchCentralEntry(descriptor, 'data.json', flags: 0x808);
+    final descriptorPath =
+        '${temp.path}${Platform.pathSeparator}descriptor.drbackup';
+    await File(descriptorPath).writeAsBytes(descriptor);
+    await expectLater(
+      service.inspectBackup(descriptorPath),
+      throwsA(isA<BackupIntegrityException>()),
+    );
+  });
+
+  test('rejects escaped duplicate JSON object keys', () async {
+    final service = BackupService(
+      database: source,
+      sourceDevice: 'Android',
+      snapshotsDirectory: temp,
+    );
+    final path = (await service.exportBackup(
+      outputPath: '${temp.path}${Platform.pathSeparator}duplicate-key.drbackup',
+    )).path;
+    await _rewriteBackup(
+      path,
+      mutateData: (bytes) {
+        final text = utf8.decode(bytes);
+        return utf8.encode(
+          text.replaceFirst(
+            '"customers":',
+            '"cust\\u006fmers":[],"customers":',
+          ),
+        );
+      },
+      repairHash: true,
+    );
+    await expectLater(
+      service.inspectBackup(path),
+      throwsA(isA<BackupIntegrityException>()),
+    );
   });
 
   test('rejects deep JSON and invalid business invariants', () async {
@@ -377,6 +415,7 @@ void _patchCentralEntry(
   String target, {
   int? externalMode,
   int? uncompressedSize,
+  int? flags,
 }) {
   for (var i = 0; i + 46 <= bytes.length; i++) {
     if (_u32(bytes, i) != 0x02014b50) continue;
@@ -387,6 +426,10 @@ void _patchCentralEntry(
     if (uncompressedSize != null) {
       _writeU32(bytes, i + 24, uncompressedSize);
       _writeU32(bytes, _u32(bytes, i + 42) + 22, uncompressedSize);
+    }
+    if (flags != null) {
+      _writeU16(bytes, i + 8, flags);
+      _writeU16(bytes, _u32(bytes, i + 42) + 6, flags);
     }
     return;
   }
@@ -401,6 +444,11 @@ void _writeU32(List<int> bytes, int offset, int value) {
   for (var i = 0; i < 4; i++) {
     bytes[offset + i] = (value >> (8 * i)) & 0xff;
   }
+}
+
+void _writeU16(List<int> bytes, int offset, int value) {
+  bytes[offset] = value & 0xff;
+  bytes[offset + 1] = (value >> 8) & 0xff;
 }
 
 void _populateValidRows(Map<String, dynamic> data) {

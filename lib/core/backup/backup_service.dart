@@ -50,12 +50,16 @@ class BackupService {
     Directory? snapshotsDirectory,
     DateTime Function()? nowUtc,
     this.limits = const BackupLimits(),
+    RealPathResolver? realPathResolver,
+    Future<File> Function(File source, String target)? renameFile,
   }) : _nowUtc = nowUtc ?? (() => clock.now().toUtc()),
+       _renameFile = renameFile ?? _defaultRename,
        snapshots = SnapshotStore(
          snapshotsDirectory ??
              Directory(
                p.join(Directory.systemTemp.path, 'deposit_renewal_snapshots'),
              ),
+         realPathResolver: realPathResolver,
        );
 
   final AppDatabase database;
@@ -63,6 +67,10 @@ class BackupService {
   final DateTime Function() _nowUtc;
   final SnapshotStore snapshots;
   final BackupLimits limits;
+  final Future<File> Function(File source, String target) _renameFile;
+
+  static Future<File> _defaultRename(File source, String target) =>
+      source.rename(target);
 
   Future<File> exportBackup({
     String? outputPath,
@@ -78,7 +86,7 @@ class BackupService {
             ),
           )
         : File(outputPath);
-    if (!automatic && snapshots.isInAutomaticDirectory(file)) {
+    if (!automatic && await snapshots.isInAutomaticDirectory(file)) {
       throw const BackupIntegrityException(
         'Manual backups cannot be written to the automatic snapshot directory',
       );
@@ -225,8 +233,7 @@ class BackupService {
     try {
       await temp.writeAsBytes(bytes, flush: true);
       await inspectBackup(temp.path);
-      if (await target.exists()) await target.delete();
-      await temp.rename(target.path);
+      await _renameFile(temp, target.path);
     } finally {
       if (await temp.exists()) await temp.delete();
     }
@@ -423,6 +430,8 @@ class BackupService {
     var tokens = 0;
     var inString = false;
     var escaped = false;
+    var stringStart = -1;
+    final containers = <Set<String>?>[];
     for (var i = 0; i < source.length; i++) {
       final code = source.codeUnitAt(i);
       if (inString) {
@@ -433,13 +442,34 @@ class BackupService {
         } else if (code == 0x22) {
           inString = false;
           tokens++;
+          var next = i + 1;
+          while (next < source.length &&
+              const {
+                0x20,
+                0x09,
+                0x0a,
+                0x0d,
+              }.contains(source.codeUnitAt(next))) {
+            next++;
+          }
+          if (next < source.length &&
+              source.codeUnitAt(next) == 0x3a &&
+              containers.isNotEmpty &&
+              containers.last != null) {
+            final key = jsonDecode(source.substring(stringStart, i + 1));
+            if (key is! String || !containers.last!.add(key)) {
+              throw const BackupIntegrityException('Duplicate JSON object key');
+            }
+          }
         }
         continue;
       }
       if (code == 0x22) {
         inString = true;
+        stringStart = i;
       } else if (code == 0x7b || code == 0x5b) {
         depth++;
+        containers.add(code == 0x7b ? <String>{} : null);
         tokens++;
         if (depth > limits.maxJsonDepth) {
           throw const BackupIntegrityException('JSON too deep');
@@ -447,9 +477,13 @@ class BackupService {
       } else if (code == 0x7d || code == 0x5d) {
         depth--;
         tokens++;
-        if (depth < 0) {
+        final closingObject = code == 0x7d;
+        if (depth < 0 ||
+            containers.isEmpty ||
+            (closingObject != (containers.last != null))) {
           throw const BackupIntegrityException('Invalid JSON structure');
         }
+        containers.removeLast();
       } else if (code == 0x2c || code == 0x3a) {
         tokens++;
       }

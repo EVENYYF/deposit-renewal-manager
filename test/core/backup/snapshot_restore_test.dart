@@ -111,7 +111,10 @@ void main() {
       );
       final files = await Future.wait([
         for (var i = 0; i < 8; i++)
-          (i.isEven ? serviceA : serviceB).exportBackup(automatic: true),
+          (i.isEven ? serviceA : serviceB).exportBackup(
+            automatic: true,
+            automaticOperation: 'restore_with_notes',
+          ),
       ]);
       expect(files.map((f) => f.path).toSet(), hasLength(8));
       for (final file in files) {
@@ -119,6 +122,10 @@ void main() {
         expect(archive.findFile('manifest.json'), isNotNull);
         expect(archive.findFile('data.json'), isNotNull);
       }
+      expect(
+        (await serviceA.listSnapshots()).map((item) => item.operation).toSet(),
+        {'restore_with_notes'},
+      );
     },
   );
 
@@ -138,5 +145,63 @@ void main() {
       throwsA(isA<BackupIntegrityException>()),
     );
     expect(await File(path).exists(), isFalse);
+  });
+
+  test('resolved parent alias into automatic directory is rejected', () async {
+    final automatic = [
+      temp.absolute.path,
+      'automatic',
+    ].join(Platform.pathSeparator);
+    final service = BackupService(
+      database: database,
+      sourceDevice: 'device',
+      snapshotsDirectory: temp,
+      realPathResolver: (path) async =>
+          path.endsWith('alias') ? automatic : path,
+    );
+    final target = [
+      temp.path,
+      'alias',
+      'manual.drbackup',
+    ].join(Platform.pathSeparator);
+    await expectLater(
+      service.exportBackup(outputPath: target),
+      throwsA(isA<BackupIntegrityException>()),
+    );
+    expect(await File(target).exists(), isFalse);
+  });
+
+  test('rename failure preserves an existing manual backup', () async {
+    final target = File(
+      [temp.path, 'existing.drbackup'].join(Platform.pathSeparator),
+    );
+    await target.writeAsString('old backup');
+    final service = BackupService(
+      database: database,
+      sourceDevice: 'device',
+      snapshotsDirectory: temp,
+      renameFile: (source, path) async {
+        throw const FileSystemException('injected rename failure');
+      },
+    );
+    await expectLater(
+      service.exportBackup(outputPath: target.path),
+      throwsA(isA<FileSystemException>()),
+    );
+    expect(await target.readAsString(), 'old backup');
+  });
+
+  test('manual rename replaces an existing target atomically', () async {
+    final target = File(
+      [temp.path, 'replace.drbackup'].join(Platform.pathSeparator),
+    );
+    await target.writeAsString('old backup');
+    final service = BackupService(
+      database: database,
+      sourceDevice: 'device',
+      snapshotsDirectory: temp,
+    );
+    await service.exportBackup(outputPath: target.path);
+    expect(await service.inspectBackup(target.path), isA<InspectedBackup>());
   });
 }

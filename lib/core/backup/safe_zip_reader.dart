@@ -32,12 +32,34 @@ class SafeZipReader {
   final BackupLimits limits;
 
   Future<Map<String, Uint8List>> read(File file) async {
-    final length = await file.length();
-    if (length > limits.maxArchiveBytes) {
-      throw const BackupIntegrityException('Archive too large');
+    final handle = await file.open();
+    try {
+      final initialLength = await handle.length();
+      if (initialLength > limits.maxArchiveBytes) {
+        throw const BackupIntegrityException('Archive too large');
+      }
+      final builder = BytesBuilder(copy: false);
+      var total = 0;
+      while (true) {
+        final remaining = limits.maxArchiveBytes + 1 - total;
+        if (remaining <= 0) {
+          throw const BackupIntegrityException('Archive too large');
+        }
+        final chunk = await handle.read(
+          remaining < 64 * 1024 ? remaining : 64 * 1024,
+        );
+        if (chunk.isEmpty) break;
+        total += chunk.length;
+        builder.add(chunk);
+      }
+      final finalLength = await handle.length();
+      if (total != initialLength || finalLength != initialLength) {
+        throw const BackupIntegrityException('Archive changed while reading');
+      }
+      return readBytes(builder.takeBytes());
+    } finally {
+      await handle.close();
     }
-    final bytes = await file.readAsBytes();
-    return readBytes(bytes);
   }
 
   Map<String, Uint8List> readBytes(List<int> source) {
@@ -107,8 +129,8 @@ class SafeZipReader {
       final end = cursor + 46 + nameLength + extraLength + commentLength;
       if (end > eocd ||
           diskStart != 0 ||
-          (flags & 1) != 0 ||
-          (flags & ~(0x800 | 0x8)) != 0) {
+          (flags & (1 | 8)) != 0 ||
+          (flags & ~0x800) != 0) {
         throw const BackupIntegrityException('Unsupported ZIP entry');
       }
       final nameBytes = bytes.sublist(cursor + 46, cursor + 46 + nameLength);
