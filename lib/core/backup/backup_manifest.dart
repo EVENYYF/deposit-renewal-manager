@@ -109,3 +109,8 @@ class BackupIntegrityException implements Exception {
   @override
   String toString() => 'BackupIntegrityException: $message';
 }
+
+class BackupTargetExistsException extends BackupIntegrityException {
+  const BackupTargetExistsException(String path)
+    : super('Backup target already exists: $path');
+}

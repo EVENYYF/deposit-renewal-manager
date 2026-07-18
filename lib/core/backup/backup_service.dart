@@ -91,6 +91,9 @@ class BackupService {
         'Manual backups cannot be written to the automatic snapshot directory',
       );
     }
+    if (!automatic && await file.exists()) {
+      throw BackupTargetExistsException(file.path);
+    }
     final data = await database.exportBusinessData();
     _validateRows(data);
     final payload = utf8.encode(_encodeDeterministic(data));
@@ -227,15 +230,50 @@ class BackupService {
 
   Future<void> _writeAtomically(File target, List<int> bytes) async {
     await target.parent.create(recursive: true);
-    final temp = File(
-      '${target.path}.${DateTime.now().microsecondsSinceEpoch}.tmp',
-    );
+    await _withTargetLock(target, () async {
+      if (await target.exists()) {
+        throw BackupTargetExistsException(target.path);
+      }
+      final temp = File(
+        '${target.path}.${DateTime.now().microsecondsSinceEpoch}.tmp',
+      );
+      try {
+        await temp.writeAsBytes(bytes, flush: true);
+        await inspectBackup(temp.path);
+        if (await target.exists()) {
+          throw BackupTargetExistsException(target.path);
+        }
+        await _renameFile(temp, target.path);
+      } finally {
+        if (await temp.exists()) await temp.delete();
+      }
+    });
+  }
+
+  Future<T> _withTargetLock<T>(File target, Future<T> Function() action) async {
+    final lock = await File(
+      p.join(target.parent.path, '.${p.basename(target.path)}.lock'),
+    ).open(mode: FileMode.append);
+    var acquired = false;
     try {
-      await temp.writeAsBytes(bytes, flush: true);
-      await inspectBackup(temp.path);
-      await _renameFile(temp, target.path);
+      for (var attempt = 0; attempt < 400; attempt++) {
+        try {
+          await lock.lock(FileLock.exclusive);
+          acquired = true;
+          break;
+        } on FileSystemException {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+        }
+      }
+      if (!acquired) {
+        throw const FileSystemException(
+          'Timed out acquiring backup target lock',
+        );
+      }
+      return await action();
     } finally {
-      if (await temp.exists()) await temp.delete();
+      if (acquired) await lock.unlock();
+      await lock.close();
     }
   }
 

@@ -171,11 +171,62 @@ void main() {
     expect(await File(target).exists(), isFalse);
   });
 
-  test('rename failure preserves an existing manual backup', () async {
+  test('existing manual target is rejected without changing bytes', () async {
     final target = File(
       [temp.path, 'existing.drbackup'].join(Platform.pathSeparator),
     );
     await target.writeAsString('old backup');
+    final service = BackupService(
+      database: database,
+      sourceDevice: 'device',
+      snapshotsDirectory: temp,
+    );
+    await expectLater(
+      service.exportBackup(outputPath: target.path),
+      throwsA(isA<BackupTargetExistsException>()),
+    );
+    expect(await target.readAsString(), 'old backup');
+  });
+
+  test('concurrent manual exports to one path have one winner', () async {
+    final target = File(
+      [temp.path, 'concurrent.drbackup'].join(Platform.pathSeparator),
+    );
+    final serviceA = BackupService(
+      database: database,
+      sourceDevice: 'device',
+      snapshotsDirectory: temp,
+    );
+    final serviceB = BackupService(
+      database: database,
+      sourceDevice: 'device',
+      snapshotsDirectory: temp,
+    );
+    final results = await Future.wait([
+      serviceA
+          .exportBackup(outputPath: target.path)
+          .then<Object>((_) => true)
+          .catchError((e) => e),
+      serviceB
+          .exportBackup(outputPath: target.path)
+          .then<Object>((_) => true)
+          .catchError((e) => e),
+    ]);
+    expect(results.whereType<bool>(), hasLength(1));
+    expect(results.whereType<BackupTargetExistsException>(), hasLength(1));
+    expect(await serviceA.inspectBackup(target.path), isA<InspectedBackup>());
+    expect(
+      (await temp.list().toList()).where(
+        (entity) => entity.path.endsWith('.tmp'),
+      ),
+      isEmpty,
+    );
+  });
+
+  test('rename failure cleans temp and leaves target absent', () async {
+    final target = File(
+      [temp.path, 'rename-failure.drbackup'].join(Platform.pathSeparator),
+    );
     final service = BackupService(
       database: database,
       sourceDevice: 'device',
@@ -188,20 +239,6 @@ void main() {
       service.exportBackup(outputPath: target.path),
       throwsA(isA<FileSystemException>()),
     );
-    expect(await target.readAsString(), 'old backup');
-  });
-
-  test('manual rename replaces an existing target atomically', () async {
-    final target = File(
-      [temp.path, 'replace.drbackup'].join(Platform.pathSeparator),
-    );
-    await target.writeAsString('old backup');
-    final service = BackupService(
-      database: database,
-      sourceDevice: 'device',
-      snapshotsDirectory: temp,
-    );
-    await service.exportBackup(outputPath: target.path);
-    expect(await service.inspectBackup(target.path), isA<InspectedBackup>());
+    expect(await target.exists(), isFalse);
   });
 }
