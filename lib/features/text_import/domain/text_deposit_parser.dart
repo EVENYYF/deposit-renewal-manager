@@ -124,28 +124,24 @@ final class TextDepositParser {
   ) {
     final labeledPattern = RegExp(
       r'(?:联系电话|手机号码|手机号|手机|电话)\s*[:：]?\s*'
-      r'(1[3-9]\d(?:[ -]?\d){8})(?![ -]?\d)',
+      r'([A-Za-z0-9]+(?:[ -][A-Za-z0-9]+)*)',
     );
     for (final match in labeledPattern.allMatches(normalized)) {
-      final value = match.group(1)!.replaceAll(RegExp(r'[\s-]'), '');
-      _add(output, source, match.start, match.end, ParseField.phone, value, 1);
-    }
-
-    final invalidLabeledPattern = RegExp(
-      r'(?:联系电话|手机号码|手机号|手机|电话)\s*[:：]?\s*'
-      r'([^\s，。；;]+)',
-    );
-    for (final match in invalidLabeledPattern.allMatches(normalized)) {
-      if (_overlapsAny(match.start, match.end, output)) continue;
+      final token = match.group(1)!;
+      final allowedCharacters = RegExp(r'^[0-9 -]+$').hasMatch(token);
+      final value = token.replaceAll(RegExp(r'[ -]'), '');
+      final valid = allowedCharacters && RegExp(r'^1\d{10}$').hasMatch(value);
       _add(
         output,
         source,
         match.start,
         match.end,
         ParseField.phone,
-        null,
-        0,
-        error: '无效手机号：${source.substring(match.start, match.end).trim()}',
+        valid ? value : null,
+        valid ? 1 : 0,
+        error: valid
+            ? null
+            : '无效手机号：${source.substring(match.start, match.end).trim()}',
       );
     }
 
@@ -295,7 +291,9 @@ final class TextDepositParser {
     List<_LocatedCandidate> output,
   ) {
     final labeledPattern = RegExp(
-      r'(?:年利率|利率)\s*[:：]?\s*([A-Za-z]+|[0-9][0-9.,]*%?)',
+      r'(?:年利率|利率)\s*[:：]?\s*(.+?)'
+      r'(?=\s|[,，。；;]|(?:联系电话|手机号码|手机号|手机|电话|金额|本金|存款|'
+      r'银行|产品|存入日|到期日|存期|期限|姓名|客户)|$)',
     );
     for (final match in labeledPattern.allMatches(normalized)) {
       _addInterestRateCandidate(source, match, output);
@@ -317,10 +315,14 @@ final class TextDepositParser {
     List<_LocatedCandidate> output,
   ) {
     final token = match.group(1)!;
-    final numeric = token.endsWith('%')
+    final lexical = RegExp(r'^\+?\d+(?:\.\d+)?%?$').hasMatch(token);
+    final numericToken = token.endsWith('%')
         ? token.substring(0, token.length - 1)
         : token;
-    final decimal = Decimal.tryParse(numeric);
+    final numeric = numericToken.startsWith('+')
+        ? numericToken.substring(1)
+        : numericToken;
+    final decimal = lexical ? Decimal.tryParse(numeric) : null;
     final valid =
         decimal != null &&
         decimal > Decimal.zero &&
@@ -345,7 +347,7 @@ final class TextDepositParser {
     List<_LocatedCandidate> output,
   ) {
     final pattern = RegExp(
-      r'(?:存期|期限|定期|存(?!入|款|期|日))\s*[:：]?\s*'
+      r'(?:存期|期限|定期(?!存款|储蓄)|存(?!入|款|期|日))\s*[:：]?\s*'
       r'([^\s，。；;]+?)\s*(天|日|个月|月|年)(?:存期)?',
     );
     for (final match in pattern.allMatches(normalized)) {
@@ -382,7 +384,7 @@ final class TextDepositParser {
     }
 
     final invalidLabeledPattern = RegExp(
-      r'(?:存期|期限|定期|存(?!入|款|期|日))\s*[:：]?\s*'
+      r'(?:存期|期限|定期(?!存款|储蓄)|存(?!入|款|期|日))\s*[:：]?\s*'
       r'([^\s，。；;]+)',
     );
     for (final match in invalidLabeledPattern.allMatches(normalized)) {

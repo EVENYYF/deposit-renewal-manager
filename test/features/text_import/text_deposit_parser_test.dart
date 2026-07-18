@@ -251,5 +251,43 @@ void main() {
         expect(candidate.source, source, reason: source);
       }
     });
+
+    test('validates the complete labeled interest rate token', () {
+      for (final source in ['利率1abc', '利率1.5%%', '利率-1%', '利率.5%']) {
+        final candidate = parser
+            .parse(source)
+            .candidates
+            .singleWhere((item) => item.field == ParseField.interestRate);
+        expect(candidate.value, isNull, reason: source);
+        expect(candidate.error, contains('无效利率'), reason: source);
+        expect(candidate.source, source, reason: source);
+      }
+    });
+
+    test('validates the complete labeled phone token', () {
+      for (final source in ['手机13800138000A', '手机138 0013 800']) {
+        final candidate = parser
+            .parse(source)
+            .candidates
+            .singleWhere((item) => item.field == ParseField.phone);
+        expect(candidate.value, isNull, reason: source);
+        expect(candidate.error, contains('无效手机号'), reason: source);
+        expect(candidate.source, source, reason: source);
+      }
+    });
+  });
+
+  test('product phrases never produce invalid term candidates', () {
+    for (final source in ['定期存款', '定期储蓄']) {
+      expect(
+        parser
+            .parse(source)
+            .candidates
+            .where((candidate) => candidate.field == ParseField.term),
+        isEmpty,
+        reason: source,
+      );
+    }
+    expect(parser.parse('定期存款').product, '定期');
   });
 }
