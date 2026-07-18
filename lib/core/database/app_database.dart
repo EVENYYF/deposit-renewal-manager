@@ -145,4 +145,65 @@ class AppDatabase extends _$AppDatabase {
     )..addColumns([count])).getSingle();
     return row.read(count) ?? 0;
   }
+
+  /// Exports only cross-device business tables as raw, deterministic-friendly maps.
+  Future<Map<String, List<Map<String, Object?>>>> exportBusinessData() async {
+    const tables = <String, String>{
+      'customers': 'id',
+      'deposits': 'id',
+      'renewals': 'id',
+      'audit_history': 'id',
+      'message_templates': 'id',
+      'import_batches': 'id',
+      'business_settings': 'singleton_id',
+    };
+    final result = <String, List<Map<String, Object?>>>{};
+    for (final table in tables.entries) {
+      final rows = await customSelect(
+        'SELECT * FROM ${table.key} ORDER BY ${table.value}',
+      ).get();
+      result[table.key] = rows
+          .map((row) => row.data.map((k, v) => MapEntry(k, v)))
+          .toList();
+    }
+    return result;
+  }
+
+  Future<void> replaceBusinessData(
+    Map<String, List<Map<String, Object?>>> data,
+  ) async {
+    const tables = <String>[
+      'customers',
+      'deposits',
+      'renewals',
+      'audit_history',
+      'message_templates',
+      'import_batches',
+      'business_settings',
+    ];
+    await transaction(() async {
+      for (final table in const [
+        'renewals',
+        'audit_history',
+        'deposits',
+        'customers',
+        'message_templates',
+        'import_batches',
+        'business_settings',
+      ]) {
+        await customStatement('DELETE FROM $table');
+      }
+      for (final table in tables) {
+        for (final row in data[table] ?? const []) {
+          final columns = row.keys.toList()..sort();
+          final placeholders = List.filled(columns.length, '?').join(', ');
+          await customStatement(
+            'INSERT INTO $table (${columns.join(', ')}) VALUES ($placeholders)',
+            columns.map((column) => row[column]).toList(),
+          );
+        }
+      }
+      await customStatement('REINDEX');
+    });
+  }
 }
