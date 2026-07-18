@@ -40,13 +40,15 @@ class AppDatabase extends _$AppDatabase {
     },
     onUpgrade: (migrator, from, to) async {
       if (from < 2) {
-        await migrator.addColumn(customers, customers.normalizedName);
-        await migrator.addColumn(customers, customers.fullPinyin);
-        await migrator.addColumn(customers, customers.initials);
-        await migrator.addColumn(customers, customers.normalizedPhone);
-        await migrator.addColumn(deposits, deposits.bankName);
-        await _backfillCustomerSearchIndexes();
-        await _createSearchIndexes();
+        await transaction(() async {
+          await migrator.addColumn(customers, customers.normalizedName);
+          await migrator.addColumn(customers, customers.fullPinyin);
+          await migrator.addColumn(customers, customers.initials);
+          await migrator.addColumn(customers, customers.normalizedPhone);
+          await migrator.addColumn(deposits, deposits.bankName);
+          await _backfillCustomerSearchIndexes();
+          await _createSearchIndexes();
+        });
       }
     },
     beforeOpen: (_) async {

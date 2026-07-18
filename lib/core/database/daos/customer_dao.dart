@@ -150,6 +150,64 @@ final class CustomerDao implements CustomerRepository {
 
   @override
   Future<List<CustomerSearchResult>> search(CustomerQuery query) async {
+    final statement = _buildSearchStatement(query);
+    final rows = await _db
+        .customSelect(
+          statement.sql,
+          variables: statement.variables,
+          readsFrom: {_db.customers, _db.deposits},
+        )
+        .get();
+
+    final results = <String, CustomerSearchResult>{};
+    for (final row in rows) {
+      final customerId = row.read<String>('customer_id');
+      final existing = results.putIfAbsent(
+        customerId,
+        () => CustomerSearchResult(
+          customer: CustomerRecord(
+            id: customerId,
+            name: row.read<String>('customer_name'),
+            phone: row.readNullable<String>('customer_phone'),
+            isActive: row.read<bool>('customer_is_active'),
+          ),
+          deposits: const [],
+        ),
+      );
+      final depositId = row.readNullable<String>('deposit_id');
+      if (depositId != null) {
+        results[customerId] = CustomerSearchResult(
+          customer: existing.customer,
+          deposits: [
+            ...existing.deposits,
+            CustomerSearchDeposit(
+              id: depositId,
+              bankName: row.read<String>('deposit_bank_name'),
+              finalExpiryDate: _parseDate(
+                row.read<String>('deposit_final_expiry_date'),
+              ),
+              lifecycle: DepositLifecycle.values.byName(
+                row.read<String>('deposit_lifecycle'),
+              ),
+            ),
+          ],
+        );
+      }
+    }
+    return List.unmodifiable(results.values);
+  }
+
+  Future<List<QueryRow>> explainSearchPlan(CustomerQuery query) {
+    final statement = _buildSearchStatement(query);
+    return _db
+        .customSelect(
+          'EXPLAIN QUERY PLAN ${statement.sql}',
+          variables: statement.variables,
+        )
+        .get();
+  }
+
+  _SearchStatement _buildSearchStatement(CustomerQuery query) {
     final normalizedText = normalizeSearchText(query.text);
     final escapedText = _escapeLike(normalizedText);
     final exact = normalizedText;
@@ -159,17 +217,15 @@ final class CustomerDao implements CustomerRepository {
     final where = <String>[];
 
     if (normalizedText.isNotEmpty) {
-      where.add(
-        '(c.normalized_name LIKE ? ESCAPE \'!\' '
-        'OR c.full_pinyin LIKE ? ESCAPE \'!\' '
-        'OR c.initials LIKE ? ESCAPE \'!\' '
-        'OR c.normalized_phone LIKE ? ESCAPE \'!\')',
-      );
+      variables.addAll(List.generate(4, (_) => Variable.withString(prefix)));
       variables.addAll(List.generate(4, (_) => Variable.withString(contains)));
+      variables.addAll(List.generate(4, (_) => Variable.withString(exact)));
+      variables.addAll(List.generate(4, (_) => Variable.withString(prefix)));
+      where.add('c.id IN (SELECT id FROM search_candidates)');
     }
     if (query.bank != null) {
-      where.add('LOWER(TRIM(d.bank_name)) = ?');
-      variables.add(Variable.withString(query.bank!.trim().toLowerCase()));
+      where.add('d.bank_name = ?');
+      variables.add(Variable.withString(query.bank!.trim()));
     }
     if (query.expiryFrom != null) {
       where.add('d.final_expiry_date >= ?');
@@ -202,17 +258,26 @@ CASE
   ELSE 2
 END
 ''';
-    if (normalizedText.isNotEmpty) {
-      variables.insertAll(0, <Variable<Object>>[
-        ...List.generate(4, (_) => Variable.withString(exact)),
-        ...List.generate(4, (_) => Variable.withString(prefix)),
-      ]);
-    }
-
     final join = query.hasDepositFilters ? 'JOIN' : 'LEFT JOIN';
-    final rows = await _db
-        .customSelect(
-          '''
+    final candidateCte = normalizedText.isEmpty
+        ? ''
+        : '''
+WITH search_candidates AS (
+  SELECT id FROM customers
+  WHERE normalized_name LIKE ? ESCAPE '!'
+     OR full_pinyin LIKE ? ESCAPE '!'
+     OR initials LIKE ? ESCAPE '!'
+     OR normalized_phone LIKE ? ESCAPE '!'
+  UNION
+  SELECT id FROM customers
+  WHERE normalized_name LIKE ? ESCAPE '!'
+     OR full_pinyin LIKE ? ESCAPE '!'
+     OR initials LIKE ? ESCAPE '!'
+     OR normalized_phone LIKE ? ESCAPE '!'
+)
+''';
+    return _SearchStatement('''
+$candidateCte
 SELECT
   c.id AS customer_id,
   c.name AS customer_name,
@@ -227,49 +292,7 @@ FROM customers c
 $join deposits d ON d.customer_id = c.id
 ${where.isEmpty ? '' : 'WHERE ${where.join(' AND ')}'}
 ORDER BY search_rank, c.rowid, d.rowid
-''',
-          variables: variables,
-          readsFrom: {_db.customers, _db.deposits},
-        )
-        .get();
-
-    final results = <String, CustomerSearchResult>{};
-    for (final row in rows) {
-      final customerId = row.read<String>('customer_id');
-      final existing = results.putIfAbsent(
-        customerId,
-        () => CustomerSearchResult(
-          customer: CustomerRecord(
-            id: customerId,
-            name: row.read<String>('customer_name'),
-            phone: row.readNullable<String>('customer_phone'),
-            isActive: row.read<bool>('customer_is_active'),
-          ),
-          deposits: const [],
-        ),
-      );
-      final depositId = row.readNullable<String>('deposit_id');
-      if (depositId != null) {
-        final deposits = <CustomerSearchDeposit>[
-          ...existing.deposits,
-          CustomerSearchDeposit(
-            id: depositId,
-            bankName: row.read<String>('deposit_bank_name'),
-            finalExpiryDate: _parseDate(
-              row.read<String>('deposit_final_expiry_date'),
-            ),
-            lifecycle: DepositLifecycle.values.byName(
-              row.read<String>('deposit_lifecycle'),
-            ),
-          ),
-        ];
-        results[customerId] = CustomerSearchResult(
-          customer: existing.customer,
-          deposits: deposits,
-        );
-      }
-    }
-    return List.unmodifiable(results.values);
+''', variables);
   }
 
   Future<CustomerRecord> _requireCustomer(String id) async {
@@ -346,4 +369,11 @@ ORDER BY search_rank, c.rowid, d.rowid
       int.parse(parts[2]),
     );
   }
+}
+
+final class _SearchStatement {
+  const _SearchStatement(this.sql, this.variables);
+
+  final String sql;
+  final List<Variable<Object>> variables;
 }

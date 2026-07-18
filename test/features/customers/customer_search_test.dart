@@ -171,17 +171,25 @@ void main() {
     );
   });
 
-  test('prefix lookup has a verifiable SQLite search index', () async {
-    final plan = await database
-        .customSelect(
-          "EXPLAIN QUERY PLAN SELECT id FROM customers "
-          "WHERE full_pinyin LIKE 'zhang%'",
-        )
-        .get();
+  test('production search prefix branch uses customer indexes', () async {
+    final plan = await customers.explainSearchPlan(
+      const CustomerQuery(text: 'zhang'),
+    );
 
     expect(
       plan.map((row) => row.read<String>('detail')).join('\n'),
       contains('customers_full_pinyin_idx'),
+    );
+  });
+
+  test('production bank filter uses the bank index', () async {
+    final plan = await customers.explainSearchPlan(
+      const CustomerQuery(bank: '\u4e2d\u56fd\u94f6\u884c'),
+    );
+
+    expect(
+      plan.map((row) => row.read<String>('detail')).join('\n'),
+      contains('deposits_bank_name_idx'),
     );
   });
 }
