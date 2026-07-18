@@ -183,8 +183,23 @@ void main() {
   });
 
   test('production bank filter uses the bank index', () async {
+    await customers.create(
+      const CustomerDraft(id: 'bank-customer', name: 'Bank Customer'),
+    );
+    await deposits.create(
+      _deposit(
+        id: 'icbc-deposit',
+        customerId: 'bank-customer',
+        bankName: ' ICBC ',
+        expiry: LocalDate(2027, 7, 18),
+      ),
+    );
+
+    final result = await service.search(const CustomerQuery(bank: 'icbc'));
+    expect(result.single.deposits.single.bankName, 'ICBC');
+
     final plan = await customers.explainSearchPlan(
-      const CustomerQuery(bank: '\u4e2d\u56fd\u94f6\u884c'),
+      const CustomerQuery(bank: 'icbc'),
     );
 
     expect(

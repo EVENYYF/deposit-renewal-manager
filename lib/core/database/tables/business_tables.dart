@@ -39,7 +39,10 @@ class Customers extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
-@TableIndex(name: 'deposits_bank_name_idx', columns: {#bankName})
+@TableIndex.sql(
+  'CREATE INDEX deposits_bank_name_idx '
+  'ON deposits (bank_name COLLATE NOCASE)',
+)
 @TableIndex(
   name: 'deposits_expiry_lifecycle_customer_idx',
   columns: {#finalExpiryDate, #lifecycle, #customerId},

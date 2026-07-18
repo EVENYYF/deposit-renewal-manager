@@ -4,13 +4,12 @@ import 'package:deposit_renewal_manager/core/database/app_database.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
+import 'package:uuid/uuid.dart';
 
 void main() {
   test('migrates a real v1 file database and backfills search data', () async {
     final file = await _createV1File();
-    addTearDown(() async {
-      if (file.existsSync()) file.deleteSync();
-    });
+    addTearDown(() => _deleteDatabaseFiles(file));
 
     final database = AppDatabase.forTesting(NativeDatabase(file));
     addTearDown(database.close);
@@ -29,9 +28,7 @@ void main() {
     expect(customers[1].read<String>('normalized_phone'), '13800138000');
 
     final deposit = await database
-        .customSelect(
-          "SELECT bank_name FROM deposits WHERE id = 'old-deposit'",
-        )
+        .customSelect("SELECT bank_name FROM deposits WHERE id = 'old-deposit'")
         .getSingle();
     expect(deposit.read<String>('bank_name'), isEmpty);
 
@@ -49,13 +46,18 @@ void main() {
         'deposits_expiry_lifecycle_customer_idx',
       }),
     );
+    final bankIndex = await database
+        .customSelect(
+          "SELECT sql FROM sqlite_master "
+          "WHERE name = 'deposits_bank_name_idx'",
+        )
+        .getSingle();
+    expect(bankIndex.read<String>('sql'), contains('COLLATE NOCASE'));
   });
 
   test('failed v1 migration leaves no partial schema changes', () async {
     final file = await _createV1File(conflictingIndex: true);
-    addTearDown(() async {
-      if (file.existsSync()) file.deleteSync();
-    });
+    addTearDown(() => _deleteDatabaseFiles(file));
 
     final database = AppDatabase.forTesting(NativeDatabase(file));
     await expectLater(
@@ -73,8 +75,10 @@ void main() {
 }
 
 Future<File> _createV1File({bool conflictingIndex = false}) async {
-  final directory = await Directory.systemTemp.createTemp('deposit-v1-');
-  final file = File('${directory.path}${Platform.pathSeparator}app.sqlite');
+  final file = File(
+    '${Directory.systemTemp.path}${Platform.pathSeparator}'
+    'deposit-v1-${const Uuid().v4()}.sqlite',
+  );
   final raw = sqlite.sqlite3.open(file.path);
   raw.execute('''
 CREATE TABLE customers (
@@ -114,4 +118,11 @@ PRAGMA user_version = 1;
   }
   raw.dispose();
   return file;
+}
+
+Future<void> _deleteDatabaseFiles(File databaseFile) async {
+  for (final suffix in ['', '-wal', '-shm', '-journal']) {
+    final file = File('${databaseFile.path}$suffix');
+    if (await file.exists()) await file.delete();
+  }
 }

@@ -3865,7 +3865,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final Index depositsBankNameIdx = Index(
     'deposits_bank_name_idx',
-    'CREATE INDEX deposits_bank_name_idx ON deposits (bank_name)',
+    'CREATE INDEX deposits_bank_name_idx ON deposits (bank_name COLLATE NOCASE)',
   );
   late final Index depositsExpiryLifecycleCustomerIdx = Index(
     'deposits_expiry_lifecycle_customer_idx',

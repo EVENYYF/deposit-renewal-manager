@@ -224,7 +224,7 @@ final class CustomerDao implements CustomerRepository {
       where.add('c.id IN (SELECT id FROM search_candidates)');
     }
     if (query.bank != null) {
-      where.add('d.bank_name = ?');
+      where.add('d.bank_name = ? COLLATE NOCASE');
       variables.add(Variable.withString(query.bank!.trim()));
     }
     if (query.expiryFrom != null) {

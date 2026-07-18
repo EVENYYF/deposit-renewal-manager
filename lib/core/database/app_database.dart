@@ -95,7 +95,8 @@ class AppDatabase extends _$AppDatabase {
       'ON customers (normalized_phone)',
     );
     await customStatement(
-      'CREATE INDEX deposits_bank_name_idx ON deposits (bank_name)',
+      'CREATE INDEX deposits_bank_name_idx '
+      'ON deposits (bank_name COLLATE NOCASE)',
     );
     await customStatement(
       'CREATE INDEX deposits_expiry_lifecycle_customer_idx '
