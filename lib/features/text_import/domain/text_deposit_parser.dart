@@ -125,8 +125,9 @@ final class TextDepositParser {
     final labeledPattern = RegExp(
       r'(?:联系电话|手机号码|手机号|手机|电话)\s*[:：]?\s*'
       r'([A-Za-z0-9 -]+?)'
-      r'(?=\s*(?:(?:金额|银行|年利率|利率|存期|期限|到期|存入|产品|备注|姓名|客户)|$)'
-      r'|[,，。；;\r\n])',
+      r'(?=\s*(?:(?:联系电话|手机号码|手机号|手机|电话|金额|银行|年利率|利率|'
+      r'存期|期限|到期|存入|产品|备注|姓名|客户)|$)'
+      r'|[,，。；;:：\r\n])',
     );
     for (final match in labeledPattern.allMatches(normalized)) {
       final token = match.group(1)!;

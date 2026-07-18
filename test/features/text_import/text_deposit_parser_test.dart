@@ -276,6 +276,30 @@ void main() {
       }
     });
 
+    test(
+      'keeps adjacent labeled mobile fields as separate complete tokens',
+      () {
+        for (final source in [
+          '手机138--0013-8000电话13900139000',
+          '手机138--0013-8000：电话13900139000',
+        ]) {
+          final phones = parser
+              .parse(source)
+              .candidates
+              .where((item) => item.field == ParseField.phone)
+              .toList();
+          expect(phones, hasLength(2), reason: source);
+          expect(phones[0].value, isNull, reason: source);
+          expect(
+            phones[0].source,
+            startsWith('手机138--0013-8000'),
+            reason: source,
+          );
+          expect(phones[1].value, '13900139000', reason: source);
+        }
+      },
+    );
+
     test('uses the same mobile prefix rule for labeled and bare tokens', () {
       for (final source in ['手机11000000000', '12000000000']) {
         final candidate = parser
