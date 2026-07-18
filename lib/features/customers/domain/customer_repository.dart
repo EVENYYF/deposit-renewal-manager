@@ -39,3 +39,12 @@ final class CustomerHasActiveDepositsException implements Exception {
   String toString() =>
       'CustomerHasActiveDepositsException(customerId: $customerId)';
 }
+
+final class CustomerInactiveException implements Exception {
+  const CustomerInactiveException(this.customerId);
+
+  final String customerId;
+
+  @override
+  String toString() => 'CustomerInactiveException(customerId: $customerId)';
+}

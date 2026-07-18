@@ -4,6 +4,7 @@ import 'package:deposit_renewal_manager/core/database/daos/deposit_dao.dart';
 import 'package:deposit_renewal_manager/features/customers/domain/customer_repository.dart';
 import 'package:deposit_renewal_manager/features/deposits/domain/deposit_repository.dart';
 import 'package:deposit_renewal_manager/features/deposits/domain/local_date.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -66,7 +67,24 @@ void main() {
 
   test('schema enforces foreign keys and financial constraints', () async {
     await expectLater(
-      deposits.create(_draft(id: 'orphan', customerId: 'missing')),
+      database
+          .into(database.deposits)
+          .insert(
+            DepositsCompanion.insert(
+              id: 'orphan',
+              customerId: 'missing',
+              amountCents: 100,
+              interestRateScaled: 1,
+              ratePrecision: 1,
+              startDate: '2026-07-18',
+              calculatedExpiryDate: const Value(null),
+              finalExpiryDate: '2027-07-18',
+              lifecycle: 'active',
+              createdAtUtc: '2026-07-18T08:30:00.000Z',
+              updatedAtUtc: '2026-07-18T08:30:00.000Z',
+              sourceDeviceId: 'test',
+            ),
+          ),
       throwsA(isA<Exception>()),
     );
 
@@ -97,6 +115,164 @@ void main() {
 
     expect((await customers.get('customer-1'))!.isActive, isTrue);
     expect(await database.businessRevision(), 2);
+  });
+
+  test(
+    'inactive customer rejects deposit creation without partial writes',
+    () async {
+      await customers.create(
+        const CustomerDraft(id: 'inactive', name: 'Inactive'),
+      );
+      await customers.deactivate('inactive');
+      final revisionBefore = await database.businessRevision();
+      final auditCountBefore = await database.auditEntryCount();
+
+      await expectLater(
+        deposits.create(_draft(id: 'rejected', customerId: 'inactive')),
+        throwsA(isA<CustomerInactiveException>()),
+      );
+
+      expect(await deposits.get('rejected'), isNull);
+      expect(await database.businessRevision(), revisionBefore);
+      expect(await database.auditEntryCount(), auditCountBefore);
+    },
+  );
+
+  test(
+    'inactive customer rejects deposit transfer without partial writes',
+    () async {
+      await customers.create(const CustomerDraft(id: 'active', name: 'Active'));
+      await customers.create(
+        const CustomerDraft(id: 'inactive', name: 'Inactive'),
+      );
+      await customers.deactivate('inactive');
+      await deposits.create(_draft(id: 'deposit-1', customerId: 'active'));
+      final revisionBefore = await database.businessRevision();
+      final auditCountBefore = await database.auditEntryCount();
+
+      await expectLater(
+        deposits.update(
+          'deposit-1',
+          _draft(id: 'ignored', customerId: 'inactive'),
+        ),
+        throwsA(isA<CustomerInactiveException>()),
+      );
+
+      expect((await deposits.get('deposit-1'))!.customerId, 'active');
+      expect(await database.businessRevision(), revisionBefore);
+      expect(await database.auditEntryCount(), auditCountBefore);
+    },
+  );
+
+  test('schema rejects malformed dates and non-UTC timestamps', () async {
+    await customers.create(
+      const CustomerDraft(id: 'customer-1', name: 'Valid'),
+    );
+
+    await expectLater(
+      database
+          .into(database.deposits)
+          .insert(
+            DepositsCompanion.insert(
+              id: 'bad-date',
+              customerId: 'customer-1',
+              amountCents: 100,
+              interestRateScaled: 1,
+              ratePrecision: 1,
+              startDate: '2026-a7-18',
+              calculatedExpiryDate: const Value(null),
+              finalExpiryDate: '2027-07-18',
+              lifecycle: 'active',
+              createdAtUtc: '2026-07-18T08:30:00.000Z',
+              updatedAtUtc: '2026-07-18T08:30:00.000Z',
+              sourceDeviceId: 'test',
+            ),
+          ),
+      throwsA(isA<Exception>()),
+    );
+
+    await expectLater(
+      database
+          .into(database.customers)
+          .insert(
+            CustomersCompanion.insert(
+              id: 'bad-time',
+              name: 'Bad time',
+              createdAtUtc: '2026-07-18T08:30:00+08:00',
+              updatedAtUtc: '2026-07-18T08:30:00+08:00',
+            ),
+          ),
+      throwsA(isA<Exception>()),
+    );
+  });
+
+  test('deposit reads still validate actual calendar dates', () async {
+    await customers.create(
+      const CustomerDraft(id: 'customer-1', name: 'Valid'),
+    );
+    await database
+        .into(database.deposits)
+        .insert(
+          DepositsCompanion.insert(
+            id: 'invalid-calendar-date',
+            customerId: 'customer-1',
+            amountCents: 100,
+            interestRateScaled: 1,
+            ratePrecision: 1,
+            startDate: '2026-02-31',
+            calculatedExpiryDate: const Value(null),
+            finalExpiryDate: '2027-07-18',
+            lifecycle: 'active',
+            createdAtUtc: '2026-07-18T08:30:00.000Z',
+            updatedAtUtc: '2026-07-18T08:30:00.000Z',
+            sourceDeviceId: 'test',
+          ),
+        );
+
+    await expectLater(
+      deposits.get('invalid-calendar-date'),
+      throwsArgumentError,
+    );
+  });
+
+  test('foreign keys restrict deletion of referenced business rows', () async {
+    await customers.create(
+      const CustomerDraft(id: 'customer-1', name: 'Valid'),
+    );
+    await deposits.create(_draft(id: 'source', customerId: 'customer-1'));
+
+    await expectLater(
+      (database.delete(
+        database.customers,
+      )..where((row) => row.id.equals('customer-1'))).go(),
+      throwsA(isA<Exception>()),
+    );
+
+    await deposits.renew(
+      'source',
+      _draft(id: 'target', customerId: 'customer-1'),
+    );
+    await expectLater(
+      (database.delete(
+        database.deposits,
+      )..where((row) => row.id.equals('source'))).go(),
+      throwsA(isA<Exception>()),
+    );
+  });
+
+  test('business revision increases monotonically across operations', () async {
+    expect(await database.businessRevision(), 0);
+    await customers.create(const CustomerDraft(id: 'customer-1', name: 'One'));
+    expect(await database.businessRevision(), 1);
+    await customers.update(
+      'customer-1',
+      const CustomerDraft(id: 'ignored', name: 'Two'),
+    );
+    expect(await database.businessRevision(), 2);
+    await deposits.create(_draft(id: 'deposit-1', customerId: 'customer-1'));
+    expect(await database.businessRevision(), 3);
+    await deposits.stopRenewal('deposit-1');
+    expect(await database.businessRevision(), 4);
   });
 
   test(

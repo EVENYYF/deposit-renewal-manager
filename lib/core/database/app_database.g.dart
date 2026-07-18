@@ -60,6 +60,7 @@ class $CustomersTable extends Customers
     'created_at_utc',
     aliasedName,
     false,
+    check: () => utcIsoTextCheck('created_at_utc'),
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
@@ -71,6 +72,7 @@ class $CustomersTable extends Customers
     'updated_at_utc',
     aliasedName,
     false,
+    check: () => utcIsoTextCheck('updated_at_utc'),
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
@@ -447,7 +449,7 @@ class $DepositsTable extends Deposits with TableInfo<$DepositsTable, Deposit> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES customers (id)',
+      'REFERENCES customers (id) ON DELETE RESTRICT',
     ),
   );
   static const VerificationMeta _amountCentsMeta = const VerificationMeta(
@@ -493,6 +495,7 @@ class $DepositsTable extends Deposits with TableInfo<$DepositsTable, Deposit> {
     'start_date',
     aliasedName,
     false,
+    check: () => isoDateTextCheck('start_date'),
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
@@ -504,6 +507,7 @@ class $DepositsTable extends Deposits with TableInfo<$DepositsTable, Deposit> {
         'calculated_expiry_date',
         aliasedName,
         true,
+        check: () => isoDateTextCheck('calculated_expiry_date'),
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
@@ -515,6 +519,7 @@ class $DepositsTable extends Deposits with TableInfo<$DepositsTable, Deposit> {
     'final_expiry_date',
     aliasedName,
     false,
+    check: () => isoDateTextCheck('final_expiry_date'),
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
@@ -540,6 +545,7 @@ class $DepositsTable extends Deposits with TableInfo<$DepositsTable, Deposit> {
     'created_at_utc',
     aliasedName,
     false,
+    check: () => utcIsoTextCheck('created_at_utc'),
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
@@ -551,6 +557,7 @@ class $DepositsTable extends Deposits with TableInfo<$DepositsTable, Deposit> {
     'updated_at_utc',
     aliasedName,
     false,
+    check: () => utcIsoTextCheck('updated_at_utc'),
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
@@ -1209,7 +1216,7 @@ class $RenewalsTable extends Renewals with TableInfo<$RenewalsTable, Renewal> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'UNIQUE REFERENCES deposits (id)',
+      'UNIQUE REFERENCES deposits (id) ON DELETE RESTRICT',
     ),
   );
   static const VerificationMeta _targetDepositIdMeta = const VerificationMeta(
@@ -1223,7 +1230,7 @@ class $RenewalsTable extends Renewals with TableInfo<$RenewalsTable, Renewal> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'UNIQUE REFERENCES deposits (id)',
+      'UNIQUE REFERENCES deposits (id) ON DELETE RESTRICT',
     ),
   );
   static const VerificationMeta _renewedAtUtcMeta = const VerificationMeta(
@@ -1234,6 +1241,7 @@ class $RenewalsTable extends Renewals with TableInfo<$RenewalsTable, Renewal> {
     'renewed_at_utc',
     aliasedName,
     false,
+    check: () => utcIsoTextCheck('renewed_at_utc'),
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
@@ -1655,6 +1663,7 @@ class $AuditHistoryTable extends AuditHistory
     'occurred_at_utc',
     aliasedName,
     false,
+    check: () => utcIsoTextCheck('occurred_at_utc'),
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
@@ -2218,6 +2227,7 @@ class $MessageTemplatesTable extends MessageTemplates
     'created_at_utc',
     aliasedName,
     false,
+    check: () => utcIsoTextCheck('created_at_utc'),
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
@@ -2229,6 +2239,7 @@ class $MessageTemplatesTable extends MessageTemplates
     'updated_at_utc',
     aliasedName,
     false,
+    check: () => utcIsoTextCheck('updated_at_utc'),
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
@@ -2648,6 +2659,7 @@ class $ImportBatchesTable extends ImportBatches
     'imported_at_utc',
     aliasedName,
     false,
+    check: () => utcIsoTextCheck('imported_at_utc'),
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
@@ -3319,6 +3331,7 @@ class $NotificationIdMappingsTable extends NotificationIdMappings
     'created_at_utc',
     aliasedName,
     false,
+    check: () => utcIsoTextCheck('created_at_utc'),
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );

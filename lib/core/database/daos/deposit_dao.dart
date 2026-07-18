@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../../features/deposits/domain/deposit.dart' as domain;
 import '../../../features/deposits/domain/deposit_repository.dart';
 import '../../../features/deposits/domain/local_date.dart';
+import '../../../features/customers/domain/customer_repository.dart';
 import '../app_database.dart' as db;
 import 'customer_dao.dart';
 
@@ -36,6 +37,7 @@ final class DepositDao implements DepositRepository {
 
   @override
   Future<StoredDeposit> create(DepositDraft draft) => _db.transaction(() async {
+    await _requireActiveCustomer(draft.customerId);
     final timestamp = _timestamp();
     await _insertDraft(draft, timestamp);
     final revision = await _db.incrementBusinessRevision();
@@ -57,6 +59,7 @@ final class DepositDao implements DepositRepository {
       _db.transaction(() async {
         final before = await _requireRow(id);
         if (before.lifecycle != 'active') throw DepositNotActiveException(id);
+        await _requireActiveCustomer(draft.customerId);
         await (_db.update(
           _db.deposits,
         )..where((deposit) => deposit.id.equals(id))).write(
@@ -105,6 +108,7 @@ final class DepositDao implements DepositRepository {
             'Must match the source customer',
           );
         }
+        await _requireActiveCustomer(before.customerId);
 
         final timestamp = _timestamp();
         await (_db.update(
@@ -210,6 +214,14 @@ final class DepositDao implements DepositRepository {
     )..where((deposit) => deposit.id.equals(id))).getSingleOrNull();
     if (row == null) throw StateError('Deposit not found: $id');
     return row;
+  }
+
+  Future<void> _requireActiveCustomer(String id) async {
+    final customer = await (_db.select(
+      _db.customers,
+    )..where((row) => row.id.equals(id))).getSingleOrNull();
+    if (customer == null) throw StateError('Customer not found: $id');
+    if (!customer.isActive) throw CustomerInactiveException(id);
   }
 
   StoredDeposit _toStored(db.Deposit row) {

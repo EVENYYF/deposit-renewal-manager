@@ -7,6 +7,7 @@ import 'package:deposit_renewal_manager/features/customers/domain/customer_repos
 import 'package:deposit_renewal_manager/features/deposits/domain/deposit.dart';
 import 'package:deposit_renewal_manager/features/deposits/domain/deposit_repository.dart';
 import 'package:deposit_renewal_manager/features/deposits/domain/local_date.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -49,37 +50,82 @@ void main() {
     },
   );
 
-  test(
-    'fault during renewal rolls back source target history and revision',
-    () async {
-      final stableRepository = _repository(database);
-      await stableRepository.create(_draft('source'));
-      final revisionBefore = await database.businessRevision();
-      final auditCountBefore = await database.auditEntryCount();
-      final failingRepository = _repository(
-        database,
-        failureInjector: (point) async {
-          if (point == RenewalFailurePoint.afterTargetInsert) {
-            throw StateError('injected failure');
-          }
-        },
-      );
+  for (final failurePoint in RenewalFailurePoint.values) {
+    test(
+      'fault at $failurePoint rolls back source target history and revision',
+      () async {
+        final stableRepository = _repository(database);
+        await stableRepository.create(_draft('source'));
+        final revisionBefore = await database.businessRevision();
+        final auditCountBefore = await database.auditEntryCount();
+        final failingRepository = _repository(
+          database,
+          failureInjector: (point) async {
+            if (point == failurePoint) {
+              throw StateError('injected failure');
+            }
+          },
+        );
 
-      await expectLater(
-        failingRepository.renew('source', _draft('target')),
-        throwsStateError,
-      );
+        await expectLater(
+          failingRepository.renew('source', _draft('target')),
+          throwsStateError,
+        );
 
-      expect(
-        (await stableRepository.get('source'))!.deposit.lifecycle,
-        DepositLifecycle.active,
-      );
-      expect(await stableRepository.get('target'), isNull);
-      expect(await stableRepository.renewalSourceOf('target'), isNull);
-      expect(await database.auditEntryCount(), auditCountBefore);
-      expect(await database.businessRevision(), revisionBefore);
-    },
-  );
+        expect(
+          (await stableRepository.get('source'))!.deposit.lifecycle,
+          DepositLifecycle.active,
+        );
+        expect(await stableRepository.get('target'), isNull);
+        expect(await stableRepository.renewalSourceOf('target'), isNull);
+        expect(await database.auditEntryCount(), auditCountBefore);
+        expect(await database.businessRevision(), revisionBefore);
+      },
+    );
+  }
+
+  test('renew rejects inactive customer without partial writes', () async {
+    final repository = _repository(database);
+    await repository.create(_draft('source'));
+    await (database.update(database.customers)
+          ..where((row) => row.id.equals('customer-1')))
+        .write(const CustomersCompanion(isActive: Value(false)));
+    final revisionBefore = await database.businessRevision();
+    final auditCountBefore = await database.auditEntryCount();
+
+    await expectLater(
+      repository.renew('source', _draft('target')),
+      throwsA(isA<CustomerInactiveException>()),
+    );
+
+    expect(
+      (await repository.get('source'))!.deposit.lifecycle,
+      DepositLifecycle.active,
+    );
+    expect(await repository.get('target'), isNull);
+    expect(await database.businessRevision(), revisionBefore);
+    expect(await database.auditEntryCount(), auditCountBefore);
+  });
+
+  test('renew rejects duplicate and non-active source deposits', () async {
+    final repository = _repository(database);
+    await repository.create(_draft('source'));
+    await repository.renew('source', _draft('target'));
+    final revisionBefore = await database.businessRevision();
+    final auditCountBefore = await database.auditEntryCount();
+
+    await expectLater(
+      repository.renew('source', _draft('another-target')),
+      throwsA(isA<DepositNotActiveException>()),
+    );
+    await expectLater(
+      repository.renew('target', _draft('source')),
+      throwsA(isA<Exception>()),
+    );
+
+    expect(await database.businessRevision(), revisionBefore);
+    expect(await database.auditEntryCount(), auditCountBefore);
+  });
 
   test('stop renewal and its audit share one transaction', () async {
     final repository = _repository(database);

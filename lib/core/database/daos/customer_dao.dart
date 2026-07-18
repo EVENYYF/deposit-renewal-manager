@@ -97,6 +97,7 @@ final class CustomerDao implements CustomerRepository {
   @override
   Future<void> deactivate(String id) => _db.transaction(() async {
     final existing = await _requireCustomer(id);
+    if (!existing.isActive) return;
     final activeDeposit =
         await (_db.select(_db.deposits)
               ..where(
@@ -109,8 +110,6 @@ final class CustomerDao implements CustomerRepository {
     if (activeDeposit != null) {
       throw CustomerHasActiveDepositsException(id);
     }
-    if (!existing.isActive) return;
-
     await (_db.update(
       _db.customers,
     )..where((customer) => customer.id.equals(id))).write(

@@ -50,13 +50,16 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<int> incrementBusinessRevision() async {
-    final nextRevision = await businessRevision() + 1;
-    await (update(
-      businessSettings,
-    )..where((settings) => settings.singletonId.equals(1))).write(
-      BusinessSettingsCompanion(businessRevision: Value(nextRevision)),
+    final affectedRows = await customUpdate(
+      'UPDATE business_settings '
+      'SET business_revision = business_revision + 1 '
+      'WHERE singleton_id = 1',
+      updates: {businessSettings},
     );
-    return nextRevision;
+    if (affectedRows != 1) {
+      throw StateError('Business revision singleton is missing');
+    }
+    return businessRevision();
   }
 
   Future<List<AuditHistoryData>> auditEntriesFor(
