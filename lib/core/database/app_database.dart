@@ -174,6 +174,58 @@ class AppDatabase extends _$AppDatabase {
   Future<void> replaceBusinessData(
     Map<String, List<Map<String, Object?>>> data,
   ) async {
+    await transaction(() => _replaceBusinessDataWithoutTransaction(data));
+  }
+
+  /// Restores [data] only while the expected import is still the latest write.
+  ///
+  /// The no-op update acquires SQLite's write lock before either guard is read,
+  /// so another connection cannot commit a business write between comparison
+  /// and replacement.
+  Future<bool> restoreLatestExcelImportAtomically({
+    required String expectedAuditId,
+    required int expectedBusinessRevision,
+    required Map<String, List<Map<String, Object?>>> data,
+  }) {
+    return transaction(() async {
+      final locked = await customUpdate(
+        'UPDATE business_settings SET business_revision = business_revision '
+        'WHERE singleton_id = 1',
+        updates: {businessSettings},
+      );
+      if (locked != 1) {
+        throw StateError('Business revision singleton is missing');
+      }
+
+      final currentRevision = await businessRevision();
+      final latestImport =
+          await (select(auditHistory)
+                ..where(
+                  (entry) =>
+                      entry.entityType.equals('import_batch') &
+                      entry.operation.equals('excel-import'),
+                )
+                ..orderBy([
+                  (entry) => OrderingTerm.desc(entry.businessRevision),
+                  (entry) => OrderingTerm.desc(entry.occurredAtUtc),
+                  (entry) => OrderingTerm.desc(entry.id),
+                ])
+                ..limit(1))
+              .getSingleOrNull();
+      if (currentRevision != expectedBusinessRevision ||
+          latestImport?.id != expectedAuditId ||
+          latestImport?.businessRevision != expectedBusinessRevision) {
+        return false;
+      }
+
+      await _replaceBusinessDataWithoutTransaction(data);
+      return true;
+    });
+  }
+
+  Future<void> _replaceBusinessDataWithoutTransaction(
+    Map<String, List<Map<String, Object?>>> data,
+  ) async {
     const tables = <String>[
       'customers',
       'deposits',
@@ -183,29 +235,27 @@ class AppDatabase extends _$AppDatabase {
       'import_batches',
       'business_settings',
     ];
-    await transaction(() async {
-      for (final table in const [
-        'renewals',
-        'audit_history',
-        'deposits',
-        'customers',
-        'message_templates',
-        'import_batches',
-        'business_settings',
-      ]) {
-        await customStatement('DELETE FROM $table');
+    for (final table in const [
+      'renewals',
+      'audit_history',
+      'deposits',
+      'customers',
+      'message_templates',
+      'import_batches',
+      'business_settings',
+    ]) {
+      await customStatement('DELETE FROM $table');
+    }
+    for (final table in tables) {
+      for (final row in data[table] ?? const []) {
+        final columns = row.keys.toList()..sort();
+        final placeholders = List.filled(columns.length, '?').join(', ');
+        await customStatement(
+          'INSERT INTO $table (${columns.join(', ')}) VALUES ($placeholders)',
+          columns.map((column) => row[column]).toList(),
+        );
       }
-      for (final table in tables) {
-        for (final row in data[table] ?? const []) {
-          final columns = row.keys.toList()..sort();
-          final placeholders = List.filled(columns.length, '?').join(', ');
-          await customStatement(
-            'INSERT INTO $table (${columns.join(', ')}) VALUES ($placeholders)',
-            columns.map((column) => row[column]).toList(),
-          );
-        }
-      }
-      await customStatement('REINDEX');
-    });
+    }
+    await customStatement('REINDEX');
   }
 }

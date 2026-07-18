@@ -32,8 +32,8 @@ class ImportRow {
     required this.normalized,
     this.errors = const [],
     this.warnings = const [],
-    this.availableDecisions = const {},
-  });
+    Set<DuplicateDecision> availableDecisions = const {},
+  }) : availableDecisions = Set.of(availableDecisions);
   final int rowNumber;
   final Map<String, Object?> raw;
   final Map<String, Object?> normalized;
@@ -81,22 +81,31 @@ class ImportResult {
     required this.affectedCustomerIds,
     required this.completedBusinessRevision,
     required this.preSnapshotId,
+    this.warnings = const [],
   });
   final String batchId;
   final int importedRows, skippedRows, failedRows, completedBusinessRevision;
   final List<String> affectedCustomerIds;
   final String? preSnapshotId;
+  final List<String> warnings;
 }
 
 LocalDate? parseImportDate(Object? value) {
   if (value is DateTime) return LocalDate(value.year, value.month, value.day);
   if (value is num) {
-    final d = DateTime.utc(
-      1899,
-      12,
-      30,
-    ).add(Duration(milliseconds: (value * 86400000).round()));
-    return LocalDate(d.year, d.month, d.day);
+    final serial = value.toDouble();
+    if (!serial.isFinite || serial < 1 || serial > 2958465) return null;
+    try {
+      final d = DateTime.utc(
+        1899,
+        12,
+        30,
+      ).add(Duration(milliseconds: (serial * 86400000).round()));
+      if (d.year < 1900 || d.year > 9999) return null;
+      return LocalDate(d.year, d.month, d.day);
+    } catch (_) {
+      return null;
+    }
   }
   final s = value?.toString().trim() ?? '';
   final m = RegExp(r'^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$').firstMatch(s);

@@ -9,3 +9,17 @@
 - `flutter test`：99 tests passed
 
 实现说明：旧式 `.xls`、公式单元格和合并单元格在解析前/解析时显式拒绝；Excel serial date 转换采用 1899-12-30 基准。导入前调用注入快照函数，客户、存款、批次、审计和 revision 在单个 Drift transaction 中提交；失败由事务回滚。撤销仅允许最新导入且 revision 未变化，并从审计中取得 preSnapshotId。
+## Task7 hardening verification (2026-07-19)
+
+- XLSX preview enforces 50 MiB, one worksheet, 10,000 rows, and 50 columns;
+  malformed cells become row-level errors.
+- Required mappings and unique headers are validated. Phones use strict
+  3-4-4 mobile formatting and rates use Decimal fixed-point percentage
+  storage (`interestRateScaled` and `ratePrecision`).
+- DuplicateResolver reports existing customers and field conflicts. Commit
+  rejects incompatible decisions and duplicate content hashes, records audit
+  hash/snapshot/revision metadata, and returns hook failures as warnings.
+- Undo re-checks audit id and business revision under a write-locked
+  transaction before restoring the pre-import snapshot.
+- Verification: `flutter analyze` clean; full `flutter test` passed (109
+  tests); `git diff --check` clean.

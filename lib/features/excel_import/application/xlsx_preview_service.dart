@@ -1,19 +1,50 @@
 import 'dart:io';
 import 'dart:isolate';
+
+import 'package:decimal/decimal.dart';
 import 'package:excel/excel.dart';
+
 import '../domain/import_models.dart';
 
 class XlsxPreviewService {
   const XlsxPreviewService();
+
+  static const maxFileBytes = 50 * 1024 * 1024;
+  static const maxRows = 10000;
+  static const maxColumns = 50;
+  static const maxSheets = 20;
+
   Future<ImportPreview> preview(
     String path, {
     Map<String, ImportField>? mapping,
   }) async {
-    if (!path.toLowerCase().endsWith('.xlsx'))
+    if (!path.toLowerCase().endsWith('.xlsx')) {
       throw const UnsupportedSpreadsheetException(
         'Only .xlsx spreadsheets are supported',
       );
-    final bytes = await File(path).readAsBytes();
+    }
+    final file = File(path);
+    late final int size;
+    try {
+      size = await file.length();
+    } catch (_) {
+      throw const UnsupportedSpreadsheetException(
+        'Unable to read the spreadsheet file',
+      );
+    }
+    if (size > maxFileBytes) {
+      throw const UnsupportedSpreadsheetException(
+        'Spreadsheet exceeds the 50 MiB import limit',
+      );
+    }
+    late final List<int> bytes;
+    try {
+      bytes = await file.readAsBytes();
+    } catch (_) {
+      throw const UnsupportedSpreadsheetException(
+        'Unable to read the spreadsheet file',
+      );
+    }
     return previewBytes(bytes, mapping: mapping);
   }
 
@@ -21,75 +52,150 @@ class XlsxPreviewService {
     List<int> bytes, {
     Map<String, ImportField>? mapping,
   }) {
-    final m = mapping == null ? null : Map<String, ImportField>.from(mapping);
-    return Isolate.run(() => _parse(bytes, m));
+    if (bytes.length > maxFileBytes) {
+      throw const UnsupportedSpreadsheetException(
+        'Spreadsheet exceeds the 50 MiB import limit',
+      );
+    }
+    final copiedMapping = mapping == null
+        ? null
+        : Map<String, ImportField>.from(mapping);
+    return Isolate.run(() => _parse(bytes, copiedMapping));
   }
 
   static ImportPreview _parse(
     List<int> bytes,
     Map<String, ImportField>? supplied,
   ) {
-    final excel = Excel.decodeBytes(bytes);
+    late final Excel excel;
+    try {
+      excel = Excel.decodeBytes(bytes);
+    } catch (_) {
+      throw const UnsupportedSpreadsheetException(
+        'The spreadsheet is damaged or is not a valid .xlsx file',
+      );
+    }
+    if (excel.tables.isEmpty) {
+      throw const UnsupportedSpreadsheetException(
+        'The spreadsheet does not contain a worksheet',
+      );
+    }
+    if (excel.tables.length > maxSheets) {
+      throw const UnsupportedSpreadsheetException(
+        'The spreadsheet exceeds the 20 worksheet import limit',
+      );
+    }
+    if (excel.tables.length != 1) {
+      throw const UnsupportedSpreadsheetException(
+        'Exactly one worksheet is required for import',
+      );
+    }
     final sheetEntry = excel.tables.entries.first;
     if (excel.getMergedCells(sheetEntry.key).isNotEmpty) {
       throw const UnsupportedSpreadsheetException(
         'Merged cells are not supported in import sheets',
       );
     }
-    final sheet = sheetEntry.value;
-    final rows = sheet.rows;
-    if (rows.isEmpty)
+    final rows = sheetEntry.value.rows;
+    if (rows.length > maxRows) {
+      throw const UnsupportedSpreadsheetException(
+        'The worksheet exceeds the 10000 row import limit',
+      );
+    }
+    if (rows.any((row) => row.length > maxColumns)) {
+      throw const UnsupportedSpreadsheetException(
+        'The worksheet exceeds the 50 column import limit',
+      );
+    }
+    if (rows.isEmpty) {
       return ImportPreview(rows: const [], mapping: supplied ?? const {});
-    final headers = rows.first
-        .map((c) => (_value(c?.value) ?? '').toString().trim())
-        .toList();
+    }
+
+    final headers = <String>[];
+    for (final cell in rows.first) {
+      try {
+        headers.add((_value(cell?.value) ?? '').toString().trim());
+      } catch (_) {
+        throw const UnsupportedSpreadsheetException(
+          'Header cells must contain plain text values',
+        );
+      }
+    }
+    _validateHeaders(headers);
     final mapping = supplied ?? _infer(headers);
+    _validateMapping(mapping, headers);
+
     final parsed = <ImportRow>[];
     for (var i = 1; i < rows.length; i++) {
       final cells = rows[i];
       final raw = <String, Object?>{};
-      for (var j = 0; j < headers.length; j++)
-        raw[headers[j]] = j < cells.length ? _value(cells[j]?.value) : null;
-      final normalized = <String, Object?>{};
       final errors = <String>[];
+      for (var j = 0; j < headers.length; j++) {
+        try {
+          raw[headers[j]] = j < cells.length ? _value(cells[j]?.value) : null;
+        } catch (_) {
+          raw[headers[j]] = null;
+          errors.add('invalid value in ${headers[j]}');
+        }
+      }
+      final normalized = <String, Object?>{};
       final warnings = <String>[];
-      for (final e in mapping.entries) normalized[e.value.name] = raw[e.key];
+      for (final entry in mapping.entries) {
+        normalized[entry.value.name] = raw[entry.key];
+      }
+
       final name = (normalized['name']?.toString() ?? '').trim();
-      if (name.isEmpty)
+      if (name.isEmpty) {
         errors.add('name is required');
-      else
+      } else {
         normalized['name'] = name;
-      final phone = normalized['phone']?.toString().trim();
-      if (phone == null || phone.isEmpty)
-        errors.add('phone is required');
-      else if (RegExp(r'[^0-9+()\- ]').hasMatch(phone))
-        errors.add('invalid phone');
-      else
+      }
+
+      final phone = _normalizePhone(normalized['phone']);
+      if (phone == null) {
+        errors.add(
+          normalized['phone'] == null ||
+                  normalized['phone'].toString().trim().isEmpty
+              ? 'phone is required'
+              : 'invalid phone',
+        );
+      } else {
         normalized['phone'] = phone;
+      }
+
       final amount = num.tryParse(
         (normalized['amount'] ?? '').toString().replaceAll(',', ''),
       );
-      if (amount == null || amount <= 0)
+      if (amount == null || !amount.toDouble().isFinite || amount <= 0) {
         errors.add('invalid amount');
-      else
+      } else {
         normalized['amountCents'] = (amount * 100).round();
+      }
+
       final date = parseImportDate(normalized['startDate']);
-      if (date == null)
+      if (date == null) {
         errors.add('invalid start date');
-      else
+      } else {
         normalized['startDate'] = date.toString();
+      }
+
       final term = int.tryParse((normalized['term'] ?? '').toString());
-      if (term == null || term <= 0)
+      if (term == null || term <= 0) {
         errors.add('invalid term');
-      else
+      } else {
         normalized['term'] = term;
-      final rate = num.tryParse((normalized['interestRate'] ?? '0').toString());
-      if (rate == null || rate < 0)
+      }
+
+      final rate = _parseRate(normalized['interestRate']);
+      if (rate == null) {
         errors.add('invalid interest rate');
-      else
-        normalized['interestRate'] = rate;
-      if (normalized['expiryMode'] == null)
+      } else {
+        normalized['interestRateScaled'] = rate;
+        normalized['ratePrecision'] = 2;
+      }
+      if (normalized['expiryMode'] == null) {
         warnings.add('expiry mode defaults to term');
+      }
       parsed.add(
         ImportRow(
           rowNumber: i + 1,
@@ -98,7 +204,7 @@ class XlsxPreviewService {
           errors: errors,
           warnings: warnings,
           availableDecisions: errors.isEmpty
-              ? DuplicateDecision.values.toSet()
+              ? {DuplicateDecision.createSeparate}
               : const {},
         ),
       );
@@ -106,21 +212,88 @@ class XlsxPreviewService {
     return ImportPreview(rows: parsed, mapping: mapping, headers: headers);
   }
 
-  static Map<String, ImportField> _infer(List<String> h) {
-    final out = <String, ImportField>{};
-    for (final x in h) {
-      final n = x.toLowerCase().replaceAll(RegExp(r'[ _-]'), '');
-      for (final f in ImportField.values) {
-        if (n == f.name.toLowerCase() ||
-            (f == ImportField.name && n.contains('姓名')) ||
-            (f == ImportField.phone && n.contains('手机')) ||
-            (f == ImportField.amount && n.contains('金额')) ||
-            (f == ImportField.startDate && n.contains('起息')) ||
-            (f == ImportField.term && n.contains('期限')))
-          out[x] = f;
+  static void _validateHeaders(List<String> headers) {
+    if (headers.isEmpty || headers.any((header) => header.isEmpty)) {
+      throw const UnsupportedSpreadsheetException(
+        'Header names must not be empty',
+      );
+    }
+    if (headers.toSet().length != headers.length) {
+      throw const UnsupportedSpreadsheetException(
+        'Header names must be unique',
+      );
+    }
+  }
+
+  static void _validateMapping(
+    Map<String, ImportField> mapping,
+    List<String> headers,
+  ) {
+    if (mapping.keys.any(
+      (header) => header.isEmpty || !headers.contains(header),
+    )) {
+      throw const UnsupportedSpreadsheetException(
+        'Field mapping contains an unknown or empty header',
+      );
+    }
+    if (mapping.values.toSet().length != mapping.length) {
+      throw const UnsupportedSpreadsheetException(
+        'Each import field can only be mapped once',
+      );
+    }
+    const required = {
+      ImportField.name,
+      ImportField.phone,
+      ImportField.amount,
+      ImportField.startDate,
+      ImportField.term,
+    };
+    if (!mapping.values.toSet().containsAll(required)) {
+      throw const UnsupportedSpreadsheetException(
+        'Mapping must include name, phone, amount, startDate, and term',
+      );
+    }
+  }
+
+  static Map<String, ImportField> _infer(List<String> headers) {
+    final output = <String, ImportField>{};
+    for (final header in headers) {
+      final normalized = header.toLowerCase().replaceAll(RegExp(r'[ _-]'), '');
+      for (final field in ImportField.values) {
+        if (normalized == field.name.toLowerCase() ||
+            (field == ImportField.name && normalized.contains('姓名')) ||
+            (field == ImportField.phone && normalized.contains('手机')) ||
+            (field == ImportField.amount && normalized.contains('金额')) ||
+            (field == ImportField.startDate && normalized.contains('起息')) ||
+            (field == ImportField.term && normalized.contains('期限'))) {
+          output[header] = field;
+        }
       }
     }
-    return out;
+    return output;
+  }
+
+  static String? _normalizePhone(Object? value) {
+    final input = value?.toString().trim() ?? '';
+    if (input.isEmpty) return null;
+    final compact = RegExp(r'^1[3-9]\d{9}$');
+    if (compact.hasMatch(input)) return input;
+    final grouped = RegExp(r'^1[3-9]\d([ -])\d{4}\1\d{4}$');
+    if (!grouped.hasMatch(input)) return null;
+    final normalized = input.replaceAll(RegExp(r'[ -]'), '');
+    return compact.hasMatch(normalized) ? normalized : null;
+  }
+
+  static int? _parseRate(Object? value) {
+    final input = (value ?? '0').toString().trim();
+    final rate = Decimal.tryParse(input);
+    if (rate == null ||
+        rate < Decimal.zero ||
+        rate > Decimal.fromInt(100) ||
+        rate.scale > 2) {
+      return null;
+    }
+    return rate.shift(2).toBigInt().toInt();
   }
 
   static Object? _value(CellValue? value) {
