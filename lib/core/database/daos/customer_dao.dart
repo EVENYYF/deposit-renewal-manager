@@ -5,6 +5,9 @@ import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../features/customers/domain/customer_repository.dart';
+import '../../../features/customers/domain/name_search_index.dart';
+import '../../../features/deposits/domain/deposit.dart';
+import '../../../features/deposits/domain/local_date.dart';
 import '../app_database.dart' as db;
 
 typedef UtcNow = DateTime Function();
@@ -27,6 +30,7 @@ final class CustomerDao implements CustomerRepository {
   Future<CustomerRecord> create(CustomerDraft draft) =>
       _db.transaction(() async {
         final normalized = _normalizeDraft(draft);
+        final searchIndex = buildNameIndex(normalized.name);
         final timestamp = _timestamp();
         await _db
             .into(_db.customers)
@@ -35,6 +39,10 @@ final class CustomerDao implements CustomerRepository {
                 id: normalized.id,
                 name: normalized.name,
                 phone: Value(normalized.phone),
+                normalizedName: Value(searchIndex.normalizedName),
+                fullPinyin: Value(searchIndex.fullPinyin),
+                initials: Value(searchIndex.initials),
+                normalizedPhone: Value(normalizePhone(normalized.phone ?? '')),
                 createdAtUtc: timestamp,
                 updatedAtUtc: timestamp,
               ),
@@ -69,12 +77,17 @@ final class CustomerDao implements CustomerRepository {
       _db.transaction(() async {
         final existing = await _requireCustomer(id);
         final normalized = _normalizeDraft(draft);
+        final searchIndex = buildNameIndex(normalized.name);
         await (_db.update(
           _db.customers,
         )..where((customer) => customer.id.equals(id))).write(
           db.CustomersCompanion(
             name: Value(normalized.name),
             phone: Value(normalized.phone),
+            normalizedName: Value(searchIndex.normalizedName),
+            fullPinyin: Value(searchIndex.fullPinyin),
+            initials: Value(searchIndex.initials),
+            normalizedPhone: Value(normalizePhone(normalized.phone ?? '')),
             updatedAtUtc: Value(_timestamp()),
           ),
         );
@@ -134,6 +147,130 @@ final class CustomerDao implements CustomerRepository {
       revision,
     );
   });
+
+  @override
+  Future<List<CustomerSearchResult>> search(CustomerQuery query) async {
+    final normalizedText = normalizeSearchText(query.text);
+    final escapedText = _escapeLike(normalizedText);
+    final exact = normalizedText;
+    final prefix = '$escapedText%';
+    final contains = '%$escapedText%';
+    final variables = <Variable<Object>>[];
+    final where = <String>[];
+
+    if (normalizedText.isNotEmpty) {
+      where.add(
+        '(c.normalized_name LIKE ? ESCAPE \'!\' '
+        'OR c.full_pinyin LIKE ? ESCAPE \'!\' '
+        'OR c.initials LIKE ? ESCAPE \'!\' '
+        'OR c.normalized_phone LIKE ? ESCAPE \'!\')',
+      );
+      variables.addAll(List.generate(4, (_) => Variable.withString(contains)));
+    }
+    if (query.bank != null) {
+      where.add('LOWER(TRIM(d.bank_name)) = ?');
+      variables.add(Variable.withString(query.bank!.trim().toLowerCase()));
+    }
+    if (query.expiryFrom != null) {
+      where.add('d.final_expiry_date >= ?');
+      variables.add(Variable.withString(query.expiryFrom.toString()));
+    }
+    if (query.expiryTo != null) {
+      where.add('d.final_expiry_date <= ?');
+      variables.add(Variable.withString(query.expiryTo.toString()));
+    }
+    if (query.lifecycle != null) {
+      where.add('d.lifecycle = ?');
+      variables.add(Variable.withString(query.lifecycle!.name));
+    }
+    if (query.overdueOnly) {
+      where.add("d.lifecycle = 'active'");
+      where.add('d.final_expiry_date < ?');
+      variables.add(Variable.withString(query.today.toString()));
+    }
+
+    final rankSql = normalizedText.isEmpty
+        ? '0'
+        : '''
+CASE
+  WHEN c.normalized_name = ? OR c.full_pinyin = ?
+    OR c.initials = ? OR c.normalized_phone = ? THEN 0
+  WHEN c.normalized_name LIKE ? ESCAPE '!'
+    OR c.full_pinyin LIKE ? ESCAPE '!'
+    OR c.initials LIKE ? ESCAPE '!'
+    OR c.normalized_phone LIKE ? ESCAPE '!' THEN 1
+  ELSE 2
+END
+''';
+    if (normalizedText.isNotEmpty) {
+      variables.insertAll(0, <Variable<Object>>[
+        ...List.generate(4, (_) => Variable.withString(exact)),
+        ...List.generate(4, (_) => Variable.withString(prefix)),
+      ]);
+    }
+
+    final join = query.hasDepositFilters ? 'JOIN' : 'LEFT JOIN';
+    final rows = await _db
+        .customSelect(
+          '''
+SELECT
+  c.id AS customer_id,
+  c.name AS customer_name,
+  c.phone AS customer_phone,
+  c.is_active AS customer_is_active,
+  d.id AS deposit_id,
+  d.bank_name AS deposit_bank_name,
+  d.final_expiry_date AS deposit_final_expiry_date,
+  d.lifecycle AS deposit_lifecycle,
+  $rankSql AS search_rank
+FROM customers c
+$join deposits d ON d.customer_id = c.id
+${where.isEmpty ? '' : 'WHERE ${where.join(' AND ')}'}
+ORDER BY search_rank, c.rowid, d.rowid
+''',
+          variables: variables,
+          readsFrom: {_db.customers, _db.deposits},
+        )
+        .get();
+
+    final results = <String, CustomerSearchResult>{};
+    for (final row in rows) {
+      final customerId = row.read<String>('customer_id');
+      final existing = results.putIfAbsent(
+        customerId,
+        () => CustomerSearchResult(
+          customer: CustomerRecord(
+            id: customerId,
+            name: row.read<String>('customer_name'),
+            phone: row.readNullable<String>('customer_phone'),
+            isActive: row.read<bool>('customer_is_active'),
+          ),
+          deposits: const [],
+        ),
+      );
+      final depositId = row.readNullable<String>('deposit_id');
+      if (depositId != null) {
+        final deposits = <CustomerSearchDeposit>[
+          ...existing.deposits,
+          CustomerSearchDeposit(
+            id: depositId,
+            bankName: row.read<String>('deposit_bank_name'),
+            finalExpiryDate: _parseDate(
+              row.read<String>('deposit_final_expiry_date'),
+            ),
+            lifecycle: DepositLifecycle.values.byName(
+              row.read<String>('deposit_lifecycle'),
+            ),
+          ),
+        ];
+        results[customerId] = CustomerSearchResult(
+          customer: existing.customer,
+          deposits: deposits,
+        );
+      }
+    }
+    return List.unmodifiable(results.values);
+  }
 
   Future<CustomerRecord> _requireCustomer(String id) async {
     final customer = await get(id);
@@ -197,4 +334,16 @@ final class CustomerDao implements CustomerRepository {
   }
 
   int _timestamp() => _nowUtc().toUtc().microsecondsSinceEpoch;
+
+  String _escapeLike(String value) =>
+      value.replaceAll('!', '!!').replaceAll('%', '!%').replaceAll('_', '!_');
+
+  LocalDate _parseDate(String value) {
+    final parts = value.split('-');
+    return LocalDate(
+      int.parse(parts[0]),
+      int.parse(parts[1]),
+      int.parse(parts[2]),
+    );
+  }
 }

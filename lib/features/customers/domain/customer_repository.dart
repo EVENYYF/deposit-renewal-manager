@@ -1,3 +1,5 @@
+import 'name_search_index.dart';
+
 final class CustomerDraft {
   const CustomerDraft({required this.id, required this.name, this.phone});
 
@@ -20,6 +22,16 @@ final class CustomerRecord {
   final bool isActive;
 }
 
+final class CustomerSearchResult {
+  CustomerSearchResult({
+    required this.customer,
+    required Iterable<CustomerSearchDeposit> deposits,
+  }) : deposits = List.unmodifiable(deposits);
+
+  final CustomerRecord customer;
+  final List<CustomerSearchDeposit> deposits;
+}
+
 abstract interface class CustomerRepository {
   Future<CustomerRecord> create(CustomerDraft draft);
 
@@ -28,6 +40,8 @@ abstract interface class CustomerRepository {
   Future<CustomerRecord> update(String id, CustomerDraft draft);
 
   Future<void> deactivate(String id);
+
+  Future<List<CustomerSearchResult>> search(CustomerQuery query);
 }
 
 final class CustomerHasActiveDepositsException implements Exception {

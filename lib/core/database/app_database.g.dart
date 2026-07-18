@@ -37,6 +37,54 @@ class $CustomersTable extends Customers
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _normalizedNameMeta = const VerificationMeta(
+    'normalizedName',
+  );
+  @override
+  late final GeneratedColumn<String> normalizedName = GeneratedColumn<String>(
+    'normalized_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _fullPinyinMeta = const VerificationMeta(
+    'fullPinyin',
+  );
+  @override
+  late final GeneratedColumn<String> fullPinyin = GeneratedColumn<String>(
+    'full_pinyin',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _initialsMeta = const VerificationMeta(
+    'initials',
+  );
+  @override
+  late final GeneratedColumn<String> initials = GeneratedColumn<String>(
+    'initials',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _normalizedPhoneMeta = const VerificationMeta(
+    'normalizedPhone',
+  );
+  @override
+  late final GeneratedColumn<String> normalizedPhone = GeneratedColumn<String>(
+    'normalized_phone',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
   static const VerificationMeta _isActiveMeta = const VerificationMeta(
     'isActive',
   );
@@ -81,6 +129,10 @@ class $CustomersTable extends Customers
     id,
     name,
     phone,
+    normalizedName,
+    fullPinyin,
+    initials,
+    normalizedPhone,
     isActive,
     createdAtUtc,
     updatedAtUtc,
@@ -114,6 +166,36 @@ class $CustomersTable extends Customers
       context.handle(
         _phoneMeta,
         phone.isAcceptableOrUnknown(data['phone']!, _phoneMeta),
+      );
+    }
+    if (data.containsKey('normalized_name')) {
+      context.handle(
+        _normalizedNameMeta,
+        normalizedName.isAcceptableOrUnknown(
+          data['normalized_name']!,
+          _normalizedNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('full_pinyin')) {
+      context.handle(
+        _fullPinyinMeta,
+        fullPinyin.isAcceptableOrUnknown(data['full_pinyin']!, _fullPinyinMeta),
+      );
+    }
+    if (data.containsKey('initials')) {
+      context.handle(
+        _initialsMeta,
+        initials.isAcceptableOrUnknown(data['initials']!, _initialsMeta),
+      );
+    }
+    if (data.containsKey('normalized_phone')) {
+      context.handle(
+        _normalizedPhoneMeta,
+        normalizedPhone.isAcceptableOrUnknown(
+          data['normalized_phone']!,
+          _normalizedPhoneMeta,
+        ),
       );
     }
     if (data.containsKey('is_active')) {
@@ -165,6 +247,22 @@ class $CustomersTable extends Customers
         DriftSqlType.string,
         data['${effectivePrefix}phone'],
       ),
+      normalizedName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}normalized_name'],
+      )!,
+      fullPinyin: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}full_pinyin'],
+      )!,
+      initials: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}initials'],
+      )!,
+      normalizedPhone: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}normalized_phone'],
+      )!,
       isActive: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_active'],
@@ -190,6 +288,10 @@ class Customer extends DataClass implements Insertable<Customer> {
   final String id;
   final String name;
   final String? phone;
+  final String normalizedName;
+  final String fullPinyin;
+  final String initials;
+  final String normalizedPhone;
   final bool isActive;
   final int createdAtUtc;
   final int updatedAtUtc;
@@ -197,6 +299,10 @@ class Customer extends DataClass implements Insertable<Customer> {
     required this.id,
     required this.name,
     this.phone,
+    required this.normalizedName,
+    required this.fullPinyin,
+    required this.initials,
+    required this.normalizedPhone,
     required this.isActive,
     required this.createdAtUtc,
     required this.updatedAtUtc,
@@ -209,6 +315,10 @@ class Customer extends DataClass implements Insertable<Customer> {
     if (!nullToAbsent || phone != null) {
       map['phone'] = Variable<String>(phone);
     }
+    map['normalized_name'] = Variable<String>(normalizedName);
+    map['full_pinyin'] = Variable<String>(fullPinyin);
+    map['initials'] = Variable<String>(initials);
+    map['normalized_phone'] = Variable<String>(normalizedPhone);
     map['is_active'] = Variable<bool>(isActive);
     map['created_at_utc'] = Variable<int>(createdAtUtc);
     map['updated_at_utc'] = Variable<int>(updatedAtUtc);
@@ -222,6 +332,10 @@ class Customer extends DataClass implements Insertable<Customer> {
       phone: phone == null && nullToAbsent
           ? const Value.absent()
           : Value(phone),
+      normalizedName: Value(normalizedName),
+      fullPinyin: Value(fullPinyin),
+      initials: Value(initials),
+      normalizedPhone: Value(normalizedPhone),
       isActive: Value(isActive),
       createdAtUtc: Value(createdAtUtc),
       updatedAtUtc: Value(updatedAtUtc),
@@ -237,6 +351,10 @@ class Customer extends DataClass implements Insertable<Customer> {
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       phone: serializer.fromJson<String?>(json['phone']),
+      normalizedName: serializer.fromJson<String>(json['normalizedName']),
+      fullPinyin: serializer.fromJson<String>(json['fullPinyin']),
+      initials: serializer.fromJson<String>(json['initials']),
+      normalizedPhone: serializer.fromJson<String>(json['normalizedPhone']),
       isActive: serializer.fromJson<bool>(json['isActive']),
       createdAtUtc: serializer.fromJson<int>(json['createdAtUtc']),
       updatedAtUtc: serializer.fromJson<int>(json['updatedAtUtc']),
@@ -249,6 +367,10 @@ class Customer extends DataClass implements Insertable<Customer> {
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'phone': serializer.toJson<String?>(phone),
+      'normalizedName': serializer.toJson<String>(normalizedName),
+      'fullPinyin': serializer.toJson<String>(fullPinyin),
+      'initials': serializer.toJson<String>(initials),
+      'normalizedPhone': serializer.toJson<String>(normalizedPhone),
       'isActive': serializer.toJson<bool>(isActive),
       'createdAtUtc': serializer.toJson<int>(createdAtUtc),
       'updatedAtUtc': serializer.toJson<int>(updatedAtUtc),
@@ -259,6 +381,10 @@ class Customer extends DataClass implements Insertable<Customer> {
     String? id,
     String? name,
     Value<String?> phone = const Value.absent(),
+    String? normalizedName,
+    String? fullPinyin,
+    String? initials,
+    String? normalizedPhone,
     bool? isActive,
     int? createdAtUtc,
     int? updatedAtUtc,
@@ -266,6 +392,10 @@ class Customer extends DataClass implements Insertable<Customer> {
     id: id ?? this.id,
     name: name ?? this.name,
     phone: phone.present ? phone.value : this.phone,
+    normalizedName: normalizedName ?? this.normalizedName,
+    fullPinyin: fullPinyin ?? this.fullPinyin,
+    initials: initials ?? this.initials,
+    normalizedPhone: normalizedPhone ?? this.normalizedPhone,
     isActive: isActive ?? this.isActive,
     createdAtUtc: createdAtUtc ?? this.createdAtUtc,
     updatedAtUtc: updatedAtUtc ?? this.updatedAtUtc,
@@ -275,6 +405,16 @@ class Customer extends DataClass implements Insertable<Customer> {
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
       phone: data.phone.present ? data.phone.value : this.phone,
+      normalizedName: data.normalizedName.present
+          ? data.normalizedName.value
+          : this.normalizedName,
+      fullPinyin: data.fullPinyin.present
+          ? data.fullPinyin.value
+          : this.fullPinyin,
+      initials: data.initials.present ? data.initials.value : this.initials,
+      normalizedPhone: data.normalizedPhone.present
+          ? data.normalizedPhone.value
+          : this.normalizedPhone,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
       createdAtUtc: data.createdAtUtc.present
           ? data.createdAtUtc.value
@@ -291,6 +431,10 @@ class Customer extends DataClass implements Insertable<Customer> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('phone: $phone, ')
+          ..write('normalizedName: $normalizedName, ')
+          ..write('fullPinyin: $fullPinyin, ')
+          ..write('initials: $initials, ')
+          ..write('normalizedPhone: $normalizedPhone, ')
           ..write('isActive: $isActive, ')
           ..write('createdAtUtc: $createdAtUtc, ')
           ..write('updatedAtUtc: $updatedAtUtc')
@@ -299,8 +443,18 @@ class Customer extends DataClass implements Insertable<Customer> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, name, phone, isActive, createdAtUtc, updatedAtUtc);
+  int get hashCode => Object.hash(
+    id,
+    name,
+    phone,
+    normalizedName,
+    fullPinyin,
+    initials,
+    normalizedPhone,
+    isActive,
+    createdAtUtc,
+    updatedAtUtc,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -308,6 +462,10 @@ class Customer extends DataClass implements Insertable<Customer> {
           other.id == this.id &&
           other.name == this.name &&
           other.phone == this.phone &&
+          other.normalizedName == this.normalizedName &&
+          other.fullPinyin == this.fullPinyin &&
+          other.initials == this.initials &&
+          other.normalizedPhone == this.normalizedPhone &&
           other.isActive == this.isActive &&
           other.createdAtUtc == this.createdAtUtc &&
           other.updatedAtUtc == this.updatedAtUtc);
@@ -317,6 +475,10 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
   final Value<String> id;
   final Value<String> name;
   final Value<String?> phone;
+  final Value<String> normalizedName;
+  final Value<String> fullPinyin;
+  final Value<String> initials;
+  final Value<String> normalizedPhone;
   final Value<bool> isActive;
   final Value<int> createdAtUtc;
   final Value<int> updatedAtUtc;
@@ -325,6 +487,10 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.phone = const Value.absent(),
+    this.normalizedName = const Value.absent(),
+    this.fullPinyin = const Value.absent(),
+    this.initials = const Value.absent(),
+    this.normalizedPhone = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAtUtc = const Value.absent(),
     this.updatedAtUtc = const Value.absent(),
@@ -334,6 +500,10 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     required String id,
     required String name,
     this.phone = const Value.absent(),
+    this.normalizedName = const Value.absent(),
+    this.fullPinyin = const Value.absent(),
+    this.initials = const Value.absent(),
+    this.normalizedPhone = const Value.absent(),
     this.isActive = const Value.absent(),
     required int createdAtUtc,
     required int updatedAtUtc,
@@ -346,6 +516,10 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     Expression<String>? id,
     Expression<String>? name,
     Expression<String>? phone,
+    Expression<String>? normalizedName,
+    Expression<String>? fullPinyin,
+    Expression<String>? initials,
+    Expression<String>? normalizedPhone,
     Expression<bool>? isActive,
     Expression<int>? createdAtUtc,
     Expression<int>? updatedAtUtc,
@@ -355,6 +529,10 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (phone != null) 'phone': phone,
+      if (normalizedName != null) 'normalized_name': normalizedName,
+      if (fullPinyin != null) 'full_pinyin': fullPinyin,
+      if (initials != null) 'initials': initials,
+      if (normalizedPhone != null) 'normalized_phone': normalizedPhone,
       if (isActive != null) 'is_active': isActive,
       if (createdAtUtc != null) 'created_at_utc': createdAtUtc,
       if (updatedAtUtc != null) 'updated_at_utc': updatedAtUtc,
@@ -366,6 +544,10 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     Value<String>? id,
     Value<String>? name,
     Value<String?>? phone,
+    Value<String>? normalizedName,
+    Value<String>? fullPinyin,
+    Value<String>? initials,
+    Value<String>? normalizedPhone,
     Value<bool>? isActive,
     Value<int>? createdAtUtc,
     Value<int>? updatedAtUtc,
@@ -375,6 +557,10 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
       id: id ?? this.id,
       name: name ?? this.name,
       phone: phone ?? this.phone,
+      normalizedName: normalizedName ?? this.normalizedName,
+      fullPinyin: fullPinyin ?? this.fullPinyin,
+      initials: initials ?? this.initials,
+      normalizedPhone: normalizedPhone ?? this.normalizedPhone,
       isActive: isActive ?? this.isActive,
       createdAtUtc: createdAtUtc ?? this.createdAtUtc,
       updatedAtUtc: updatedAtUtc ?? this.updatedAtUtc,
@@ -393,6 +579,18 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     }
     if (phone.present) {
       map['phone'] = Variable<String>(phone.value);
+    }
+    if (normalizedName.present) {
+      map['normalized_name'] = Variable<String>(normalizedName.value);
+    }
+    if (fullPinyin.present) {
+      map['full_pinyin'] = Variable<String>(fullPinyin.value);
+    }
+    if (initials.present) {
+      map['initials'] = Variable<String>(initials.value);
+    }
+    if (normalizedPhone.present) {
+      map['normalized_phone'] = Variable<String>(normalizedPhone.value);
     }
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
@@ -415,6 +613,10 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('phone: $phone, ')
+          ..write('normalizedName: $normalizedName, ')
+          ..write('fullPinyin: $fullPinyin, ')
+          ..write('initials: $initials, ')
+          ..write('normalizedPhone: $normalizedPhone, ')
           ..write('isActive: $isActive, ')
           ..write('createdAtUtc: $createdAtUtc, ')
           ..write('updatedAtUtc: $updatedAtUtc, ')
@@ -463,6 +665,18 @@ class $DepositsTable extends Deposits with TableInfo<$DepositsTable, Deposit> {
     check: () => const CustomExpression<bool>('amount_cents > 0'),
     type: DriftSqlType.int,
     requiredDuringInsert: true,
+  );
+  static const VerificationMeta _bankNameMeta = const VerificationMeta(
+    'bankName',
+  );
+  @override
+  late final GeneratedColumn<String> bankName = GeneratedColumn<String>(
+    'bank_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
   );
   static const VerificationMeta _interestRateScaledMeta =
       const VerificationMeta('interestRateScaled');
@@ -577,6 +791,7 @@ class $DepositsTable extends Deposits with TableInfo<$DepositsTable, Deposit> {
     id,
     customerId,
     amountCents,
+    bankName,
     interestRateScaled,
     ratePrecision,
     startDate,
@@ -622,6 +837,12 @@ class $DepositsTable extends Deposits with TableInfo<$DepositsTable, Deposit> {
       );
     } else if (isInserting) {
       context.missing(_amountCentsMeta);
+    }
+    if (data.containsKey('bank_name')) {
+      context.handle(
+        _bankNameMeta,
+        bankName.isAcceptableOrUnknown(data['bank_name']!, _bankNameMeta),
+      );
     }
     if (data.containsKey('interest_rate_scaled')) {
       context.handle(
@@ -735,6 +956,10 @@ class $DepositsTable extends Deposits with TableInfo<$DepositsTable, Deposit> {
         DriftSqlType.int,
         data['${effectivePrefix}amount_cents'],
       )!,
+      bankName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}bank_name'],
+      )!,
       interestRateScaled: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}interest_rate_scaled'],
@@ -784,6 +1009,7 @@ class Deposit extends DataClass implements Insertable<Deposit> {
   final String id;
   final String customerId;
   final int amountCents;
+  final String bankName;
   final int interestRateScaled;
   final int ratePrecision;
   final String startDate;
@@ -797,6 +1023,7 @@ class Deposit extends DataClass implements Insertable<Deposit> {
     required this.id,
     required this.customerId,
     required this.amountCents,
+    required this.bankName,
     required this.interestRateScaled,
     required this.ratePrecision,
     required this.startDate,
@@ -813,6 +1040,7 @@ class Deposit extends DataClass implements Insertable<Deposit> {
     map['id'] = Variable<String>(id);
     map['customer_id'] = Variable<String>(customerId);
     map['amount_cents'] = Variable<int>(amountCents);
+    map['bank_name'] = Variable<String>(bankName);
     map['interest_rate_scaled'] = Variable<int>(interestRateScaled);
     map['rate_precision'] = Variable<int>(ratePrecision);
     map['start_date'] = Variable<String>(startDate);
@@ -832,6 +1060,7 @@ class Deposit extends DataClass implements Insertable<Deposit> {
       id: Value(id),
       customerId: Value(customerId),
       amountCents: Value(amountCents),
+      bankName: Value(bankName),
       interestRateScaled: Value(interestRateScaled),
       ratePrecision: Value(ratePrecision),
       startDate: Value(startDate),
@@ -855,6 +1084,7 @@ class Deposit extends DataClass implements Insertable<Deposit> {
       id: serializer.fromJson<String>(json['id']),
       customerId: serializer.fromJson<String>(json['customerId']),
       amountCents: serializer.fromJson<int>(json['amountCents']),
+      bankName: serializer.fromJson<String>(json['bankName']),
       interestRateScaled: serializer.fromJson<int>(json['interestRateScaled']),
       ratePrecision: serializer.fromJson<int>(json['ratePrecision']),
       startDate: serializer.fromJson<String>(json['startDate']),
@@ -875,6 +1105,7 @@ class Deposit extends DataClass implements Insertable<Deposit> {
       'id': serializer.toJson<String>(id),
       'customerId': serializer.toJson<String>(customerId),
       'amountCents': serializer.toJson<int>(amountCents),
+      'bankName': serializer.toJson<String>(bankName),
       'interestRateScaled': serializer.toJson<int>(interestRateScaled),
       'ratePrecision': serializer.toJson<int>(ratePrecision),
       'startDate': serializer.toJson<String>(startDate),
@@ -891,6 +1122,7 @@ class Deposit extends DataClass implements Insertable<Deposit> {
     String? id,
     String? customerId,
     int? amountCents,
+    String? bankName,
     int? interestRateScaled,
     int? ratePrecision,
     String? startDate,
@@ -904,6 +1136,7 @@ class Deposit extends DataClass implements Insertable<Deposit> {
     id: id ?? this.id,
     customerId: customerId ?? this.customerId,
     amountCents: amountCents ?? this.amountCents,
+    bankName: bankName ?? this.bankName,
     interestRateScaled: interestRateScaled ?? this.interestRateScaled,
     ratePrecision: ratePrecision ?? this.ratePrecision,
     startDate: startDate ?? this.startDate,
@@ -925,6 +1158,7 @@ class Deposit extends DataClass implements Insertable<Deposit> {
       amountCents: data.amountCents.present
           ? data.amountCents.value
           : this.amountCents,
+      bankName: data.bankName.present ? data.bankName.value : this.bankName,
       interestRateScaled: data.interestRateScaled.present
           ? data.interestRateScaled.value
           : this.interestRateScaled,
@@ -957,6 +1191,7 @@ class Deposit extends DataClass implements Insertable<Deposit> {
           ..write('id: $id, ')
           ..write('customerId: $customerId, ')
           ..write('amountCents: $amountCents, ')
+          ..write('bankName: $bankName, ')
           ..write('interestRateScaled: $interestRateScaled, ')
           ..write('ratePrecision: $ratePrecision, ')
           ..write('startDate: $startDate, ')
@@ -975,6 +1210,7 @@ class Deposit extends DataClass implements Insertable<Deposit> {
     id,
     customerId,
     amountCents,
+    bankName,
     interestRateScaled,
     ratePrecision,
     startDate,
@@ -992,6 +1228,7 @@ class Deposit extends DataClass implements Insertable<Deposit> {
           other.id == this.id &&
           other.customerId == this.customerId &&
           other.amountCents == this.amountCents &&
+          other.bankName == this.bankName &&
           other.interestRateScaled == this.interestRateScaled &&
           other.ratePrecision == this.ratePrecision &&
           other.startDate == this.startDate &&
@@ -1007,6 +1244,7 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
   final Value<String> id;
   final Value<String> customerId;
   final Value<int> amountCents;
+  final Value<String> bankName;
   final Value<int> interestRateScaled;
   final Value<int> ratePrecision;
   final Value<String> startDate;
@@ -1021,6 +1259,7 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
     this.id = const Value.absent(),
     this.customerId = const Value.absent(),
     this.amountCents = const Value.absent(),
+    this.bankName = const Value.absent(),
     this.interestRateScaled = const Value.absent(),
     this.ratePrecision = const Value.absent(),
     this.startDate = const Value.absent(),
@@ -1036,6 +1275,7 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
     required String id,
     required String customerId,
     required int amountCents,
+    this.bankName = const Value.absent(),
     required int interestRateScaled,
     required int ratePrecision,
     required String startDate,
@@ -1061,6 +1301,7 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
     Expression<String>? id,
     Expression<String>? customerId,
     Expression<int>? amountCents,
+    Expression<String>? bankName,
     Expression<int>? interestRateScaled,
     Expression<int>? ratePrecision,
     Expression<String>? startDate,
@@ -1076,6 +1317,7 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
       if (id != null) 'id': id,
       if (customerId != null) 'customer_id': customerId,
       if (amountCents != null) 'amount_cents': amountCents,
+      if (bankName != null) 'bank_name': bankName,
       if (interestRateScaled != null)
         'interest_rate_scaled': interestRateScaled,
       if (ratePrecision != null) 'rate_precision': ratePrecision,
@@ -1095,6 +1337,7 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
     Value<String>? id,
     Value<String>? customerId,
     Value<int>? amountCents,
+    Value<String>? bankName,
     Value<int>? interestRateScaled,
     Value<int>? ratePrecision,
     Value<String>? startDate,
@@ -1110,6 +1353,7 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
       id: id ?? this.id,
       customerId: customerId ?? this.customerId,
       amountCents: amountCents ?? this.amountCents,
+      bankName: bankName ?? this.bankName,
       interestRateScaled: interestRateScaled ?? this.interestRateScaled,
       ratePrecision: ratePrecision ?? this.ratePrecision,
       startDate: startDate ?? this.startDate,
@@ -1134,6 +1378,9 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
     }
     if (amountCents.present) {
       map['amount_cents'] = Variable<int>(amountCents.value);
+    }
+    if (bankName.present) {
+      map['bank_name'] = Variable<String>(bankName.value);
     }
     if (interestRateScaled.present) {
       map['interest_rate_scaled'] = Variable<int>(interestRateScaled.value);
@@ -1176,6 +1423,7 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
           ..write('id: $id, ')
           ..write('customerId: $customerId, ')
           ..write('amountCents: $amountCents, ')
+          ..write('bankName: $bankName, ')
           ..write('interestRateScaled: $interestRateScaled, ')
           ..write('ratePrecision: $ratePrecision, ')
           ..write('startDate: $startDate, ')
@@ -3599,6 +3847,30 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $NotificationIdMappingsTable notificationIdMappings =
       $NotificationIdMappingsTable(this);
+  late final Index customersNormalizedNameIdx = Index(
+    'customers_normalized_name_idx',
+    'CREATE INDEX customers_normalized_name_idx ON customers (normalized_name)',
+  );
+  late final Index customersFullPinyinIdx = Index(
+    'customers_full_pinyin_idx',
+    'CREATE INDEX customers_full_pinyin_idx ON customers (full_pinyin)',
+  );
+  late final Index customersInitialsIdx = Index(
+    'customers_initials_idx',
+    'CREATE INDEX customers_initials_idx ON customers (initials)',
+  );
+  late final Index customersNormalizedPhoneIdx = Index(
+    'customers_normalized_phone_idx',
+    'CREATE INDEX customers_normalized_phone_idx ON customers (normalized_phone)',
+  );
+  late final Index depositsBankNameIdx = Index(
+    'deposits_bank_name_idx',
+    'CREATE INDEX deposits_bank_name_idx ON deposits (bank_name)',
+  );
+  late final Index depositsExpiryLifecycleCustomerIdx = Index(
+    'deposits_expiry_lifecycle_customer_idx',
+    'CREATE INDEX deposits_expiry_lifecycle_customer_idx ON deposits (final_expiry_date, lifecycle, customer_id)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3612,6 +3884,12 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     importBatches,
     businessSettings,
     notificationIdMappings,
+    customersNormalizedNameIdx,
+    customersFullPinyinIdx,
+    customersInitialsIdx,
+    customersNormalizedPhoneIdx,
+    depositsBankNameIdx,
+    depositsExpiryLifecycleCustomerIdx,
   ];
 }
 
@@ -3620,6 +3898,10 @@ typedef $$CustomersTableCreateCompanionBuilder =
       required String id,
       required String name,
       Value<String?> phone,
+      Value<String> normalizedName,
+      Value<String> fullPinyin,
+      Value<String> initials,
+      Value<String> normalizedPhone,
       Value<bool> isActive,
       required int createdAtUtc,
       required int updatedAtUtc,
@@ -3630,6 +3912,10 @@ typedef $$CustomersTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> name,
       Value<String?> phone,
+      Value<String> normalizedName,
+      Value<String> fullPinyin,
+      Value<String> initials,
+      Value<String> normalizedPhone,
       Value<bool> isActive,
       Value<int> createdAtUtc,
       Value<int> updatedAtUtc,
@@ -3681,6 +3967,26 @@ class $$CustomersTableFilterComposer
 
   ColumnFilters<String> get phone => $composableBuilder(
     column: $table.phone,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get normalizedName => $composableBuilder(
+    column: $table.normalizedName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get fullPinyin => $composableBuilder(
+    column: $table.fullPinyin,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get initials => $composableBuilder(
+    column: $table.initials,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get normalizedPhone => $composableBuilder(
+    column: $table.normalizedPhone,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3749,6 +4055,26 @@ class $$CustomersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get normalizedName => $composableBuilder(
+    column: $table.normalizedName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get fullPinyin => $composableBuilder(
+    column: $table.fullPinyin,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get initials => $composableBuilder(
+    column: $table.initials,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get normalizedPhone => $composableBuilder(
+    column: $table.normalizedPhone,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isActive => $composableBuilder(
     column: $table.isActive,
     builder: (column) => ColumnOrderings(column),
@@ -3782,6 +4108,24 @@ class $$CustomersTableAnnotationComposer
 
   GeneratedColumn<String> get phone =>
       $composableBuilder(column: $table.phone, builder: (column) => column);
+
+  GeneratedColumn<String> get normalizedName => $composableBuilder(
+    column: $table.normalizedName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get fullPinyin => $composableBuilder(
+    column: $table.fullPinyin,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get initials =>
+      $composableBuilder(column: $table.initials, builder: (column) => column);
+
+  GeneratedColumn<String> get normalizedPhone => $composableBuilder(
+    column: $table.normalizedPhone,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
@@ -3853,6 +4197,10 @@ class $$CustomersTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String?> phone = const Value.absent(),
+                Value<String> normalizedName = const Value.absent(),
+                Value<String> fullPinyin = const Value.absent(),
+                Value<String> initials = const Value.absent(),
+                Value<String> normalizedPhone = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<int> createdAtUtc = const Value.absent(),
                 Value<int> updatedAtUtc = const Value.absent(),
@@ -3861,6 +4209,10 @@ class $$CustomersTableTableManager
                 id: id,
                 name: name,
                 phone: phone,
+                normalizedName: normalizedName,
+                fullPinyin: fullPinyin,
+                initials: initials,
+                normalizedPhone: normalizedPhone,
                 isActive: isActive,
                 createdAtUtc: createdAtUtc,
                 updatedAtUtc: updatedAtUtc,
@@ -3871,6 +4223,10 @@ class $$CustomersTableTableManager
                 required String id,
                 required String name,
                 Value<String?> phone = const Value.absent(),
+                Value<String> normalizedName = const Value.absent(),
+                Value<String> fullPinyin = const Value.absent(),
+                Value<String> initials = const Value.absent(),
+                Value<String> normalizedPhone = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 required int createdAtUtc,
                 required int updatedAtUtc,
@@ -3879,6 +4235,10 @@ class $$CustomersTableTableManager
                 id: id,
                 name: name,
                 phone: phone,
+                normalizedName: normalizedName,
+                fullPinyin: fullPinyin,
+                initials: initials,
+                normalizedPhone: normalizedPhone,
                 isActive: isActive,
                 createdAtUtc: createdAtUtc,
                 updatedAtUtc: updatedAtUtc,
@@ -3945,6 +4305,7 @@ typedef $$DepositsTableCreateCompanionBuilder =
       required String id,
       required String customerId,
       required int amountCents,
+      Value<String> bankName,
       required int interestRateScaled,
       required int ratePrecision,
       required String startDate,
@@ -3961,6 +4322,7 @@ typedef $$DepositsTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> customerId,
       Value<int> amountCents,
+      Value<String> bankName,
       Value<int> interestRateScaled,
       Value<int> ratePrecision,
       Value<String> startDate,
@@ -4054,6 +4416,11 @@ class $$DepositsTableFilterComposer
 
   ColumnFilters<int> get amountCents => $composableBuilder(
     column: $table.amountCents,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get bankName => $composableBuilder(
+    column: $table.bankName,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4195,6 +4562,11 @@ class $$DepositsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get bankName => $composableBuilder(
+    column: $table.bankName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get interestRateScaled => $composableBuilder(
     column: $table.interestRateScaled,
     builder: (column) => ColumnOrderings(column),
@@ -4280,6 +4652,9 @@ class $$DepositsTableAnnotationComposer
     column: $table.amountCents,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get bankName =>
+      $composableBuilder(column: $table.bankName, builder: (column) => column);
 
   GeneratedColumn<int> get interestRateScaled => $composableBuilder(
     column: $table.interestRateScaled,
@@ -4431,6 +4806,7 @@ class $$DepositsTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> customerId = const Value.absent(),
                 Value<int> amountCents = const Value.absent(),
+                Value<String> bankName = const Value.absent(),
                 Value<int> interestRateScaled = const Value.absent(),
                 Value<int> ratePrecision = const Value.absent(),
                 Value<String> startDate = const Value.absent(),
@@ -4445,6 +4821,7 @@ class $$DepositsTableTableManager
                 id: id,
                 customerId: customerId,
                 amountCents: amountCents,
+                bankName: bankName,
                 interestRateScaled: interestRateScaled,
                 ratePrecision: ratePrecision,
                 startDate: startDate,
@@ -4461,6 +4838,7 @@ class $$DepositsTableTableManager
                 required String id,
                 required String customerId,
                 required int amountCents,
+                Value<String> bankName = const Value.absent(),
                 required int interestRateScaled,
                 required int ratePrecision,
                 required String startDate,
@@ -4475,6 +4853,7 @@ class $$DepositsTableTableManager
                 id: id,
                 customerId: customerId,
                 amountCents: amountCents,
+                bankName: bankName,
                 interestRateScaled: interestRateScaled,
                 ratePrecision: ratePrecision,
                 startDate: startDate,

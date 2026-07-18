@@ -17,10 +17,18 @@ Expression<bool> isoDateTextCheck(String column) => CustomExpression<bool>(
 Expression<bool> utcEpochCheck(String column) =>
     CustomExpression<bool>("typeof($column) = 'integer' AND $column > 0");
 
+@TableIndex(name: 'customers_normalized_name_idx', columns: {#normalizedName})
+@TableIndex(name: 'customers_full_pinyin_idx', columns: {#fullPinyin})
+@TableIndex(name: 'customers_initials_idx', columns: {#initials})
+@TableIndex(name: 'customers_normalized_phone_idx', columns: {#normalizedPhone})
 class Customers extends Table {
   TextColumn get id => text()();
   TextColumn get name => text().check(name.length.isBiggerThanValue(0))();
   TextColumn get phone => text().nullable()();
+  TextColumn get normalizedName => text().withDefault(const Constant(''))();
+  TextColumn get fullPinyin => text().withDefault(const Constant(''))();
+  TextColumn get initials => text().withDefault(const Constant(''))();
+  TextColumn get normalizedPhone => text().withDefault(const Constant(''))();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
   IntColumn get createdAtUtc =>
       integer().check(utcEpochCheck('created_at_utc'))();
@@ -31,12 +39,18 @@ class Customers extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+@TableIndex(name: 'deposits_bank_name_idx', columns: {#bankName})
+@TableIndex(
+  name: 'deposits_expiry_lifecycle_customer_idx',
+  columns: {#finalExpiryDate, #lifecycle, #customerId},
+)
 class Deposits extends Table {
   TextColumn get id => text()();
   TextColumn get customerId =>
       text().references(Customers, #id, onDelete: KeyAction.restrict)();
   IntColumn get amountCents =>
       integer().check(const CustomExpression<bool>('amount_cents > 0'))();
+  TextColumn get bankName => text().withDefault(const Constant(''))();
   IntColumn get interestRateScaled => integer().check(
     const CustomExpression<bool>('interest_rate_scaled >= 0'),
   )();

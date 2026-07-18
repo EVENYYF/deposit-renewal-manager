@@ -30,7 +30,7 @@ void main() {
   tearDown(() => database.close());
 
   test('schema version, primary keys and foreign keys are enabled', () async {
-    expect(database.schemaVersion, 1);
+    expect(database.schemaVersion, 2);
     final pragma = await database
         .customSelect('PRAGMA foreign_keys')
         .getSingle();
@@ -284,6 +284,10 @@ void main() {
             CustomersCompanion.insert(
               id: 'zero-time',
               name: 'Zero',
+              normalizedName: const Value('zero'),
+              fullPinyin: const Value('zero'),
+              initials: const Value('z'),
+              normalizedPhone: const Value(''),
               createdAtUtc: 0,
               updatedAtUtc: _testEpoch,
             ),
