@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:deposit_renewal_manager/core/database/app_database.dart';
 import 'package:deposit_renewal_manager/features/excel_import/application/import_commit_service.dart';
 import 'package:deposit_renewal_manager/features/excel_import/domain/import_models.dart';
+import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -277,6 +278,31 @@ void main() {
     expect(outcomes.whereType<DuplicateImportException>(), hasLength(1));
     expect(await database.select(database.importBatches).get(), hasLength(1));
     expect(await database.select(database.deposits).get(), hasLength(1));
+  });
+
+  test('preflight hash lookup is case insensitive', () async {
+    final now = DateTime.now().toUtc().millisecondsSinceEpoch;
+    final bytes = [42];
+    await database
+        .into(database.importBatches)
+        .insert(
+          ImportBatchesCompanion.insert(
+            id: 'legacy-uppercase',
+            fileName: 'legacy.xlsx',
+            contentHash: sha256.convert(bytes).toString().toUpperCase(),
+            importedAtUtc: now,
+            sourceDeviceId: 'test-device',
+          ),
+        );
+
+    await expectLater(
+      service.commit(
+        fileName: 'same.xlsx',
+        fileBytes: bytes,
+        preview: _preview(_row(name: 'Same', phone: '13900139000')),
+      ),
+      throwsA(isA<DuplicateImportException>()),
+    );
   });
 }
 

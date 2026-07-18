@@ -166,10 +166,13 @@ class XlsxPreviewService {
     for (var i = 1; i < rows.length; i++) {
       final cells = rows[i];
       final raw = <String, Object?>{};
+      final dateCellHeaders = <String>{};
       final errors = <String>[];
       for (var j = 0; j < headers.length; j++) {
         try {
-          raw[headers[j]] = j < cells.length ? _value(cells[j]?.value) : null;
+          final cellValue = j < cells.length ? cells[j]?.value : null;
+          if (_isDateCell(cellValue)) dateCellHeaders.add(headers[j]);
+          raw[headers[j]] = _value(cellValue);
         } catch (_) {
           raw[headers[j]] = null;
           errors.add('invalid value in ${headers[j]}');
@@ -209,14 +212,25 @@ class XlsxPreviewService {
         normalized['amountCents'] = (amount * 100).round();
       }
 
-      final date = parseImportDate(
-        normalized['startDate'],
-        dateSystem: dateSystem,
-      );
-      if (date == null) {
-        errors.add('invalid start date');
+      final startDateHeader = mapping.entries
+          .where((entry) => entry.value == ImportField.startDate)
+          .map((entry) => entry.key)
+          .first;
+      if (dateSystem == ExcelDateSystem.excel1904 &&
+          dateCellHeaders.contains(startDateHeader)) {
+        errors.add(
+          '1904 workbook date-formatted cells unsupported; use numeric serial/text',
+        );
       } else {
-        normalized['startDate'] = date.toString();
+        final date = parseImportDate(
+          normalized['startDate'],
+          dateSystem: dateSystem,
+        );
+        if (date == null) {
+          errors.add('invalid start date');
+        } else {
+          normalized['startDate'] = date.toString();
+        }
       }
 
       final term = int.tryParse((normalized['term'] ?? '').toString());
@@ -357,4 +371,7 @@ class XlsxPreviewService {
       _ => value.toString(),
     };
   }
+
+  static bool _isDateCell(CellValue? value) =>
+      value is DateCellValue || value is DateTimeCellValue;
 }

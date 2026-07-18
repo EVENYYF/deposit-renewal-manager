@@ -36,13 +36,11 @@ class ImportCommitService {
     Map<int, Map<String, bool>> fieldChoices = const {},
   }) async {
     _validateDecisionInputs(preview, decisions, fieldChoices);
-    final hash = sha256.convert(fileBytes).toString();
-    final duplicateHash =
-        await (database.select(database.importBatches)
-              ..where((b) => b.contentHash.equals(hash))
-              ..limit(1))
-            .getSingleOrNull();
-    if (duplicateHash != null) {
+    final hash = sha256.convert(fileBytes).toString().toLowerCase();
+    if (!RegExp(r'^[0-9a-f]{64}$').hasMatch(hash)) {
+      throw StateError('SHA-256 produced an invalid content hash');
+    }
+    if (await _contentHashExists(hash)) {
       throw const DuplicateImportException(
         'This spreadsheet content has already been imported',
       );
@@ -55,12 +53,7 @@ class ImportCommitService {
     late final ImportResult result;
     try {
       result = await database.transaction(() async {
-        final duplicateInTransaction =
-            await (database.select(database.importBatches)
-                  ..where((b) => b.contentHash.equals(hash))
-                  ..limit(1))
-                .getSingleOrNull();
-        if (duplicateInTransaction != null) {
+        if (await _contentHashExists(hash)) {
           throw const DuplicateImportException(
             'This spreadsheet content has already been imported',
           );
@@ -283,6 +276,18 @@ class ImportCommitService {
       throw StateError('invalid normalized $key');
     }
     return value;
+  }
+
+  Future<bool> _contentHashExists(String hash) async {
+    final rows = await database
+        .customSelect(
+          'SELECT 1 FROM import_batches '
+          'WHERE content_hash = ? COLLATE NOCASE LIMIT 1',
+          variables: [Variable.withString(hash)],
+          readsFrom: {database.importBatches},
+        )
+        .get();
+    return rows.isNotEmpty;
   }
 
   void _validateDecisionInputs(

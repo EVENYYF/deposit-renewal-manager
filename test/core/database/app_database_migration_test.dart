@@ -73,31 +73,47 @@ void main() {
     expect(raw.select('PRAGMA user_version').single['user_version'], 1);
   });
 
-  test('migrates v2 import batches and creates a unique hash index', () async {
-    final file = await _createV2File();
-    addTearDown(() => _deleteDatabaseFiles(file));
+  test(
+    'migrates v2 hashes, deduplicates batches and cleans audit history',
+    () async {
+      final file = await _createV2File();
+      addTearDown(() => _deleteDatabaseFiles(file));
 
-    final database = AppDatabase.forTesting(NativeDatabase(file));
-    addTearDown(database.close);
-    expect(
-      await database
+      final database = AppDatabase.forTesting(NativeDatabase(file));
+      addTearDown(database.close);
+      final index = await database
           .customSelect(
-            "SELECT name FROM sqlite_master "
+            "SELECT sql FROM sqlite_master "
             "WHERE name = 'import_batches_content_hash_idx'",
           )
-          .get(),
-      hasLength(1),
-    );
-    expect(
-      await database.customSelect('SELECT * FROM import_batches').get(),
-      hasLength(2),
-    );
-  });
+          .getSingle();
+      expect(index.read<String>('sql'), contains('COLLATE NOCASE'));
+
+      final batches = await database
+          .customSelect(
+            'SELECT id, content_hash FROM import_batches ORDER BY id',
+          )
+          .get();
+      expect(batches, hasLength(2));
+      expect(batches[0].read<String>('id'), 'batch-3');
+      expect(batches[0].read<String>('content_hash'), _hashB);
+      expect(batches[1].read<String>('id'), 'batch-a');
+      expect(batches[1].read<String>('content_hash'), _hashA);
+
+      final audits = await database
+          .customSelect('SELECT id FROM audit_history ORDER BY id')
+          .get();
+      expect(audits.map((row) => row.read<String>('id')), [
+        'audit-a',
+        'audit-other',
+      ]);
+    },
+  );
 
   test(
-    'v2 migration rejects duplicate hashes without changing version',
+    'v2 migration rejects invalid hashes without changing version',
     () async {
-      final file = await _createV2File(duplicateHash: true);
+      final file = await _createV2File(invalidHash: true);
       addTearDown(() => _deleteDatabaseFiles(file));
 
       final database = AppDatabase.forTesting(NativeDatabase(file));
@@ -107,7 +123,7 @@ void main() {
           isA<StateError>().having(
             (error) => error.message,
             'message',
-            contains('duplicate content_hash'),
+            contains('invalid SHA-256 content_hash'),
           ),
         ),
       );
@@ -123,11 +139,28 @@ void main() {
         ),
         isEmpty,
       );
+      expect(
+        raw
+            .select('SELECT COUNT(*) AS count FROM import_batches')
+            .single['count'],
+        4,
+      );
+      expect(
+        raw
+            .select('SELECT COUNT(*) AS count FROM audit_history')
+            .single['count'],
+        4,
+      );
     },
   );
 }
 
-Future<File> _createV2File({bool duplicateHash = false}) async {
+const _hashA =
+    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const _hashB =
+    'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
+Future<File> _createV2File({bool invalidHash = false}) async {
   final file = File(
     '${Directory.systemTemp.path}${Platform.pathSeparator}'
     'deposit-v2-${const Uuid().v4()}.sqlite',
@@ -144,8 +177,26 @@ CREATE TABLE import_batches (
   source_device_id TEXT NOT NULL
 );
 INSERT INTO import_batches VALUES
-  ('batch-1', 'a.xlsx', 'hash-a', 1, 0, 1, 'test'),
-  ('batch-2', 'b.xlsx', '${duplicateHash ? 'hash-a' : 'hash-b'}', 1, 0, 1, 'test');
+  ('batch-z', 'z.xlsx', '${invalidHash ? 'invalid' : _hashA.toUpperCase()}', 1, 0, 2, 'test'),
+  ('batch-b', 'b.xlsx', '$_hashA', 1, 0, 1, 'test'),
+  ('batch-a', 'a.xlsx', ' $_hashA ', 1, 0, 1, 'test'),
+  ('batch-3', 'c.xlsx', '$_hashB', 1, 0, 3, 'test');
+CREATE TABLE audit_history (
+  id TEXT NOT NULL PRIMARY KEY,
+  entity_type TEXT NOT NULL,
+  entity_id TEXT NOT NULL,
+  operation TEXT NOT NULL,
+  before_json TEXT,
+  after_json TEXT,
+  occurred_at_utc INTEGER NOT NULL,
+  source_device_id TEXT NOT NULL,
+  business_revision INTEGER NOT NULL
+);
+INSERT INTO audit_history VALUES
+  ('audit-a', 'import_batch', 'batch-a', 'excel-import', NULL, NULL, 1, 'test', 1),
+  ('audit-b', 'import_batch', 'batch-b', 'excel-import', NULL, NULL, 1, 'test', 2),
+  ('audit-z', 'import_batch', 'batch-z', 'excel-import', NULL, NULL, 2, 'test', 3),
+  ('audit-other', 'deposit', 'batch-b', 'create', NULL, NULL, 1, 'test', 4);
 PRAGMA user_version = 2;
 ''');
   raw.dispose();

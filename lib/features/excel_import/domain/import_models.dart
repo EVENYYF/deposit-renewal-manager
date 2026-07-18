@@ -136,12 +136,24 @@ LocalDate? parseImportDate(
     final serial = value.toDouble();
     final minimum = dateSystem == ExcelDateSystem.excel1900 ? 1 : 0;
     if (!serial.isFinite || serial < minimum || serial > 2958465) return null;
+    // Excel's 1900 system includes the non-existent 1900-02-29 at serial 60.
+    if (dateSystem == ExcelDateSystem.excel1900 &&
+        serial >= 60 &&
+        serial < 61) {
+      return null;
+    }
     try {
       final epoch = dateSystem == ExcelDateSystem.excel1900
-          ? DateTime.utc(1899, 12, 30)
+          ? DateTime.utc(1899, 12, 31)
           : DateTime.utc(1904, 1, 1);
+      final adjustedSerial =
+          dateSystem == ExcelDateSystem.excel1900 && serial >= 61
+          ? serial - 1
+          : serial;
       final d = epoch.add(
-        Duration(milliseconds: (serial * Duration.millisecondsPerDay).round()),
+        Duration(
+          milliseconds: (adjustedSerial * Duration.millisecondsPerDay).round(),
+        ),
       );
       if (d.year < 1900 || d.year > 9999) return null;
       return LocalDate(d.year, d.month, d.day);

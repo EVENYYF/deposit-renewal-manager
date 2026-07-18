@@ -127,10 +127,9 @@ class MessageTemplates extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
-@TableIndex(
-  name: 'import_batches_content_hash_idx',
-  columns: {#contentHash},
-  unique: true,
+@TableIndex.sql(
+  'CREATE UNIQUE INDEX import_batches_content_hash_idx '
+  'ON import_batches (content_hash COLLATE NOCASE)',
 )
 class ImportBatches extends Table {
   TextColumn get id => text()();

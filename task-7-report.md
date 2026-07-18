@@ -39,3 +39,17 @@
   becoming zero silently.
 - Verification: targeted migration/import tests passed (35 tests),
   `flutter analyze` is clean, and the full suite passed (118 tests).
+## Task7 Excel date and hash identity closure (2026-07-19)
+
+- Excel 1900 serials now model the virtual leap day explicitly: serials 1,
+  59, and 61 map correctly while the virtual serial-60 day is a row error.
+  Excel 1904 serial zero is valid. Date-formatted cells are rejected in 1904
+  mode because the Excel package has already decoded them as 1900 dates.
+- New SHA-256 hashes are lowercase 64-digit hex strings. The schema v3 index
+  and import queries use `COLLATE NOCASE`. Migration validates legacy hashes,
+  canonicalizes them, keeps the earliest case-equivalent batch, and removes
+  the discarded batch's import audit in the same transaction.
+- Import undo integration tests cover successful restore, a write injected in
+  the guard window, restore failure rollback, and missing latest snapshots.
+- Verification: targeted database/import tests passed (51 tests),
+  `flutter analyze` is clean, and the full suite passed (128 tests).

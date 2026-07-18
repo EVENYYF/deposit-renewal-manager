@@ -57,19 +57,44 @@ class AppDatabase extends _$AppDatabase {
             "AND name = 'import_batches'",
           ).get();
           if (table.isEmpty) return;
-          final duplicates = await customSelect(
-            'SELECT content_hash FROM import_batches '
-            'GROUP BY content_hash HAVING COUNT(*) > 1 LIMIT 1',
+
+          final invalidHashes = await customSelect(
+            'SELECT id, content_hash FROM import_batches '
+            "WHERE length(trim(content_hash)) != 64 "
+            "OR trim(content_hash) GLOB '*[^0-9A-Fa-f]*' LIMIT 1",
           ).get();
-          if (duplicates.isNotEmpty) {
-            final hash = duplicates.single.read<String>('content_hash');
+          if (invalidHashes.isNotEmpty) {
+            final row = invalidHashes.single;
             throw StateError(
-              'Cannot migrate import_batches: duplicate content_hash $hash',
+              'Cannot migrate import_batches: invalid SHA-256 content_hash '
+              'for batch ${row.read<String>('id')}',
             );
           }
+
+          const duplicateBatchIds = '''
+SELECT id FROM (
+  SELECT id,
+         ROW_NUMBER() OVER (
+           PARTITION BY lower(trim(content_hash))
+           ORDER BY imported_at_utc, id
+         ) AS duplicate_rank
+  FROM import_batches
+)
+WHERE duplicate_rank > 1
+''';
+          await customStatement(
+            "DELETE FROM audit_history WHERE entity_type = 'import_batch' "
+            'AND entity_id IN ($duplicateBatchIds)',
+          );
+          await customStatement(
+            'DELETE FROM import_batches WHERE id IN ($duplicateBatchIds)',
+          );
+          await customStatement(
+            'UPDATE import_batches SET content_hash = lower(trim(content_hash))',
+          );
           await customStatement(
             'CREATE UNIQUE INDEX import_batches_content_hash_idx '
-            'ON import_batches (content_hash)',
+            'ON import_batches (content_hash COLLATE NOCASE)',
           );
         });
       }

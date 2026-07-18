@@ -162,6 +162,80 @@ void main() {
     expect(parseImportDate(2958466), isNull);
   });
 
+  test('uses the Excel 1900 serial boundaries including the leap-day gap', () {
+    expect(parseImportDate(1)?.toString(), '1900-01-01');
+    expect(parseImportDate(59)?.toString(), '1900-02-28');
+    expect(parseImportDate(60), isNull);
+    expect(parseImportDate(60.5), isNull);
+    expect(parseImportDate(61)?.toString(), '1900-03-01');
+  });
+
+  test('allows serial zero in the Excel 1904 date system', () {
+    expect(
+      parseImportDate(0, dateSystem: ExcelDateSystem.excel1904)?.toString(),
+      '1904-01-01',
+    );
+  });
+
+  test('rejects date-formatted cells in the Excel 1904 workbook mode', () async {
+    final excel = Excel.createExcel();
+    final sheet = excel[excel.getDefaultSheet()!];
+    sheet.appendRow(
+      [
+        'name',
+        'phone',
+        'amount',
+        'interestRate',
+        'startDate',
+        'term',
+      ].map(TextCellValue.new).toList(),
+    );
+    sheet.appendRow([
+      TextCellValue('Alice'),
+      TextCellValue('13800138000'),
+      IntCellValue(100),
+      DoubleCellValue(2.5),
+      DateCellValue(year: 2024, month: 1, day: 1),
+      IntCellValue(12),
+    ]);
+    final result = await service.previewBytes(
+      excel.encode()!,
+      dateSystem: ExcelDateSystem.excel1904,
+    );
+    expect(
+      result.rows.single.errors,
+      contains(
+        '1904 workbook date-formatted cells unsupported; use numeric serial/text',
+      ),
+    );
+  });
+
+  test('accepts DateTimeCellValue in Excel 1900 mode', () async {
+    final excel = Excel.createExcel();
+    final sheet = excel[excel.getDefaultSheet()!];
+    sheet.appendRow(
+      [
+        'name',
+        'phone',
+        'amount',
+        'interestRate',
+        'startDate',
+        'term',
+      ].map(TextCellValue.new).toList(),
+    );
+    sheet.appendRow([
+      TextCellValue('Alice'),
+      TextCellValue('13800138000'),
+      IntCellValue(100),
+      DoubleCellValue(2.5),
+      DateTimeCellValue(year: 2024, month: 1, day: 1, hour: 9, minute: 0),
+      IntCellValue(12),
+    ]);
+    final result = await service.previewBytes(excel.encode()!);
+    expect(result.rows.single.errors, isNot(contains('invalid start date')));
+    expect(result.rows.single.normalized['startDate'], '2024-01-01');
+  });
+
   test('supports the Excel 1904 date system', () async {
     final excel = Excel.createExcel();
     final sheet = excel[excel.getDefaultSheet()!];

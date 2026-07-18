@@ -65,11 +65,12 @@ void main() {
     expect(await database.auditEntryCount(), 1);
   });
 
-  test('import batch content hashes are unique', () async {
+  test('import batch content hashes are case-insensitively unique', () async {
     final first = ImportBatchesCompanion.insert(
       id: 'batch-1',
       fileName: 'a.xlsx',
-      contentHash: 'same-hash',
+      contentHash:
+          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       importedAtUtc: _testEpoch,
       sourceDeviceId: 'test',
     );
@@ -77,9 +78,26 @@ void main() {
     await expectLater(
       database
           .into(database.importBatches)
-          .insert(first.copyWith(id: const Value('batch-2'))),
+          .insert(
+            first.copyWith(
+              id: const Value('batch-2'),
+              contentHash: const Value(
+                'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+              ),
+            ),
+          ),
       throwsA(isA<Exception>()),
     );
+  });
+
+  test('import batch content hash index is case insensitive', () async {
+    final sql = await database
+        .customSelect(
+          "SELECT sql FROM sqlite_master "
+          "WHERE name = 'import_batches_content_hash_idx'",
+        )
+        .getSingle();
+    expect(sql.read<String>('sql'), contains('COLLATE NOCASE'));
   });
 
   test('every persisted UTC field uses SQLite INTEGER storage', () async {

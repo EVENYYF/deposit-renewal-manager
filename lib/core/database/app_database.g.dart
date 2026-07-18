@@ -3873,7 +3873,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final Index importBatchesContentHashIdx = Index(
     'import_batches_content_hash_idx',
-    'CREATE UNIQUE INDEX import_batches_content_hash_idx ON import_batches (content_hash)',
+    'CREATE UNIQUE INDEX import_batches_content_hash_idx ON import_batches (content_hash COLLATE NOCASE)',
   );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
