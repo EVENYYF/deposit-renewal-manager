@@ -3,13 +3,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/database/app_database.dart';
 import '../core/notifications/notification_scheduler.dart';
+import 'app_dependencies.dart';
 import 'router.dart';
 import 'theme.dart';
 
-class DepositRenewalApp extends StatelessWidget {
+class DepositRenewalApp extends StatefulWidget {
   const DepositRenewalApp({
     this.themeMode = ThemeMode.light,
+    this.database,
     this.notificationScheduler,
     this.notificationTapDispatcher,
     this.notificationInitializationError,
@@ -17,22 +20,48 @@ class DepositRenewalApp extends StatelessWidget {
   });
 
   final ThemeMode themeMode;
+  final AppDatabase? database;
   final NotificationScheduler? notificationScheduler;
   final NotificationTapDispatcher? notificationTapDispatcher;
   final String? notificationInitializationError;
 
   @override
-  Widget build(BuildContext context) => ProviderScope(
-    overrides: [
-      if (notificationScheduler != null)
-        notificationSchedulerProvider.overrideWithValue(notificationScheduler!),
-    ],
-    child: _NotificationLifecycle(
-      tapDispatcher: notificationTapDispatcher,
-      initializationError: notificationInitializationError,
-      child: _DepositRenewalMaterialApp(themeMode: themeMode),
-    ),
-  );
+  State<DepositRenewalApp> createState() => _DepositRenewalAppState();
+}
+
+final class _DepositRenewalAppState extends State<DepositRenewalApp> {
+  @override
+  void dispose() {
+    unawaited(widget.database?.close());
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final content = _NotificationLifecycle(
+      tapDispatcher: widget.notificationTapDispatcher,
+      initializationError: widget.notificationInitializationError,
+      child: _DepositRenewalMaterialApp(themeMode: widget.themeMode),
+    );
+    if (widget.database != null) {
+      return ApplicationProviderScope(
+        database: widget.database!,
+        notificationScheduler:
+            widget.notificationScheduler ??
+            const UnsupportedNotificationScheduler(),
+        child: content,
+      );
+    }
+    return ProviderScope(
+      overrides: [
+        if (widget.notificationScheduler != null)
+          notificationSchedulerProvider.overrideWithValue(
+            widget.notificationScheduler!,
+          ),
+      ],
+      child: content,
+    );
+  }
 }
 
 final class _NotificationLifecycle extends ConsumerStatefulWidget {

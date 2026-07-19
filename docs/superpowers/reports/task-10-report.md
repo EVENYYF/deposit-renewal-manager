@@ -9,14 +9,19 @@
 - 新增手机优先客户列表，支持姓名、手机号或拼音搜索，客户卡可展开查看存款。
 - 新增存款表单，支持自动计算/直接填写到期日、人工调整标记及保存状态反馈。
 - 路由接入真实首页、客户页和新增存款页；通知深链保留原有“通知”显示。
+- 正式启动在 Android 与 Windows 均创建一个共享 `AppDatabase`，并绑定真实
+  CustomerDao、DepositDao 与首页查询；Android 通知调度复用同一实例。
+- 应用根组件统一关闭数据库，避免页面、DAO 或通知层重复持有数据库生命周期。
 
 ## 测试
 
 - `flutter analyze`：通过，无问题。
 - `flutter test test/features/customers/customer_pages_test.dart test/features/dashboard/dashboard_page_test.dart`：通过。
 - `flutter test test/app/responsive_shell_test.dart`：通过（手机底部导航、Windows NavigationRail、通知深链、动态字体）。
+- `flutter test test/app/application_bindings_test.dart`：通过（真实 SQLite
+  创建客户、创建存款、拼音搜索、首页互斥分组与关闭生命周期）。
+- 全量 `flutter test`：169 项通过。
 
 ## 未验证项
 
-- 当前默认 `EmptyCustomerUseCases`、`EmptyDashboardUseCases` 与 `EmptyDepositWorkflow` 仍需由应用启动层绑定实际 DAO/use case；本任务仅定义注入边界和页面交互。
 - Android 真机通知、键盘、厂商省电策略及真实 Drift 数据流待 Task 12 集成验收。

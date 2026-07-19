@@ -10,9 +10,8 @@ Future<void> main() async {
   NotificationScheduler scheduler = const UnsupportedNotificationScheduler();
   final taps = NotificationTapDispatcher();
   String? notificationInitializationError;
-  AppDatabase? database;
+  final database = AppDatabase();
   if (defaultTargetPlatform == TargetPlatform.android) {
-    database = AppDatabase();
     try {
       scheduler = await AndroidNotificationScheduler.create(
         database: database,
@@ -28,6 +27,7 @@ Future<void> main() async {
   }
   runApp(
     DepositRenewalApp(
+      database: database,
       notificationScheduler: scheduler,
       notificationTapDispatcher: taps,
       notificationInitializationError: notificationInitializationError,
