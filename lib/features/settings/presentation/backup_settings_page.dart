@@ -32,14 +32,16 @@ final class BackupSettingsBindings {
   }) => BackupSettingsBindings(
     listSnapshots: backup.listSnapshots,
     exportBackup: () async {
+      final archive = await backup.buildBackupArchive();
       final path = await FilePicker.platform.saveFile(
         dialogTitle: '导出备份',
-        fileName: 'deposit-backup.drbackup',
+        fileName: archive.suggestedFileName,
         type: FileType.custom,
         allowedExtensions: const ['drbackup'],
+        bytes: archive.bytes,
       );
       if (path == null) return null;
-      return (await backup.exportBackup(outputPath: path)).path;
+      return path;
     },
     pickBackup: () async {
       final result = await FilePicker.platform.pickFiles(

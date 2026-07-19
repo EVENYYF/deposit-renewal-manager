@@ -35,10 +35,10 @@ final class AndroidNotificationScheduler extends NotificationReconciler {
     NotificationTapCallback? onTap,
     NotificationPlanSettings settings = const NotificationPlanSettings(),
   }) async {
-    await AndroidAlarmManager.initialize();
-    final timezone = await _initializeTimezone();
+    await _initializeStage('Android 闹钟服务', AndroidAlarmManager.initialize);
+    final timezone = await _initializeStage('时区数据', _initializeTimezone);
     final gateway = AndroidNotificationGateway(onTap: onTap);
-    await gateway.initialize();
+    await _initializeStage('通知插件', gateway.initialize);
     final clock = TimezoneNotificationClock(timezone);
     return AndroidNotificationScheduler(
       dataSource: DatabaseNotificationDataSource(database),
@@ -55,6 +55,17 @@ final class AndroidNotificationScheduler extends NotificationReconciler {
         AndroidDailySummaryScheduler.notificationId,
       ],
     );
+  }
+
+  static Future<T> _initializeStage<T>(
+    String stage,
+    Future<T> Function() action,
+  ) async {
+    try {
+      return await action();
+    } catch (error) {
+      throw NotificationInitializationException(stage, error);
+    }
   }
 
   static Future<tz.Location> _initializeTimezone() async {
@@ -76,6 +87,16 @@ final class AndroidNotificationScheduler extends NotificationReconciler {
     await timezoneClock.refresh();
     return super.reconcileDeposit(depositId);
   }
+}
+
+final class NotificationInitializationException implements Exception {
+  const NotificationInitializationException(this.stage, this.cause);
+
+  final String stage;
+  final Object cause;
+
+  @override
+  String toString() => '$stage初始化失败：$cause';
 }
 
 final class AndroidNotificationGateway implements NotificationGateway {
@@ -142,7 +163,9 @@ final class AndroidNotificationGateway implements NotificationGateway {
       await android?.requestExactAlarmsPermission() ?? false;
 
   @override
-  Future<void> openSettings() =>
+  Future<void> openSettings() => openApplicationSettings();
+
+  static Future<void> openApplicationSettings() =>
       _settingsChannel.invokeMethod<void>('openAppSettings');
 
   @override

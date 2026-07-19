@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:collection';
+import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:clock/clock.dart';
@@ -43,6 +44,15 @@ class InspectedBackup {
   });
 }
 
+/// 已完成完整性校验、可直接交给平台文件选择器保存的备份归档。
+final class BackupArchive {
+  BackupArchive({required List<int> bytes, required this.suggestedFileName})
+    : bytes = Uint8List.fromList(bytes);
+
+  final Uint8List bytes;
+  final String suggestedFileName;
+}
+
 final class RestoreImpact {
   RestoreImpact({
     required Map<String, int> lostRecords,
@@ -83,6 +93,49 @@ class BackupService {
   static Future<File> _defaultRename(File source, String target) =>
       source.rename(target);
 
+  /// 在写入目标文件前生成并校验备份字节。
+  ///
+  /// Android 使用 Storage Access Framework 时必须将 [bytes] 直接传给
+  /// `FilePicker.saveFile`，因此该 API 不依赖本地文件路径。
+  Future<BackupArchive> buildBackupArchive() async {
+    final now = _nowUtc().toUtc();
+    final data = await database.exportBusinessData();
+    _validateRows(data);
+    final payload = utf8.encode(_encodeDeterministic(data));
+    final counts = {
+      for (final entry in data.entries) entry.key: entry.value.length,
+    };
+    final manifest = BackupManifest(
+      formatVersion: 1,
+      schemaVersion: database.schemaVersion,
+      sourceDevice: sourceDevice,
+      createdAtUtc: now,
+      counts: counts,
+      payloadSha256: sha256.convert(payload).toString(),
+    );
+    BackupManifest.fromJson(manifest.toJson());
+    final manifestBytes = utf8.encode(manifest.encode());
+    final archive = Archive()
+      ..addFile(
+        ArchiveFile('manifest.json', manifestBytes.length, manifestBytes),
+      )
+      ..addFile(ArchiveFile('data.json', payload.length, payload));
+    final encoded = ZipEncoder().encode(archive)!;
+    _inspectEncodedEntries(
+      SafeZipReader(limits).readBytes(encoded),
+      path: suggestedBackupFileName(now),
+    );
+    return BackupArchive(
+      bytes: encoded,
+      suggestedFileName: suggestedBackupFileName(now),
+    );
+  }
+
+  String suggestedBackupFileName([DateTime? timestamp]) {
+    final now = (timestamp ?? _nowUtc()).toUtc();
+    return 'deposit-backup-${now.microsecondsSinceEpoch}.drbackup';
+  }
+
   Future<File> exportBackup({
     String? outputPath,
     bool automatic = false,
@@ -105,35 +158,7 @@ class BackupService {
     if (!automatic && await file.exists()) {
       throw BackupTargetExistsException(file.path);
     }
-    final data = await database.exportBusinessData();
-    _validateRows(data);
-    final payload = utf8.encode(_encodeDeterministic(data));
-    final counts = {
-      for (final entry in data.entries) entry.key: entry.value.length,
-    };
-    final manifest = BackupManifest(
-      formatVersion: 1,
-      schemaVersion: database.schemaVersion,
-      sourceDevice: sourceDevice,
-      createdAtUtc: now,
-      counts: counts,
-      payloadSha256: sha256.convert(payload).toString(),
-    );
-    BackupManifest.fromJson(manifest.toJson());
-    final archive = Archive()
-      ..addFile(
-        ArchiveFile(
-          'manifest.json',
-          utf8.encode(manifest.encode()).length,
-          utf8.encode(manifest.encode()),
-        ),
-      )
-      ..addFile(ArchiveFile('data.json', payload.length, payload));
-    final encoded = ZipEncoder().encode(archive)!;
-    _inspectEncodedEntries(
-      SafeZipReader(limits).readBytes(encoded),
-      path: file.path,
-    );
+    final encoded = (await buildBackupArchive()).bytes;
     if (automatic) {
       return snapshots.writeAutomatic(encoded, now, automaticOperation, (
         temporary,

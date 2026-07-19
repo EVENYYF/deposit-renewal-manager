@@ -73,6 +73,26 @@ void main() {
     },
   );
 
+  test('builds a validated archive for platform saveFile bytes', () async {
+    final service = BackupService(
+      database: source,
+      sourceDevice: 'Android',
+      snapshotsDirectory: temp,
+      nowUtc: () => DateTime.utc(2026, 7, 20),
+    );
+
+    final archive = await service.buildBackupArchive();
+
+    expect(archive.bytes, isNotEmpty);
+    expect(archive.suggestedFileName, endsWith('.drbackup'));
+
+    final path = '${temp.path}${Platform.pathSeparator}platform.drbackup';
+    await File(path).writeAsBytes(archive.bytes, flush: true);
+    final inspected = await service.inspectBackup(path);
+    expect(inspected.manifest.sourceDevice, 'Android');
+    expect(inspected.data['customers'], hasLength(1));
+  });
+
   test('restores schema v3 backups by normalizing template defaults', () async {
     await source
         .into(source.messageTemplates)

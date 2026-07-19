@@ -176,6 +176,121 @@ final notificationSchedulerProvider = Provider<NotificationScheduler>(
   (ref) => const UnsupportedNotificationScheduler(),
 );
 
+/// Keeps notification features recoverable when platform initialization fails.
+/// A failed attempt is not terminal: the next capability/reconcile call retries
+/// the factory and swaps in the working scheduler.
+final class RecoverableNotificationScheduler implements NotificationScheduler {
+  RecoverableNotificationScheduler({
+    required this.create,
+    this.openSettingsFallback,
+  });
+
+  final Future<NotificationScheduler> Function() create;
+  final Future<void> Function()? openSettingsFallback;
+  NotificationScheduler? _delegate;
+  Future<NotificationScheduler>? _creating;
+  Object? _lastError;
+
+  String get errorMessage => _lastError?.toString() ?? '通知初始化失败';
+
+  Future<NotificationScheduler> _ready() async {
+    final existing = _delegate;
+    if (existing != null) return existing;
+    final inFlight = _creating;
+    if (inFlight != null) return inFlight;
+    final attempt = create();
+    _creating = attempt;
+    try {
+      final created = await attempt;
+      _delegate = created;
+      _lastError = null;
+      return created;
+    } catch (error) {
+      _lastError = error;
+      rethrow;
+    } finally {
+      _creating = null;
+    }
+  }
+
+  @override
+  Future<NotificationCapability> get capability async {
+    try {
+      return await (await _ready()).capability;
+    } catch (error) {
+      return NotificationCapability.unsupported('Android 通知初始化失败：$error');
+    }
+  }
+
+  Future<NotificationReconcileResult> _run(
+    Future<NotificationReconcileResult> Function(NotificationScheduler) action,
+  ) async {
+    try {
+      return await action(await _ready());
+    } catch (error) {
+      _lastError = error;
+      final cap = NotificationCapability.unsupported('Android 通知初始化失败：$error');
+      return NotificationReconcileResult(
+        capability: cap,
+        scheduledCount: 0,
+        cancelledCount: 0,
+        status: NotificationReconcileStatus.error,
+        degradedReason: cap.reason,
+      );
+    }
+  }
+
+  @override
+  Future<NotificationReconcileResult> reconcileAll() =>
+      _run((scheduler) => scheduler.reconcileAll());
+
+  @override
+  Future<NotificationReconcileResult> reconcileDeposit(String depositId) =>
+      _run((scheduler) => scheduler.reconcileDeposit(depositId));
+
+  @override
+  Future<NotificationReconcileResult> cancelDeposit(String depositId) =>
+      _run((scheduler) => scheduler.cancelDeposit(depositId));
+
+  @override
+  Future<NotificationReconcileResult> reconcileSummary() =>
+      _run((scheduler) => scheduler.reconcileSummary());
+
+  @override
+  Future<bool> requestNotificationPermission() async {
+    try {
+      return await (await _ready()).requestNotificationPermission();
+    } catch (error) {
+      _lastError = error;
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> requestExactAlarmPermission() async {
+    try {
+      return await (await _ready()).requestExactAlarmPermission();
+    } catch (error) {
+      _lastError = error;
+      return false;
+    }
+  }
+
+  @override
+  Future<void> openSettings() async {
+    try {
+      if (openSettingsFallback != null) {
+        await openSettingsFallback!();
+        return;
+      }
+      await (await _ready()).openSettings();
+    } catch (error) {
+      _lastError = error;
+      rethrow;
+    }
+  }
+}
+
 final class UnsupportedNotificationScheduler implements NotificationScheduler {
   const UnsupportedNotificationScheduler([
     this.reason = 'Platform notifications are unsupported',
@@ -264,6 +379,21 @@ final class NotificationCapabilityController
   @override
   NotificationCapabilityState build() => const NotificationCapabilityState();
 
+  bool _initialized = false;
+
+  /// Performs the first capability check and requests Android 13+ permission
+  /// when the platform reports it is missing.
+  Future<void> initialize() async {
+    if (_initialized) return;
+    _initialized = true;
+    await refresh();
+    if (state.needsNotificationPermission) {
+      await requestNotificationPermission();
+    } else {
+      await reconcileAll();
+    }
+  }
+
   Future<void> refresh() async {
     state = state.copyWith(busy: true, message: state.message);
     try {
@@ -300,7 +430,13 @@ final class NotificationCapabilityController
     }
   }
 
-  Future<void> openSettings() => _scheduler.openSettings();
+  Future<void> openSettings() async {
+    try {
+      await _scheduler.openSettings();
+    } catch (error) {
+      state = state.copyWith(message: '打开系统通知设置失败：$error');
+    }
+  }
 
   void warning(String message) => state = state.copyWith(message: message);
 

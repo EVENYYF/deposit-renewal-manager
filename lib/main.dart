@@ -14,7 +14,6 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   NotificationScheduler scheduler = const UnsupportedNotificationScheduler();
   final taps = NotificationTapDispatcher();
-  String? notificationInitializationError;
   final database = AppDatabase();
   final supportDirectory = await getApplicationSupportDirectory();
   final backupService = BackupService(
@@ -25,18 +24,13 @@ Future<void> main() async {
     ),
   );
   if (defaultTargetPlatform == TargetPlatform.android) {
-    try {
-      scheduler = await AndroidNotificationScheduler.create(
+    scheduler = RecoverableNotificationScheduler(
+      create: () => AndroidNotificationScheduler.create(
         database: database,
         onTap: taps.dispatch,
-      );
-    } catch (error, stack) {
-      notificationInitializationError = 'Android 通知初始化失败：$error';
-      debugPrint('$notificationInitializationError\n$stack');
-      scheduler = const UnsupportedNotificationScheduler(
-        'Android notification initialization failed',
-      );
-    }
+      ),
+      openSettingsFallback: AndroidNotificationGateway.openApplicationSettings,
+    );
   }
   runApp(
     DepositRenewalApp(
@@ -44,7 +38,6 @@ Future<void> main() async {
       backupService: backupService,
       notificationScheduler: scheduler,
       notificationTapDispatcher: taps,
-      notificationInitializationError: notificationInitializationError,
     ),
   );
 }

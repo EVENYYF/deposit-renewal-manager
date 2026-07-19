@@ -107,7 +107,7 @@ final class _NotificationLifecycleState
             .read(notificationCapabilityControllerProvider.notifier)
             .warning(initializationError);
       }
-      unawaited(_reconcile());
+      unawaited(_initializeNotifications());
     });
   }
 
@@ -132,6 +132,13 @@ final class _NotificationLifecycleState
     await ref
         .read(notificationCapabilityControllerProvider.notifier)
         .reconcileAll();
+  }
+
+  Future<void> _initializeNotifications() async {
+    final controller = ref.read(
+      notificationCapabilityControllerProvider.notifier,
+    );
+    await controller.initialize();
   }
 
   void _routeNotification() {

@@ -8,6 +8,68 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test(
+    'recoverable scheduler retries factory after initialization failure',
+    () async {
+      var createCalls = 0;
+      final delegate = _PermissionScheduler()..allowed = true;
+      final scheduler = RecoverableNotificationScheduler(
+        create: () async {
+          createCalls++;
+          if (createCalls == 1) throw StateError('plugin unavailable');
+          return delegate;
+        },
+      );
+
+      final first = await scheduler.reconcileAll();
+      expect(first.status, NotificationReconcileStatus.error);
+      expect(first.degradedReason, contains('plugin unavailable'));
+
+      final second = await scheduler.reconcileAll();
+      expect(createCalls, 2);
+      expect(second.scheduledCount, 1);
+      expect(delegate.reconcileCalls, 1);
+    },
+  );
+
+  test(
+    'initialization actively requests missing permission only once',
+    () async {
+      final scheduler = _PermissionScheduler();
+      final container = ProviderContainer(
+        overrides: [notificationSchedulerProvider.overrideWithValue(scheduler)],
+      );
+      addTearDown(container.dispose);
+      final controller = container.read(
+        notificationCapabilityControllerProvider.notifier,
+      );
+
+      await controller.initialize();
+      await controller.initialize();
+
+      expect(scheduler.permissionRequests, 1);
+      expect(scheduler.reconcileCalls, 1);
+    },
+  );
+
+  test('open settings failure is exposed to the capability state', () async {
+    final scheduler = _PermissionScheduler()
+      ..settingsError = StateError('no activity');
+    final container = ProviderContainer(
+      overrides: [notificationSchedulerProvider.overrideWithValue(scheduler)],
+    );
+    addTearDown(container.dispose);
+
+    await container
+        .read(notificationCapabilityControllerProvider.notifier)
+        .openSettings();
+
+    expect(
+      container.read(notificationCapabilityControllerProvider).message,
+      contains('no activity'),
+    );
+  });
+
+  test(
     'denied permission requires user action then grant reconciles all',
     () async {
       final scheduler = _PermissionScheduler();
@@ -119,6 +181,7 @@ void main() {
 
 final class _PermissionScheduler implements NotificationScheduler {
   bool allowed = false;
+  Object? settingsError;
   int permissionRequests = 0;
   int reconcileCalls = 0;
 
@@ -153,7 +216,10 @@ final class _PermissionScheduler implements NotificationScheduler {
   Future<NotificationReconcileResult> cancelDeposit(String depositId) =>
       reconcileAll();
   @override
-  Future<void> openSettings() async {}
+  Future<void> openSettings() async {
+    if (settingsError case final error?) throw error;
+  }
+
   @override
   Future<NotificationReconcileResult> reconcileDeposit(String depositId) =>
       reconcileAll();
