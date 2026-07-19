@@ -2467,6 +2467,21 @@ class $MessageTemplatesTable extends MessageTemplates
     ),
     defaultValue: const Constant(true),
   );
+  static const VerificationMeta _isDefaultMeta = const VerificationMeta(
+    'isDefault',
+  );
+  @override
+  late final GeneratedColumn<bool> isDefault = GeneratedColumn<bool>(
+    'is_default',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_default" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _createdAtUtcMeta = const VerificationMeta(
     'createdAtUtc',
   );
@@ -2497,6 +2512,7 @@ class $MessageTemplatesTable extends MessageTemplates
     name,
     content,
     isActive,
+    isDefault,
     createdAtUtc,
     updatedAtUtc,
   ];
@@ -2537,6 +2553,12 @@ class $MessageTemplatesTable extends MessageTemplates
       context.handle(
         _isActiveMeta,
         isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
+    if (data.containsKey('is_default')) {
+      context.handle(
+        _isDefaultMeta,
+        isDefault.isAcceptableOrUnknown(data['is_default']!, _isDefaultMeta),
       );
     }
     if (data.containsKey('created_at_utc')) {
@@ -2586,6 +2608,10 @@ class $MessageTemplatesTable extends MessageTemplates
         DriftSqlType.bool,
         data['${effectivePrefix}is_active'],
       )!,
+      isDefault: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_default'],
+      )!,
       createdAtUtc: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}created_at_utc'],
@@ -2608,6 +2634,7 @@ class MessageTemplate extends DataClass implements Insertable<MessageTemplate> {
   final String name;
   final String content;
   final bool isActive;
+  final bool isDefault;
   final int createdAtUtc;
   final int updatedAtUtc;
   const MessageTemplate({
@@ -2615,6 +2642,7 @@ class MessageTemplate extends DataClass implements Insertable<MessageTemplate> {
     required this.name,
     required this.content,
     required this.isActive,
+    required this.isDefault,
     required this.createdAtUtc,
     required this.updatedAtUtc,
   });
@@ -2625,6 +2653,7 @@ class MessageTemplate extends DataClass implements Insertable<MessageTemplate> {
     map['name'] = Variable<String>(name);
     map['content'] = Variable<String>(content);
     map['is_active'] = Variable<bool>(isActive);
+    map['is_default'] = Variable<bool>(isDefault);
     map['created_at_utc'] = Variable<int>(createdAtUtc);
     map['updated_at_utc'] = Variable<int>(updatedAtUtc);
     return map;
@@ -2636,6 +2665,7 @@ class MessageTemplate extends DataClass implements Insertable<MessageTemplate> {
       name: Value(name),
       content: Value(content),
       isActive: Value(isActive),
+      isDefault: Value(isDefault),
       createdAtUtc: Value(createdAtUtc),
       updatedAtUtc: Value(updatedAtUtc),
     );
@@ -2651,6 +2681,7 @@ class MessageTemplate extends DataClass implements Insertable<MessageTemplate> {
       name: serializer.fromJson<String>(json['name']),
       content: serializer.fromJson<String>(json['content']),
       isActive: serializer.fromJson<bool>(json['isActive']),
+      isDefault: serializer.fromJson<bool>(json['isDefault']),
       createdAtUtc: serializer.fromJson<int>(json['createdAtUtc']),
       updatedAtUtc: serializer.fromJson<int>(json['updatedAtUtc']),
     );
@@ -2663,6 +2694,7 @@ class MessageTemplate extends DataClass implements Insertable<MessageTemplate> {
       'name': serializer.toJson<String>(name),
       'content': serializer.toJson<String>(content),
       'isActive': serializer.toJson<bool>(isActive),
+      'isDefault': serializer.toJson<bool>(isDefault),
       'createdAtUtc': serializer.toJson<int>(createdAtUtc),
       'updatedAtUtc': serializer.toJson<int>(updatedAtUtc),
     };
@@ -2673,6 +2705,7 @@ class MessageTemplate extends DataClass implements Insertable<MessageTemplate> {
     String? name,
     String? content,
     bool? isActive,
+    bool? isDefault,
     int? createdAtUtc,
     int? updatedAtUtc,
   }) => MessageTemplate(
@@ -2680,6 +2713,7 @@ class MessageTemplate extends DataClass implements Insertable<MessageTemplate> {
     name: name ?? this.name,
     content: content ?? this.content,
     isActive: isActive ?? this.isActive,
+    isDefault: isDefault ?? this.isDefault,
     createdAtUtc: createdAtUtc ?? this.createdAtUtc,
     updatedAtUtc: updatedAtUtc ?? this.updatedAtUtc,
   );
@@ -2689,6 +2723,7 @@ class MessageTemplate extends DataClass implements Insertable<MessageTemplate> {
       name: data.name.present ? data.name.value : this.name,
       content: data.content.present ? data.content.value : this.content,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      isDefault: data.isDefault.present ? data.isDefault.value : this.isDefault,
       createdAtUtc: data.createdAtUtc.present
           ? data.createdAtUtc.value
           : this.createdAtUtc,
@@ -2705,6 +2740,7 @@ class MessageTemplate extends DataClass implements Insertable<MessageTemplate> {
           ..write('name: $name, ')
           ..write('content: $content, ')
           ..write('isActive: $isActive, ')
+          ..write('isDefault: $isDefault, ')
           ..write('createdAtUtc: $createdAtUtc, ')
           ..write('updatedAtUtc: $updatedAtUtc')
           ..write(')'))
@@ -2712,8 +2748,15 @@ class MessageTemplate extends DataClass implements Insertable<MessageTemplate> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, name, content, isActive, createdAtUtc, updatedAtUtc);
+  int get hashCode => Object.hash(
+    id,
+    name,
+    content,
+    isActive,
+    isDefault,
+    createdAtUtc,
+    updatedAtUtc,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2722,6 +2765,7 @@ class MessageTemplate extends DataClass implements Insertable<MessageTemplate> {
           other.name == this.name &&
           other.content == this.content &&
           other.isActive == this.isActive &&
+          other.isDefault == this.isDefault &&
           other.createdAtUtc == this.createdAtUtc &&
           other.updatedAtUtc == this.updatedAtUtc);
 }
@@ -2731,6 +2775,7 @@ class MessageTemplatesCompanion extends UpdateCompanion<MessageTemplate> {
   final Value<String> name;
   final Value<String> content;
   final Value<bool> isActive;
+  final Value<bool> isDefault;
   final Value<int> createdAtUtc;
   final Value<int> updatedAtUtc;
   final Value<int> rowid;
@@ -2739,6 +2784,7 @@ class MessageTemplatesCompanion extends UpdateCompanion<MessageTemplate> {
     this.name = const Value.absent(),
     this.content = const Value.absent(),
     this.isActive = const Value.absent(),
+    this.isDefault = const Value.absent(),
     this.createdAtUtc = const Value.absent(),
     this.updatedAtUtc = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -2748,6 +2794,7 @@ class MessageTemplatesCompanion extends UpdateCompanion<MessageTemplate> {
     required String name,
     required String content,
     this.isActive = const Value.absent(),
+    this.isDefault = const Value.absent(),
     required int createdAtUtc,
     required int updatedAtUtc,
     this.rowid = const Value.absent(),
@@ -2761,6 +2808,7 @@ class MessageTemplatesCompanion extends UpdateCompanion<MessageTemplate> {
     Expression<String>? name,
     Expression<String>? content,
     Expression<bool>? isActive,
+    Expression<bool>? isDefault,
     Expression<int>? createdAtUtc,
     Expression<int>? updatedAtUtc,
     Expression<int>? rowid,
@@ -2770,6 +2818,7 @@ class MessageTemplatesCompanion extends UpdateCompanion<MessageTemplate> {
       if (name != null) 'name': name,
       if (content != null) 'content': content,
       if (isActive != null) 'is_active': isActive,
+      if (isDefault != null) 'is_default': isDefault,
       if (createdAtUtc != null) 'created_at_utc': createdAtUtc,
       if (updatedAtUtc != null) 'updated_at_utc': updatedAtUtc,
       if (rowid != null) 'rowid': rowid,
@@ -2781,6 +2830,7 @@ class MessageTemplatesCompanion extends UpdateCompanion<MessageTemplate> {
     Value<String>? name,
     Value<String>? content,
     Value<bool>? isActive,
+    Value<bool>? isDefault,
     Value<int>? createdAtUtc,
     Value<int>? updatedAtUtc,
     Value<int>? rowid,
@@ -2790,6 +2840,7 @@ class MessageTemplatesCompanion extends UpdateCompanion<MessageTemplate> {
       name: name ?? this.name,
       content: content ?? this.content,
       isActive: isActive ?? this.isActive,
+      isDefault: isDefault ?? this.isDefault,
       createdAtUtc: createdAtUtc ?? this.createdAtUtc,
       updatedAtUtc: updatedAtUtc ?? this.updatedAtUtc,
       rowid: rowid ?? this.rowid,
@@ -2811,6 +2862,9 @@ class MessageTemplatesCompanion extends UpdateCompanion<MessageTemplate> {
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
     }
+    if (isDefault.present) {
+      map['is_default'] = Variable<bool>(isDefault.value);
+    }
     if (createdAtUtc.present) {
       map['created_at_utc'] = Variable<int>(createdAtUtc.value);
     }
@@ -2830,6 +2884,7 @@ class MessageTemplatesCompanion extends UpdateCompanion<MessageTemplate> {
           ..write('name: $name, ')
           ..write('content: $content, ')
           ..write('isActive: $isActive, ')
+          ..write('isDefault: $isDefault, ')
           ..write('createdAtUtc: $createdAtUtc, ')
           ..write('updatedAtUtc: $updatedAtUtc, ')
           ..write('rowid: $rowid')
@@ -3871,6 +3926,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'deposits_expiry_lifecycle_customer_idx',
     'CREATE INDEX deposits_expiry_lifecycle_customer_idx ON deposits (final_expiry_date, lifecycle, customer_id)',
   );
+  late final Index messageTemplatesSingleDefaultIdx = Index(
+    'message_templates_single_default_idx',
+    'CREATE UNIQUE INDEX message_templates_single_default_idx ON message_templates (is_default) WHERE is_default = 1',
+  );
   late final Index importBatchesContentHashIdx = Index(
     'import_batches_content_hash_idx',
     'CREATE UNIQUE INDEX import_batches_content_hash_idx ON import_batches (content_hash COLLATE NOCASE)',
@@ -3894,6 +3953,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     customersNormalizedPhoneIdx,
     depositsBankNameIdx,
     depositsExpiryLifecycleCustomerIdx,
+    messageTemplatesSingleDefaultIdx,
     importBatchesContentHashIdx,
   ];
 }
@@ -5696,6 +5756,7 @@ typedef $$MessageTemplatesTableCreateCompanionBuilder =
       required String name,
       required String content,
       Value<bool> isActive,
+      Value<bool> isDefault,
       required int createdAtUtc,
       required int updatedAtUtc,
       Value<int> rowid,
@@ -5706,6 +5767,7 @@ typedef $$MessageTemplatesTableUpdateCompanionBuilder =
       Value<String> name,
       Value<String> content,
       Value<bool> isActive,
+      Value<bool> isDefault,
       Value<int> createdAtUtc,
       Value<int> updatedAtUtc,
       Value<int> rowid,
@@ -5737,6 +5799,11 @@ class $$MessageTemplatesTableFilterComposer
 
   ColumnFilters<bool> get isActive => $composableBuilder(
     column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isDefault => $composableBuilder(
+    column: $table.isDefault,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5780,6 +5847,11 @@ class $$MessageTemplatesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isDefault => $composableBuilder(
+    column: $table.isDefault,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get createdAtUtc => $composableBuilder(
     column: $table.createdAtUtc,
     builder: (column) => ColumnOrderings(column),
@@ -5811,6 +5883,9 @@ class $$MessageTemplatesTableAnnotationComposer
 
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDefault =>
+      $composableBuilder(column: $table.isDefault, builder: (column) => column);
 
   GeneratedColumn<int> get createdAtUtc => $composableBuilder(
     column: $table.createdAtUtc,
@@ -5864,6 +5939,7 @@ class $$MessageTemplatesTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<String> content = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
+                Value<bool> isDefault = const Value.absent(),
                 Value<int> createdAtUtc = const Value.absent(),
                 Value<int> updatedAtUtc = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -5872,6 +5948,7 @@ class $$MessageTemplatesTableTableManager
                 name: name,
                 content: content,
                 isActive: isActive,
+                isDefault: isDefault,
                 createdAtUtc: createdAtUtc,
                 updatedAtUtc: updatedAtUtc,
                 rowid: rowid,
@@ -5882,6 +5959,7 @@ class $$MessageTemplatesTableTableManager
                 required String name,
                 required String content,
                 Value<bool> isActive = const Value.absent(),
+                Value<bool> isDefault = const Value.absent(),
                 required int createdAtUtc,
                 required int updatedAtUtc,
                 Value<int> rowid = const Value.absent(),
@@ -5890,6 +5968,7 @@ class $$MessageTemplatesTableTableManager
                 name: name,
                 content: content,
                 isActive: isActive,
+                isDefault: isDefault,
                 createdAtUtc: createdAtUtc,
                 updatedAtUtc: updatedAtUtc,
                 rowid: rowid,

@@ -1,11 +1,13 @@
 final class MessageTemplate {
   const MessageTemplate({
+    this.id = '',
     required this.name,
     required this.body,
     this.isEnabled = true,
     this.isDefault = false,
   });
 
+  final String id;
   final String name;
   final String body;
   final bool isEnabled;

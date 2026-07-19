@@ -113,11 +113,16 @@ class AuditHistory extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+@TableIndex.sql(
+  'CREATE UNIQUE INDEX message_templates_single_default_idx '
+  'ON message_templates (is_default) WHERE is_default = 1',
+)
 class MessageTemplates extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
   TextColumn get content => text()();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+  BoolColumn get isDefault => boolean().withDefault(const Constant(false))();
   IntColumn get createdAtUtc =>
       integer().check(utcEpochCheck('created_at_utc'))();
   IntColumn get updatedAtUtc =>

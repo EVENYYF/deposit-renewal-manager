@@ -43,6 +43,14 @@ class InspectedBackup {
   });
 }
 
+final class RestoreImpact {
+  RestoreImpact({required Map<String, int> lostRecords})
+    : lostRecords = UnmodifiableMapView(Map<String, int>.from(lostRecords));
+
+  final Map<String, int> lostRecords;
+  int get totalLost => lostRecords.values.fold(0, (sum, value) => sum + value);
+}
+
 class BackupService {
   BackupService({
     required this.database,
@@ -223,6 +231,32 @@ class BackupService {
     await restorer.restore(backup);
   }
 
+  Future<RestoreImpact> inspectRestoreImpact(InspectedBackup backup) async {
+    if (!backup._trustedToken) {
+      throw const BackupIntegrityException('Backup was not inspected');
+    }
+    const primaryKeys = <String, String>{
+      'customers': 'id',
+      'deposits': 'id',
+      'renewals': 'id',
+      'audit_history': 'id',
+      'message_templates': 'id',
+      'import_batches': 'id',
+      'business_settings': 'singleton_id',
+    };
+    final current = await database.exportBusinessData();
+    final lost = <String, int>{};
+    for (final entry in primaryKeys.entries) {
+      final backupKeys = backup.data[entry.key]!
+          .map((row) => row[entry.value])
+          .toSet();
+      lost[entry.key] = current[entry.key]!
+          .where((row) => !backupKeys.contains(row[entry.value]))
+          .length;
+    }
+    return RestoreImpact(lostRecords: lost);
+  }
+
   Future<File> createAutomaticSnapshot(String operation) =>
       exportBackup(automatic: true, automaticOperation: operation);
 
@@ -329,6 +363,7 @@ class BackupService {
         'name',
         'content',
         'is_active',
+        'is_default',
         'created_at_utc',
         'updated_at_utc',
       },
@@ -379,6 +414,7 @@ class BackupService {
       'rejected_rows',
       'singleton_id',
       'is_active',
+      'is_default',
     };
     const nullable = {
       'phone',
@@ -389,7 +425,9 @@ class BackupService {
     for (final e in row.entries) {
       final v = e.value;
       if (ints.contains(e.key) && v is! int) return false;
-      if (e.key == 'is_active' && v != 0 && v != 1) return false;
+      if ((e.key == 'is_active' || e.key == 'is_default') && v != 0 && v != 1) {
+        return false;
+      }
       if (!ints.contains(e.key) && v != null && v is! String) return false;
       if (v == null && !nullable.contains(e.key)) return false;
       if (v is String && v.length > 1024 * 1024) return false;

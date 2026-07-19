@@ -61,7 +61,7 @@ GoRouter createAppRouter({String initialLocation = '/'}) => GoRouter(
           '/deposits/new',
           const _NewEntryPage(),
         ),
-        _branch(AppRouteNames.templates, '/templates', const TemplatesPage()),
+        _branch(AppRouteNames.templates, '/templates', const _TemplatesRoute()),
         _branch(AppRouteNames.settings, '/settings', const _SettingsPage()),
       ],
     ),
@@ -168,6 +168,14 @@ class _NewEntryPage extends ConsumerWidget {
   void _push(BuildContext context, Widget page) {
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
   }
+}
+
+class _TemplatesRoute extends ConsumerWidget {
+  const _TemplatesRoute();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) =>
+      TemplatesPage(bindings: ref.watch(templateBindingsProvider));
 }
 
 class _SettingsPage extends ConsumerWidget {

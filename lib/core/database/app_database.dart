@@ -25,7 +25,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : this(executor);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -95,6 +95,27 @@ WHERE duplicate_rank > 1
           await customStatement(
             'CREATE UNIQUE INDEX import_batches_content_hash_idx '
             'ON import_batches (content_hash COLLATE NOCASE)',
+          );
+        });
+      }
+      if (from < 4) {
+        await transaction(() async {
+          final table = await customSelect(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' "
+            "AND name = 'message_templates'",
+          ).get();
+          if (table.isEmpty) {
+            await migrator.createTable(messageTemplates);
+          } else {
+            await migrator.addColumn(
+              messageTemplates,
+              messageTemplates.isDefault,
+            );
+          }
+          await customStatement(
+            'CREATE UNIQUE INDEX IF NOT EXISTS '
+            'message_templates_single_default_idx '
+            'ON message_templates (is_default) WHERE is_default = 1',
           );
         });
       }

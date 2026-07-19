@@ -10,6 +10,7 @@ final class BackupSettingsBindings {
     required this.exportBackup,
     required this.pickBackup,
     required this.inspectBackup,
+    required this.inspectRestoreImpact,
     required this.restoreBackup,
   });
 
@@ -17,6 +18,8 @@ final class BackupSettingsBindings {
   final Future<String?> Function() exportBackup;
   final Future<String?> Function() pickBackup;
   final Future<InspectedBackup> Function(String path) inspectBackup;
+  final Future<RestoreImpact> Function(InspectedBackup backup)
+  inspectRestoreImpact;
   final Future<void> Function(InspectedBackup backup) restoreBackup;
 
   static BackupSettingsBindings fromService(
@@ -42,6 +45,7 @@ final class BackupSettingsBindings {
       return result?.files.single.path;
     },
     inspectBackup: backup.inspectBackup,
+    inspectRestoreImpact: backup.inspectRestoreImpact,
     restoreBackup: (inspected) async {
       await backup.restore(inspected);
       await afterRestore?.call();
@@ -106,6 +110,7 @@ class _BackupSettingsPageState extends State<BackupSettingsPage> {
       final path = await widget.bindings.pickBackup();
       if (path == null) return;
       final inspected = await widget.bindings.inspectBackup(path);
+      final impact = await widget.bindings.inspectRestoreImpact(inspected);
       if (!mounted) return;
       final counts = inspected.manifest.counts;
       final proceed = await showDialog<bool>(
@@ -113,7 +118,7 @@ class _BackupSettingsPageState extends State<BackupSettingsPage> {
         builder: (context) => AlertDialog(
           title: const Text('确认恢复备份？'),
           content: Text(
-            '来源设备：${inspected.manifest.sourceDevice}\n版本：${inspected.manifest.schemaVersion}\n时间：${inspected.manifest.createdAtUtc.toLocal()}\n客户：${counts['customers'] ?? 0}，存款：${counts['deposits'] ?? 0}\n当前数据将被替换，未包含在备份中的记录会丢失。恢复前会自动创建快照。',
+            '来源设备：${inspected.manifest.sourceDevice}\n版本：${inspected.manifest.schemaVersion}\n时间：${inspected.manifest.createdAtUtc.toLocal()}\n备份包含客户 ${counts['customers'] ?? 0} 条、存款 ${counts['deposits'] ?? 0} 条。\n\n当前库中将丢失 ${impact.totalLost} 条记录：客户 ${impact.lostRecords['customers'] ?? 0}、存款 ${impact.lostRecords['deposits'] ?? 0}、续期关系 ${impact.lostRecords['renewals'] ?? 0}、模板 ${impact.lostRecords['message_templates'] ?? 0}、导入批次 ${impact.lostRecords['import_batches'] ?? 0}、审计记录 ${impact.lostRecords['audit_history'] ?? 0}。\n\n同一编号的记录也会被备份内容覆盖。恢复前会自动创建快照。',
           ),
           actions: [
             TextButton(

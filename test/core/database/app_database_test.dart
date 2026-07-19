@@ -30,7 +30,7 @@ void main() {
   tearDown(() => database.close());
 
   test('schema version, primary keys and foreign keys are enabled', () async {
-    expect(database.schemaVersion, 3);
+    expect(database.schemaVersion, 4);
     final pragma = await database
         .customSelect('PRAGMA foreign_keys')
         .getSingle();
@@ -98,6 +98,29 @@ void main() {
         )
         .getSingle();
     expect(sql.read<String>('sql'), contains('COLLATE NOCASE'));
+  });
+
+  test('message templates allow at most one default', () async {
+    final first = MessageTemplatesCompanion.insert(
+      id: 'template-1',
+      name: '模板一',
+      content: '内容一',
+      isDefault: const Value(true),
+      createdAtUtc: _testEpoch,
+      updatedAtUtc: _testEpoch,
+    );
+    await database.into(database.messageTemplates).insert(first);
+    await expectLater(
+      database
+          .into(database.messageTemplates)
+          .insert(
+            first.copyWith(
+              id: const Value('template-2'),
+              name: const Value('模板二'),
+            ),
+          ),
+      throwsA(isA<Exception>()),
+    );
   });
 
   test('every persisted UTC field uses SQLite INTEGER storage', () async {

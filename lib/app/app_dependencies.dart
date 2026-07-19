@@ -26,6 +26,9 @@ import '../features/excel_import/application/import_commit_service.dart';
 import '../features/excel_import/application/xlsx_preview_service.dart';
 import '../features/excel_import/presentation/import_wizard.dart';
 import '../features/text_import/domain/text_deposit_parser.dart';
+import '../features/templates/application/template_repository.dart';
+import '../features/templates/domain/message_template.dart' as template_domain;
+import '../features/templates/presentation/templates_page.dart';
 
 const String localSourceDeviceId = 'local-device';
 
@@ -45,6 +48,19 @@ typedef ConfirmedTextImport = Future<void> Function(ParseResult result);
 
 final confirmedTextImportProvider = Provider<ConfirmedTextImport>(
   (ref) => throw StateError('Text import is not configured'),
+);
+
+final templateBindingsProvider = Provider<TemplateBindings>(
+  (ref) => TemplateBindings(
+    load: () async => const [
+      template_domain.MessageTemplate(
+        name: '到期提醒',
+        body: '{{customerName}}您好，您的存款将于{{expiryDate}}到期。',
+        isDefault: true,
+      ),
+    ],
+    save: (template) async => template,
+  ),
 );
 
 class ApplicationProviderScope extends StatelessWidget {
@@ -87,6 +103,13 @@ class ApplicationProviderScope extends StatelessWidget {
       dashboardUseCasesProvider.overrideWith(
         (ref) => SqliteDashboardUseCases(database),
       ),
+      templateBindingsProvider.overrideWith((ref) {
+        final repository = TemplateRepository(
+          database,
+          sourceDeviceId: localSourceDeviceId,
+        );
+        return TemplateBindings(load: repository.load, save: repository.save);
+      }),
       excelImportBindingsProvider.overrideWith((ref) {
         final preview = const XlsxPreviewService();
         final resolver = DuplicateResolver(database);

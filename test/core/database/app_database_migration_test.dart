@@ -153,12 +153,72 @@ void main() {
       );
     },
   );
+
+  test(
+    'migrates v3 templates with no default and enforces one default',
+    () async {
+      final file = await _createV3File();
+      addTearDown(() => _deleteDatabaseFiles(file));
+
+      final database = AppDatabase.forTesting(NativeDatabase(file));
+      addTearDown(database.close);
+      final migrated = await database
+          .customSelect(
+            'SELECT id, is_default FROM message_templates ORDER BY id',
+          )
+          .get();
+      expect(migrated.map((row) => row.read<int>('is_default')), [0, 0]);
+      final index = await database
+          .customSelect(
+            "SELECT sql FROM sqlite_master "
+            "WHERE name = 'message_templates_single_default_idx'",
+          )
+          .getSingle();
+      expect(index.read<String>('sql'), contains('WHERE is_default = 1'));
+
+      await database.customUpdate(
+        "UPDATE message_templates SET is_default = 1 WHERE id = 'a'",
+        updates: {database.messageTemplates},
+      );
+      await expectLater(
+        database.customUpdate(
+          "UPDATE message_templates SET is_default = 1 WHERE id = 'b'",
+          updates: {database.messageTemplates},
+        ),
+        throwsA(isA<Exception>()),
+      );
+    },
+  );
 }
 
 const _hashA =
     'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const _hashB =
     'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
+Future<File> _createV3File() async {
+  final file = File(
+    '${Directory.systemTemp.path}${Platform.pathSeparator}'
+    'deposit-v3-${const Uuid().v4()}.sqlite',
+  );
+  final raw = sqlite.sqlite3.open(file.path);
+  raw.execute('''
+CREATE TABLE message_templates (
+  id TEXT NOT NULL PRIMARY KEY,
+  name TEXT NOT NULL,
+  content TEXT NOT NULL,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at_utc INTEGER NOT NULL,
+  updated_at_utc INTEGER NOT NULL
+);
+INSERT INTO message_templates VALUES
+  ('a', 'A', 'content-a', 1, 1, 1),
+  ('b', 'B', 'content-b', 0, 1, 1);
+PRAGMA user_version = 3;
+''');
+  raw.dispose();
+  return file;
+}
 
 Future<File> _createV2File({bool invalidHash = false}) async {
   final file = File(

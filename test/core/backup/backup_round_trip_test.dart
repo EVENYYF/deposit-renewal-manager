@@ -73,6 +73,38 @@ void main() {
     },
   );
 
+  test(
+    'restore impact counts current records absent from backup by id',
+    () async {
+      await CustomerDao(
+        target,
+        sourceDeviceId: 'windows',
+        nowUtc: () => DateTime.utc(2026, 7, 20),
+      ).create(const CustomerDraft(id: 'local-only', name: '本机客户'));
+      final exporter = BackupService(
+        database: source,
+        sourceDevice: 'Android',
+        snapshotsDirectory: temp,
+      );
+      final path = (await exporter.exportBackup(
+        outputPath: '${temp.path}${Platform.pathSeparator}impact.drbackup',
+      )).path;
+      final importer = BackupService(
+        database: target,
+        sourceDevice: 'Windows',
+        snapshotsDirectory: temp,
+      );
+      final inspected = await importer.inspectBackup(path);
+
+      final impact = await importer.inspectRestoreImpact(inspected);
+
+      expect(impact.lostRecords['customers'], 1);
+      expect(impact.lostRecords['audit_history'], 1);
+      expect(impact.lostRecords['business_settings'], 0);
+      expect(impact.totalLost, 2);
+    },
+  );
+
   test('rejects corrupt zip and payload hash mismatch', () async {
     final service = BackupService(
       database: source,
@@ -338,6 +370,10 @@ void main() {
       },
       (data) {
         _populateValidRows(data);
+        ((data['message_templates'] as List).single as Map)['is_default'] = 2;
+      },
+      (data) {
+        _populateValidRows(data);
         ((data['import_batches'] as List).single as Map)['imported_rows'] = -1;
       },
       (data) =>
@@ -513,6 +549,7 @@ void _populateValidRows(Map<String, dynamic> data) {
       'name': 'Template',
       'content': 'Hello',
       'is_active': 1,
+      'is_default': 0,
       'created_at_utc': epoch,
       'updated_at_utc': epoch,
     },

@@ -1,4 +1,5 @@
 import 'package:deposit_renewal_manager/features/settings/presentation/backup_settings_page.dart';
+import 'package:deposit_renewal_manager/core/backup/backup_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -14,6 +15,8 @@ void main() {
             exportBackup: () async => null,
             pickBackup: () async => null,
             inspectBackup: (_) => throw UnimplementedError(),
+            inspectRestoreImpact: (_) async =>
+                RestoreImpact(lostRecords: const {}),
             restoreBackup: (_) async {},
           ),
         ),
