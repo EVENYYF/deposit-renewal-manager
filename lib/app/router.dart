@@ -22,7 +22,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state, shell) =>
             ResponsiveAppShell(navigationShell: shell),
         branches: [
-          _branch(AppRouteNames.dashboard, '/', const DashboardPage()),
+          _branch(
+            AppRouteNames.dashboard,
+            '/',
+            const DashboardPage(),
+            routes: [
+              GoRoute(
+                name: AppRouteNames.notification,
+                path: 'notifications/:notificationId',
+                builder: (context, state) => _PlaceholderPage(
+                  title: '通知',
+                  subtitle: state.pathParameters['notificationId'],
+                ),
+              ),
+            ],
+          ),
           _branch(
             AppRouteNames.customers,
             '/customers',
@@ -45,26 +59,27 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      GoRoute(
-        name: AppRouteNames.notification,
-        path: '/notifications/:notificationId',
-        builder: (context, state) => _PlaceholderPage(
-          title: '通知',
-          subtitle: state.pathParameters['notificationId'],
-        ),
-      ),
     ],
   );
   ref.onDispose(router.dispose);
   return router;
 });
 
-StatefulShellBranch _branch(String name, String path, Widget child) =>
-    StatefulShellBranch(
-      routes: [
-        GoRoute(name: name, path: path, builder: (context, state) => child),
-      ],
-    );
+StatefulShellBranch _branch(
+  String name,
+  String path,
+  Widget child, {
+  List<GoRoute> routes = const [],
+}) => StatefulShellBranch(
+  routes: [
+    GoRoute(
+      name: name,
+      path: path,
+      builder: (context, state) => child,
+      routes: routes,
+    ),
+  ],
+);
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});

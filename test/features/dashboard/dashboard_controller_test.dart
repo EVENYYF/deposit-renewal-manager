@@ -67,6 +67,32 @@ void main() {
     expect(container.read(dashboardControllerProvider).value?.overdueCount, 1);
     expect(useCases.loadCalls, 2);
   });
+
+  test('an older retry cannot overwrite a newer save refresh', () async {
+    const command = DashboardCommand('deposit-2');
+    final older = Completer<DashboardSnapshot>();
+    final newer = Completer<DashboardSnapshot>();
+    final useCases = _FakeDashboardUseCases()
+      ..loadResults.add(Future.value(const DashboardSnapshot()))
+      ..loadResults.add(older.future)
+      ..loadResults.add(newer.future);
+    final container = ProviderContainer(
+      overrides: [dashboardUseCasesProvider.overrideWithValue(useCases)],
+    );
+    addTearDown(container.dispose);
+    await container.read(dashboardControllerProvider.future);
+
+    final retry = container.read(dashboardControllerProvider.notifier).retry();
+    final save = container
+        .read(dashboardControllerProvider.notifier)
+        .saveAndRefresh(command);
+    newer.complete(const DashboardSnapshot(customerCount: 7));
+    await save;
+    older.complete(const DashboardSnapshot(customerCount: 1));
+    await retry;
+
+    expect(container.read(dashboardControllerProvider).value?.customerCount, 7);
+  });
 }
 
 final class _FakeDashboardUseCases implements DashboardUseCases {

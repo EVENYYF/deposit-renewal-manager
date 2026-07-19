@@ -1,6 +1,7 @@
 import 'package:deposit_renewal_manager/app/app.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 void main() {
   const destinations = ['首页', '客户', '新增', '模板', '设置'];
@@ -52,6 +53,30 @@ void main() {
       expect(bar.selectedIndex, index);
       expect(find.text(destinations[index]), findsWidgets);
     }
+  });
+
+  testWidgets('notification deep link stays inside the shell and can go back', (
+    tester,
+  ) async {
+    setSize(tester, const Size(390, 844));
+    await tester.pumpWidget(const DepositRenewalApp());
+    await tester.pumpAndSettle();
+
+    GoRouter.of(
+      tester.element(find.byType(NavigationBar)),
+    ).go('/notifications/42');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.text('通知\n42'), findsOneWidget);
+    expect(
+      tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+      0,
+    );
+
+    GoRouter.of(tester.element(find.byType(NavigationBar))).pop();
+    await tester.pumpAndSettle();
+    expect(find.text('存款续期'), findsOneWidget);
   });
 
   testWidgets('long Chinese copy and large text do not overflow', (

@@ -47,23 +47,56 @@ final dashboardControllerProvider =
     );
 
 final class DashboardController extends AsyncNotifier<DashboardSnapshot> {
+  int _requestGeneration = 0;
+  bool _disposed = false;
+  bool _lifecycleBound = false;
+
   DashboardUseCases get _useCases => ref.read(dashboardUseCasesProvider);
 
   @override
-  Future<DashboardSnapshot> build() => _useCases.load();
+  Future<DashboardSnapshot> build() {
+    _bindLifecycle();
+    ++_requestGeneration;
+    return _useCases.load();
+  }
 
   Future<void> retry() => _refresh();
 
   Future<void> saveAndRefresh(DashboardCommand command) async {
+    final generation = ++_requestGeneration;
+    if (_disposed) return;
     state = const AsyncLoading<DashboardSnapshot>();
-    state = await AsyncValue.guard(() async {
+    try {
       await _useCases.save(command);
-      return _useCases.load();
-    });
+      if (!_isCurrent(generation)) return;
+      final snapshot = await _useCases.load();
+      if (_isCurrent(generation)) state = AsyncData(snapshot);
+    } catch (error, stack) {
+      if (_isCurrent(generation)) state = AsyncError(error, stack);
+    }
   }
 
   Future<void> _refresh() async {
+    final generation = ++_requestGeneration;
+    if (_disposed) return;
     state = const AsyncLoading<DashboardSnapshot>();
-    state = await AsyncValue.guard(_useCases.load);
+    try {
+      final snapshot = await _useCases.load();
+      if (_isCurrent(generation)) state = AsyncData(snapshot);
+    } catch (error, stack) {
+      if (_isCurrent(generation)) state = AsyncError(error, stack);
+    }
   }
+
+  void _bindLifecycle() {
+    if (_lifecycleBound) return;
+    _lifecycleBound = true;
+    ref.onDispose(() {
+      _disposed = true;
+      _requestGeneration++;
+    });
+  }
+
+  bool _isCurrent(int generation) =>
+      !_disposed && generation == _requestGeneration;
 }

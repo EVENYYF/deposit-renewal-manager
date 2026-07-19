@@ -40,34 +40,78 @@ final customerControllerProvider =
 
 final class CustomerController extends AsyncNotifier<CustomerDirectoryState> {
   String _query = '';
+  int _requestGeneration = 0;
+  bool _disposed = false;
+  bool _lifecycleBound = false;
 
   CustomerUseCases get _useCases => ref.read(customerUseCasesProvider);
 
   @override
-  Future<CustomerDirectoryState> build() => _load();
-
-  Future<void> search(String query) async {
-    _query = query.trim();
-    await _refresh();
+  Future<CustomerDirectoryState> build() {
+    _bindLifecycle();
+    ++_requestGeneration;
+    final query = _query;
+    return _load(query);
   }
 
-  Future<void> retry() => _refresh();
+  Future<void> search(String query) async {
+    final normalized = query.trim();
+    _query = normalized;
+    await _refresh(normalized);
+  }
+
+  Future<void> retry() => _refresh(_query);
 
   Future<void> saveAndRefresh(CustomerDraft draft) async {
+    final generation = ++_requestGeneration;
+    final query = _query;
+    if (_disposed) return;
     state = const AsyncLoading<CustomerDirectoryState>();
-    state = await AsyncValue.guard(() async {
+    try {
       await _useCases.save(draft);
-      return _load();
+      if (!_isCurrent(generation)) return;
+      final results = await _useCases.load(query);
+      if (_isCurrent(generation)) {
+        state = AsyncData(
+          CustomerDirectoryState(query: query, results: results),
+        );
+      }
+    } catch (error, stack) {
+      if (_isCurrent(generation)) state = AsyncError(error, stack);
+    }
+  }
+
+  Future<CustomerDirectoryState> _load(String query) async =>
+      CustomerDirectoryState(
+        query: query,
+        results: await _useCases.load(query),
+      );
+
+  Future<void> _refresh(String query) async {
+    final generation = ++_requestGeneration;
+    if (_disposed) return;
+    state = const AsyncLoading<CustomerDirectoryState>();
+    try {
+      final results = await _useCases.load(query);
+      if (_isCurrent(generation)) {
+        state = AsyncData(
+          CustomerDirectoryState(query: query, results: results),
+        );
+      }
+    } catch (error, stack) {
+      if (_isCurrent(generation)) state = AsyncError(error, stack);
+    }
+  }
+
+  void _bindLifecycle() {
+    if (_lifecycleBound) return;
+    _lifecycleBound = true;
+    ref.onDispose(() {
+      _disposed = true;
+      _requestGeneration++;
     });
   }
 
-  Future<CustomerDirectoryState> _load() async => CustomerDirectoryState(
-    query: _query,
-    results: await _useCases.load(_query),
-  );
-
-  Future<void> _refresh() async {
-    state = const AsyncLoading<CustomerDirectoryState>();
-    state = await AsyncValue.guard(_load);
-  }
+  bool _isCurrent(int generation) =>
+      !_disposed && generation == _requestGeneration;
 }
