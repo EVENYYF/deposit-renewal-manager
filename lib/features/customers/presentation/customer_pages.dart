@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
+import 'package:intl/intl.dart';
 
 import '../application/customer_controller.dart';
+import '../application/customer_history_service.dart';
 import '../domain/customer_repository.dart';
+import '../../deposits/presentation/deposit_form_page.dart';
 
 class CustomerDirectoryPage extends ConsumerStatefulWidget {
   const CustomerDirectoryPage({super.key});
@@ -167,12 +170,12 @@ class _CustomerDirectoryPageState extends ConsumerState<CustomerDirectoryPage> {
   }
 }
 
-class _CustomerCard extends StatelessWidget {
+class _CustomerCard extends ConsumerWidget {
   const _CustomerCard({required this.result});
   final CustomerSearchResult result;
 
   @override
-  Widget build(BuildContext context) => Card(
+  Widget build(BuildContext context, WidgetRef ref) => Card(
     child: ExpansionTile(
       leading: CircleAvatar(child: Text(result.customer.name.characters.first)),
       title: Text(
@@ -200,12 +203,12 @@ class _CustomerCard extends StatelessWidget {
         OverflowBar(
           children: [
             TextButton.icon(
-              onPressed: () {},
+              onPressed: () => _showHistory(context, ref),
               icon: const Icon(Icons.history),
               label: const Text('修改记录'),
             ),
             FilledButton.tonalIcon(
-              onPressed: () {},
+              onPressed: () => _addDeposit(context, ref),
               icon: const Icon(Icons.add),
               label: const Text('新增存款'),
             ),
@@ -219,5 +222,73 @@ class _CustomerCard extends StatelessWidget {
     'active' => '有效',
     'renewed' => '已续期',
     _ => '已停止',
+  };
+
+  Future<void> _addDeposit(BuildContext context, WidgetRef ref) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        child: SizedBox(
+          width: 560,
+          height: 700,
+          child: DepositFormPage(
+            initialCustomerId: result.customer.id,
+            onSaved: () => Navigator.of(dialogContext).pop(),
+          ),
+        ),
+      ),
+    );
+    if (context.mounted) {
+      await ref.read(customerControllerProvider.notifier).retry();
+    }
+  }
+
+  Future<void> _showHistory(BuildContext context, WidgetRef ref) async {
+    final history = await ref
+        .read(customerHistoryUseCasesProvider)
+        .load(result.customer.id);
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('${result.customer.name}的修改记录'),
+        content: SizedBox(
+          width: 480,
+          child: history.isEmpty
+              ? const Text('暂无修改记录')
+              : ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: history.length,
+                  separatorBuilder: (_, _) => const Divider(),
+                  itemBuilder: (context, index) {
+                    final entry = history[index];
+                    return ListTile(
+                      leading: const Icon(Icons.history),
+                      title: Text(_operationLabel(entry.operation)),
+                      subtitle: Text(
+                        DateFormat('yyyy-MM-dd HH:mm').format(entry.occurredAt),
+                      ),
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _operationLabel(String value) => switch (value) {
+    'create' => '新建',
+    'update' => '更新',
+    'renew' => '续期',
+    'create_from_renewal' => '续期生成新存款',
+    'stop' => '停止续期',
+    'deactivate' => '停用客户',
+    _ => value,
   };
 }

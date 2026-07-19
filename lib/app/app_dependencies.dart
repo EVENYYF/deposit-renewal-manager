@@ -1,4 +1,5 @@
 import 'package:clock/clock.dart';
+import 'package:drift/drift.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,6 +8,7 @@ import '../core/database/daos/customer_dao.dart';
 import '../core/database/daos/deposit_dao.dart';
 import '../core/notifications/notification_scheduler.dart';
 import '../features/customers/application/customer_controller.dart';
+import '../features/customers/application/customer_history_service.dart';
 import '../features/customers/application/customer_search_service.dart';
 import '../features/customers/domain/customer_repository.dart';
 import '../features/customers/domain/name_search_index.dart';
@@ -37,6 +39,9 @@ class ApplicationProviderScope extends StatelessWidget {
         (ref) => SqliteCustomerUseCases(
           CustomerDao(database, sourceDeviceId: localSourceDeviceId),
         ),
+      ),
+      customerHistoryUseCasesProvider.overrideWith(
+        (ref) => SqliteCustomerHistoryUseCases(database),
       ),
       depositWorkflowProvider.overrideWith(
         (ref) => DaoDepositWorkflow(
@@ -113,7 +118,8 @@ final class SqliteDashboardUseCases implements DashboardUseCases {
     final rows = await _database
         .customSelect(
           '''
-SELECT d.id, d.customer_id, d.amount_cents, d.bank_name,
+SELECT d.id, d.customer_id, d.amount_cents, d.bank_name, d.start_date,
+       d.interest_rate_scaled, d.rate_precision,
        d.calculated_expiry_date, d.final_expiry_date, d.lifecycle,
        c.name AS customer_name
 FROM deposits d
@@ -146,6 +152,10 @@ ORDER BY d.final_expiry_date, c.name
         bankName: row.read<String>('bank_name'),
         amountCents: row.read<int>('amount_cents'),
         expiryDate: finalExpiry.toString(),
+        startDate: row.read<String>('start_date'),
+        calculatedExpiryDate: calculated,
+        interestRateScaled: row.read<int>('interest_rate_scaled'),
+        ratePrecision: row.read<int>('rate_precision'),
       );
     }
     final now = _now().toLocal();
@@ -183,5 +193,43 @@ ORDER BY d.final_expiry_date, c.name
       int.parse(parts[1]),
       int.parse(parts[2]),
     );
+  }
+}
+
+final class SqliteCustomerHistoryUseCases implements CustomerHistoryUseCases {
+  const SqliteCustomerHistoryUseCases(this._database);
+  final AppDatabase _database;
+
+  @override
+  Future<List<CustomerHistoryEntry>> load(String customerId) async {
+    final rows = await _database
+        .customSelect(
+          '''
+SELECT a.operation, a.occurred_at_utc
+FROM audit_history a
+WHERE (a.entity_type = 'customer' AND a.entity_id = ?)
+   OR (a.entity_type = 'deposit' AND a.entity_id IN (
+     SELECT id FROM deposits WHERE customer_id = ?
+   ))
+ORDER BY a.occurred_at_utc DESC
+''',
+          variables: [
+            Variable.withString(customerId),
+            Variable.withString(customerId),
+          ],
+          readsFrom: {_database.auditHistory, _database.deposits},
+        )
+        .get();
+    return rows
+        .map(
+          (row) => CustomerHistoryEntry(
+            operation: row.read<String>('operation'),
+            occurredAt: DateTime.fromMicrosecondsSinceEpoch(
+              row.read<int>('occurred_at_utc'),
+              isUtc: true,
+            ).toLocal(),
+          ),
+        )
+        .toList(growable: false);
   }
 }

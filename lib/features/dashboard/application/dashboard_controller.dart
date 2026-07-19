@@ -32,6 +32,10 @@ final class DashboardReminder {
     required this.bankName,
     required this.amountCents,
     required this.expiryDate,
+    required this.startDate,
+    this.calculatedExpiryDate,
+    required this.interestRateScaled,
+    required this.ratePrecision,
   });
 
   final String depositId;
@@ -40,6 +44,10 @@ final class DashboardReminder {
   final String bankName;
   final int amountCents;
   final String expiryDate;
+  final String startDate;
+  final String? calculatedExpiryDate;
+  final int interestRateScaled;
+  final int ratePrecision;
 }
 
 final class DashboardCommand {

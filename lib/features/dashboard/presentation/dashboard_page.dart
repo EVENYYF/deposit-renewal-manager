@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/notifications/notification_scheduler.dart';
 import '../../deposits/application/deposit_workflow_controller.dart';
+import '../../deposits/domain/deposit_repository.dart';
+import '../../deposits/domain/local_date.dart';
+import '../../deposits/presentation/deposit_form_page.dart';
+import '../../templates/application/render_message.dart';
+import '../../templates/domain/message_template.dart';
 import '../application/dashboard_controller.dart';
 
 class DashboardPage extends ConsumerWidget {
@@ -207,12 +213,20 @@ class _ReminderTile extends ConsumerWidget {
             runSpacing: 8,
             children: [
               OutlinedButton.icon(
-                onPressed: () {},
+                onPressed: () => _showPrompt(context),
                 icon: const Icon(Icons.content_copy),
                 label: const Text('提示语'),
               ),
-              FilledButton.tonal(onPressed: () {}, child: const Text('续期')),
-              TextButton(onPressed: () {}, child: const Text('更新')),
+              FilledButton.tonal(
+                onPressed: () =>
+                    _showDepositForm(context, ref, DepositFormMode.renew),
+                child: const Text('续期'),
+              ),
+              TextButton(
+                onPressed: () =>
+                    _showDepositForm(context, ref, DepositFormMode.update),
+                child: const Text('更新'),
+              ),
               TextButton(
                 onPressed: () => _confirmStop(context, ref),
                 child: const Text('停止续期'),
@@ -245,6 +259,107 @@ class _ReminderTile extends ConsumerWidget {
     if (confirmed != true) return;
     await ref.read(depositWorkflowProvider).stop(record.depositId);
     await ref.read(dashboardControllerProvider.notifier).retry();
+  }
+
+  Future<void> _showDepositForm(
+    BuildContext context,
+    WidgetRef ref,
+    DepositFormMode mode,
+  ) async {
+    final draft = _draft;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        child: SizedBox(
+          width: 560,
+          height: 700,
+          child: DepositFormPage(
+            mode: mode,
+            sourceDepositId: record.depositId,
+            initial: draft,
+            onSaved: () => Navigator.of(dialogContext).pop(),
+          ),
+        ),
+      ),
+    );
+    if (context.mounted) {
+      await ref.read(dashboardControllerProvider.notifier).retry();
+    }
+  }
+
+  DepositDraft get _draft => DepositDraft(
+    id: record.depositId,
+    customerId: record.customerId,
+    amountCents: record.amountCents,
+    bankName: record.bankName,
+    interestRateScaled: record.interestRateScaled,
+    ratePrecision: record.ratePrecision,
+    startDate: _parseDate(record.startDate),
+    calculatedExpiryDate: record.calculatedExpiryDate == null
+        ? null
+        : _parseDate(record.calculatedExpiryDate!),
+    finalExpiryDate: _parseDate(record.expiryDate),
+  );
+
+  LocalDate _parseDate(String value) {
+    final parts = value.split('-');
+    return LocalDate(
+      int.parse(parts[0]),
+      int.parse(parts[1]),
+      int.parse(parts[2]),
+    );
+  }
+
+  Future<void> _showPrompt(BuildContext context) async {
+    final amount = NumberFormat.currency(
+      locale: 'zh_CN',
+      symbol: '¥',
+    ).format(record.amountCents / 100);
+    final values = TemplateValues(
+      customerName: record.customerName,
+      amount: amount,
+      bank: record.bankName,
+      depositDate: record.startDate,
+      expiryDate: record.expiryDate,
+    );
+    final rendered = renderMessage(
+      const MessageTemplate(
+        name: '到期提醒',
+        body:
+            '您好，{{customerName}}，您在{{bank}}的{{amount}}存款将于{{expiryDate}}到期，请问是否需要续期？',
+      ),
+      values,
+    );
+    final editor = TextEditingController(text: rendered);
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('续期提示语'),
+        content: TextField(controller: editor, maxLines: 6, autofocus: true),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('关闭'),
+          ),
+          FilledButton.icon(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: editor.text));
+              if (dialogContext.mounted) {
+                Navigator.pop(dialogContext);
+              }
+              if (context.mounted) {
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('已复制')));
+              }
+            },
+            icon: const Icon(Icons.copy),
+            label: const Text('复制'),
+          ),
+        ],
+      ),
+    );
+    editor.dispose();
   }
 }
 

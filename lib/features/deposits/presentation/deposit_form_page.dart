@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../customers/application/customer_controller.dart';
+import '../../dashboard/application/dashboard_controller.dart';
 import '../application/deposit_workflow_controller.dart';
 import '../domain/deposit_repository.dart';
 import '../domain/expiry_calculator.dart';
@@ -14,12 +16,16 @@ class DepositFormPage extends ConsumerStatefulWidget {
     this.mode = DepositFormMode.create,
     this.sourceDepositId,
     this.initial,
+    this.initialCustomerId,
+    this.onSaved,
     super.key,
   });
 
   final DepositFormMode mode;
   final String? sourceDepositId;
   final DepositDraft? initial;
+  final String? initialCustomerId;
+  final VoidCallback? onSaved;
 
   @override
   ConsumerState<DepositFormPage> createState() => _DepositFormPageState();
@@ -43,7 +49,9 @@ class _DepositFormPageState extends ConsumerState<DepositFormPage> {
     super.initState();
     final initial = widget.initial;
     _automatic = initial?.calculatedExpiryDate != null;
-    _customer = TextEditingController(text: initial?.customerId ?? '');
+    _customer = TextEditingController(
+      text: initial?.customerId ?? widget.initialCustomerId ?? '',
+    );
     _amount = TextEditingController(
       text: initial == null
           ? ''
@@ -238,9 +246,12 @@ class _DepositFormPageState extends ConsumerState<DepositFormPage> {
           await workflow.renew(widget.sourceDepositId!, draft);
       }
       if (mounted) {
+        ref.invalidate(customerControllerProvider);
+        ref.invalidate(dashboardControllerProvider);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('已保存')));
+        widget.onSaved?.call();
       }
     } on Object catch (error) {
       if (mounted) {
