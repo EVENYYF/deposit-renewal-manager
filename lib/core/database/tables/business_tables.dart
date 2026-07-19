@@ -182,14 +182,13 @@ class DeviceSettings extends Table {
           'snapshot_retention_count BETWEEN 1 AND 50',
         ),
       )();
-  IntColumn get lastSnapshotAtUtc =>
-      integer().nullable().check(
-        const CustomExpression<bool>(
-          'last_snapshot_at_utc IS NULL OR '
-          '(typeof(last_snapshot_at_utc) = \'integer\' AND '
-          'last_snapshot_at_utc > 0)',
-        ),
-      )();
+  IntColumn get lastSnapshotAtUtc => integer().nullable().check(
+    const CustomExpression<bool>(
+      'last_snapshot_at_utc IS NULL OR '
+      '(typeof(last_snapshot_at_utc) = \'integer\' AND '
+      'last_snapshot_at_utc > 0)',
+    ),
+  )();
   IntColumn get lastSnapshotBusinessRevision => integer()
       .withDefault(const Constant(0))
       .check(

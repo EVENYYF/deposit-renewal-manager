@@ -125,11 +125,17 @@ WHERE duplicate_rank > 1
       }
       if (from < 5) {
         await transaction(() async {
-          await migrator.addColumn(deposits, deposits.productName);
-          await customStatement(
-            'CREATE INDEX IF NOT EXISTS deposits_product_name_idx '
-            'ON deposits (product_name COLLATE NOCASE)',
-          );
+          final depositsTable = await customSelect(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' "
+            "AND name = 'deposits'",
+          ).get();
+          if (depositsTable.isNotEmpty) {
+            await migrator.addColumn(deposits, deposits.productName);
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS deposits_product_name_idx '
+              'ON deposits (product_name COLLATE NOCASE)',
+            );
+          }
           await migrator.createTable(deviceSettings);
           await into(
             deviceSettings,
