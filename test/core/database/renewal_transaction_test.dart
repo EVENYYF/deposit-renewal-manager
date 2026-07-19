@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:deposit_renewal_manager/core/database/app_database.dart';
 import 'package:deposit_renewal_manager/core/database/daos/customer_dao.dart';
 import 'package:deposit_renewal_manager/core/database/daos/deposit_dao.dart';
+import 'package:deposit_renewal_manager/core/notifications/notification_scheduler.dart';
 import 'package:deposit_renewal_manager/features/customers/domain/customer_repository.dart';
 import 'package:deposit_renewal_manager/features/deposits/domain/deposit.dart';
 import 'package:deposit_renewal_manager/features/deposits/domain/deposit_repository.dart';
@@ -152,18 +153,100 @@ void main() {
     expect(jsonDecode(audit.last.afterJson!)['lifecycle'], 'stopped');
     expect(audit.last.sourceDeviceId, 'device-a');
   });
+
+  test(
+    'repository invokes notification hooks after committed mutations',
+    () async {
+      final coordinator = _RecordingNotificationCoordinator();
+      final repository = _repository(
+        database,
+        notificationCoordinator: coordinator,
+      );
+
+      await repository.create(_draft('source'));
+      await repository.update('source', _draft('ignored'));
+      await repository.renew('source', _draft('target'));
+      await repository.stopRenewal('target');
+
+      expect(coordinator.events, [
+        'upsert:source',
+        'upsert:source',
+        'renew:source:target',
+        'stop:target',
+      ]);
+    },
+  );
+
+  test(
+    'notification hook failure warns without rolling back mutation',
+    () async {
+      final warnings = <String>[];
+      final repository = _repository(
+        database,
+        notificationCoordinator: _RecordingNotificationCoordinator(fail: true),
+        notificationWarning: warnings.add,
+      );
+
+      await repository.create(_draft('source'));
+
+      expect(await repository.get('source'), isNotNull);
+      expect(warnings.single, contains('通知更新失败'));
+    },
+  );
 }
 
 DepositDao _repository(
   AppDatabase database, {
   RenewalFailureInjector? failureInjector,
+  NotificationMutationCoordinator? notificationCoordinator,
+  void Function(String warning)? notificationWarning,
 }) {
   return DepositDao(
     database,
     sourceDeviceId: 'device-a',
     nowUtc: () => DateTime.utc(2026, 7, 18, 9),
     failureInjector: failureInjector,
+    notificationCoordinator: notificationCoordinator,
+    notificationWarning: notificationWarning,
   );
+}
+
+final class _RecordingNotificationCoordinator
+    implements NotificationMutationCoordinator {
+  _RecordingNotificationCoordinator({this.fail = false});
+
+  final bool fail;
+  final List<String> events = [];
+
+  Future<void> _record(String event) async {
+    events.add(event);
+    if (fail) throw StateError('notification failed');
+  }
+
+  @override
+  Future<void> afterCreateOrUpdate(String depositId) =>
+      _record('upsert:$depositId');
+
+  @override
+  Future<void> afterRenew(String sourceDepositId, String targetDepositId) =>
+      _record('renew:$sourceDepositId:$targetDepositId');
+
+  @override
+  Future<void> afterStopOrDelete(String depositId) =>
+      _record('stop:$depositId');
+
+  @override
+  Future<void> cancelDeposit(String depositId) => _record('cancel:$depositId');
+
+  @override
+  Future<void> reconcileAll() => _record('all');
+
+  @override
+  Future<void> reconcileDeposit(String depositId) =>
+      _record('reconcile:$depositId');
+
+  @override
+  Future<void> reconcileSummary() => _record('summary');
 }
 
 DepositDraft _draft(String id) => DepositDraft(

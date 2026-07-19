@@ -25,6 +25,7 @@ final class AndroidNotificationScheduler extends NotificationReconciler {
     required super.gateway,
     super.settings,
     super.dailySummaryScheduler,
+    super.legacySummaryNotificationIds,
   }) : super(clock: timezoneClock);
 
   final TimezoneNotificationClock timezoneClock;
@@ -50,6 +51,9 @@ final class AndroidNotificationScheduler extends NotificationReconciler {
         capability: gateway.capability,
         settings: settings,
       ),
+      legacySummaryNotificationIds: const [
+        AndroidDailySummaryScheduler.notificationId,
+      ],
     );
   }
 
@@ -193,6 +197,7 @@ typedef AndroidAlarmOneShotAt =
       DateTime time,
       int id,
       Function callback, {
+      bool allowWhileIdle,
       bool exact,
       bool wakeup,
       bool rescheduleOnReboot,
@@ -228,6 +233,7 @@ final class AndroidDailySummaryScheduler implements DailySummaryScheduler {
       target,
       alarmId,
       dailySummaryAlarmCallback,
+      allowWhileIdle: true,
       exact: currentCapability.canScheduleExact,
       wakeup: true,
       rescheduleOnReboot: true,
@@ -240,7 +246,32 @@ final class AndroidDailySummaryScheduler implements DailySummaryScheduler {
 Future<void> dailySummaryAlarmCallback() async {
   WidgetsFlutterBinding.ensureInitialized();
   DartPluginRegistrant.ensureInitialized();
-  await AndroidAlarmManager.initialize();
+  await runDailySummaryAlarmJob(
+    bootstrapAndShow: _bootstrapAndShowDailySummary,
+    scheduleNext: _scheduleNextDailySummary,
+    recordError: debugPrint,
+  );
+}
+
+Future<void> runDailySummaryAlarmJob({
+  required Future<void> Function() bootstrapAndShow,
+  required Future<void> Function() scheduleNext,
+  required void Function(String message) recordError,
+}) async {
+  try {
+    await bootstrapAndShow();
+  } catch (error, stack) {
+    recordError('每日汇总后台执行失败：$error\n$stack');
+  } finally {
+    try {
+      await scheduleNext();
+    } catch (error, stack) {
+      recordError('每日汇总续排失败：$error\n$stack');
+    }
+  }
+}
+
+Future<void> _bootstrapAndShowDailySummary() async {
   final database = AppDatabase();
   try {
     final timezone = await AndroidNotificationScheduler._initializeTimezone();
@@ -260,13 +291,21 @@ Future<void> dailySummaryAlarmCallback() async {
       '今日 ${counts.today}，未来三天 ${counts.nextThreeDays}，'
       '本周 ${counts.thisWeek}，逾期 ${counts.overdue}',
     );
-    await AndroidDailySummaryScheduler(
-      clock: clock,
-      capability: gateway.capability,
-    ).scheduleNext();
   } finally {
     await database.close();
   }
+}
+
+Future<void> _scheduleNextDailySummary() async {
+  await AndroidAlarmManager.initialize();
+  final timezone = await AndroidNotificationScheduler._initializeTimezone();
+  final clock = TimezoneNotificationClock(timezone);
+  final gateway = AndroidNotificationGateway();
+  await gateway.initialize();
+  await AndroidDailySummaryScheduler(
+    clock: clock,
+    capability: gateway.capability,
+  ).scheduleNext();
 }
 
 final class TimezoneNotificationClock implements NotificationLocalClock {

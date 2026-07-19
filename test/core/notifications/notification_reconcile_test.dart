@@ -117,6 +117,23 @@ void main() {
     );
   });
 
+  test(
+    'upgrade removes 30 legacy summary mappings without recreating them',
+    () async {
+      final store = StableNotificationIdStore(database);
+      final legacyIds = <int>{};
+      for (var index = 0; index < 30; index++) {
+        legacyIds.add(await store.idFor('summary:$index'));
+      }
+      final gateway = _Gateway();
+
+      await _scheduler(database, gateway).reconcileAll();
+
+      expect(gateway.cancelled.toSet(), containsAll(legacyIds));
+      expect(await store.mappingsWithPrefix('summary:'), isEmpty);
+    },
+  );
+
   test('notification payload JSON is strict and round trips', () {
     const payload = NotificationPayload(customerId: 'c-1', depositId: 'd-1');
     expect(NotificationPayload.parse(payload.toJson()).depositId, 'd-1');

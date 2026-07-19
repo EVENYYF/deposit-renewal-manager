@@ -468,6 +468,7 @@ class NotificationReconciler implements NotificationScheduler {
     this.settings = const NotificationPlanSettings(),
     this.dailySummaryScheduler = const NoopDailySummaryScheduler(),
     this.maxScheduledDepositAlarms = 400,
+    this.legacySummaryNotificationIds = const [],
   });
 
   final NotificationDataSource dataSource;
@@ -477,6 +478,7 @@ class NotificationReconciler implements NotificationScheduler {
   final NotificationPlanSettings settings;
   final DailySummaryScheduler dailySummaryScheduler;
   final int maxScheduledDepositAlarms;
+  final List<int> legacySummaryNotificationIds;
 
   @override
   Future<NotificationCapability> get capability => gateway.capability();
@@ -512,6 +514,19 @@ class NotificationReconciler implements NotificationScheduler {
       if (outcome.desiredKeys.contains(mapping.entityId)) continue;
       await gateway.cancel(mapping.notificationId);
       await idStore.remove(mapping.entityId);
+      cancelled++;
+    }
+    final legacySummaryMappings = await idStore.mappingsWithPrefix('summary:');
+    final cancelledIds = <int>{};
+    for (final mapping in legacySummaryMappings) {
+      await gateway.cancel(mapping.notificationId);
+      cancelledIds.add(mapping.notificationId);
+      await idStore.remove(mapping.entityId);
+      cancelled++;
+    }
+    for (final notificationId in legacySummaryNotificationIds) {
+      if (!cancelledIds.add(notificationId)) continue;
+      await gateway.cancel(notificationId);
       cancelled++;
     }
     await dailySummaryScheduler.scheduleNext();
@@ -709,8 +724,13 @@ final class SchedulerNotificationMutationCoordinator
       reconcileDeposit(depositId);
 
   @override
-  Future<void> afterRenew(String sourceDepositId, String targetDepositId) =>
-      _run(() => scheduler.reconcileAll());
+  Future<void> afterRenew(
+    String sourceDepositId,
+    String targetDepositId,
+  ) async {
+    await _run(() => scheduler.cancelDeposit(sourceDepositId));
+    await _run(() => scheduler.reconcileDeposit(targetDepositId));
+  }
 
   @override
   Future<void> afterStopOrDelete(String depositId) => cancelDeposit(depositId);

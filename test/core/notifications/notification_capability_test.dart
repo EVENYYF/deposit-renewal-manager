@@ -46,6 +46,7 @@ void main() {
     () async {
       DateTime? scheduledAt;
       bool? recordedExact;
+      bool? recordedAllowWhileIdle;
       bool? recordedRescheduleOnReboot;
       final scheduler = AndroidDailySummaryScheduler(
         clock: _Clock(),
@@ -59,11 +60,13 @@ void main() {
               time,
               id,
               callback, {
+              allowWhileIdle = false,
               exact = false,
               wakeup = false,
               rescheduleOnReboot = false,
             }) async {
               scheduledAt = time;
+              recordedAllowWhileIdle = allowWhileIdle;
               recordedExact = exact;
               recordedRescheduleOnReboot = rescheduleOnReboot;
               return true;
@@ -73,8 +76,26 @@ void main() {
       await scheduler.scheduleNext();
 
       expect(scheduledAt, DateTime(2026, 7, 21, 9));
+      expect(recordedAllowWhileIdle, isTrue);
       expect(recordedExact, isFalse);
       expect(recordedRescheduleOnReboot, isTrue);
+    },
+  );
+
+  test(
+    'daily summary failure is recorded and still schedules next alarm',
+    () async {
+      var scheduleCalls = 0;
+      final errors = <String>[];
+
+      await runDailySummaryAlarmJob(
+        bootstrapAndShow: () async => throw StateError('show failed'),
+        scheduleNext: () async => scheduleCalls++,
+        recordError: errors.add,
+      );
+
+      expect(scheduleCalls, 1);
+      expect(errors.single, contains('show failed'));
     },
   );
 
