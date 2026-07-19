@@ -1,5 +1,7 @@
 import 'package:deposit_renewal_manager/app/app.dart';
+import 'package:deposit_renewal_manager/app/router.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
@@ -75,6 +77,33 @@ void main() {
     );
 
     GoRouter.of(tester.element(find.byType(NavigationBar))).pop();
+    await tester.pumpAndSettle();
+    expect(find.text('存款续期'), findsOneWidget);
+  });
+
+  testWidgets('notification deep link cold start selects the dashboard shell', (
+    tester,
+  ) async {
+    setSize(tester, const Size(390, 844));
+    final router = createAppRouter(initialLocation: '/notifications/42');
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [routerProvider.overrideWithValue(router)],
+        child: const DepositRenewalApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.text('通知\n42'), findsOneWidget);
+    expect(
+      tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+      0,
+    );
+
+    router.pop();
     await tester.pumpAndSettle();
     expect(find.text('存款续期'), findsOneWidget);
   });

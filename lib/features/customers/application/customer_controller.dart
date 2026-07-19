@@ -49,9 +49,9 @@ final class CustomerController extends AsyncNotifier<CustomerDirectoryState> {
   @override
   Future<CustomerDirectoryState> build() {
     _bindLifecycle();
-    ++_requestGeneration;
+    final generation = ++_requestGeneration;
     final query = _query;
-    return _load(query);
+    return _load(generation, query);
   }
 
   Future<void> search(String query) async {
@@ -63,41 +63,33 @@ final class CustomerController extends AsyncNotifier<CustomerDirectoryState> {
   Future<void> retry() => _refresh(_query);
 
   Future<void> saveAndRefresh(CustomerDraft draft) async {
-    final generation = ++_requestGeneration;
-    final query = _query;
+    var generation = ++_requestGeneration;
     if (_disposed) return;
     state = const AsyncLoading<CustomerDirectoryState>();
     try {
       await _useCases.save(draft);
-      if (!_isCurrent(generation)) return;
-      final results = await _useCases.load(query);
-      if (_isCurrent(generation)) {
-        state = AsyncData(
-          CustomerDirectoryState(query: query, results: results),
-        );
-      }
+      if (_disposed) return;
+      generation = ++_requestGeneration;
+      state = const AsyncLoading<CustomerDirectoryState>();
+      await _load(generation, _query);
     } catch (error, stack) {
       if (_isCurrent(generation)) state = AsyncError(error, stack);
     }
   }
 
-  Future<CustomerDirectoryState> _load(String query) async =>
-      CustomerDirectoryState(
-        query: query,
-        results: await _useCases.load(query),
-      );
+  Future<CustomerDirectoryState> _load(int generation, String query) async {
+    final results = await _useCases.load(query);
+    final loaded = CustomerDirectoryState(query: query, results: results);
+    if (_isCurrent(generation)) state = AsyncData(loaded);
+    return _isCurrent(generation) ? loaded : (state.value ?? loaded);
+  }
 
   Future<void> _refresh(String query) async {
     final generation = ++_requestGeneration;
     if (_disposed) return;
     state = const AsyncLoading<CustomerDirectoryState>();
     try {
-      final results = await _useCases.load(query);
-      if (_isCurrent(generation)) {
-        state = AsyncData(
-          CustomerDirectoryState(query: query, results: results),
-        );
-      }
+      await _load(generation, query);
     } catch (error, stack) {
       if (_isCurrent(generation)) state = AsyncError(error, stack);
     }

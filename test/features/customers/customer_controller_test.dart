@@ -62,6 +62,104 @@ void main() {
         .saveAndRefresh(const CustomerDraft(id: 'new', name: 'New'));
     expect(useCases.saved, hasLength(1));
   });
+
+  test('a search during save is followed by a refresh of its query', () async {
+    final savePending = Completer<void>();
+    final searchPending = Completer<List<CustomerSearchResult>>();
+    final useCases = _FakeCustomerUseCases()
+      ..responses[''] = [Future.value(const [])]
+      ..responses['latest'] = [
+        searchPending.future,
+        Future.value([_result('saved')]),
+      ]
+      ..saveResults.add(savePending.future);
+    final container = ProviderContainer(
+      overrides: [customerUseCasesProvider.overrideWithValue(useCases)],
+    );
+    addTearDown(container.dispose);
+    await container.read(customerControllerProvider.future);
+
+    final save = container
+        .read(customerControllerProvider.notifier)
+        .saveAndRefresh(const CustomerDraft(id: 'new', name: 'New'));
+    final search = container
+        .read(customerControllerProvider.notifier)
+        .search('latest');
+    searchPending.complete([_result('old')]);
+    await search;
+    savePending.complete();
+    await save;
+
+    final state = container.read(customerControllerProvider).value!;
+    expect(state.query, 'latest');
+    expect(state.results.single.customer.id, 'saved');
+  });
+
+  test('a retry during save cannot suppress the post-save refresh', () async {
+    final savePending = Completer<void>();
+    final retryPending = Completer<List<CustomerSearchResult>>();
+    final useCases = _FakeCustomerUseCases()
+      ..responses[''] = [
+        Future.value(const []),
+        retryPending.future,
+        Future.value([_result('saved')]),
+      ]
+      ..saveResults.add(savePending.future);
+    final container = ProviderContainer(
+      overrides: [customerUseCasesProvider.overrideWithValue(useCases)],
+    );
+    addTearDown(container.dispose);
+    await container.read(customerControllerProvider.future);
+
+    final save = container
+        .read(customerControllerProvider.notifier)
+        .saveAndRefresh(const CustomerDraft(id: 'new', name: 'New'));
+    final retry = container.read(customerControllerProvider.notifier).retry();
+    retryPending.complete([_result('old')]);
+    await retry;
+    savePending.complete();
+    await save;
+
+    expect(
+      container
+          .read(customerControllerProvider)
+          .value!
+          .results
+          .single
+          .customer
+          .id,
+      'saved',
+    );
+  });
+
+  test('initial load cannot overwrite a manual retry', () async {
+    final initial = Completer<List<CustomerSearchResult>>();
+    final retryPending = Completer<List<CustomerSearchResult>>();
+    final useCases = _FakeCustomerUseCases()
+      ..responses[''] = [initial.future, retryPending.future];
+    final container = ProviderContainer(
+      overrides: [customerUseCasesProvider.overrideWithValue(useCases)],
+    );
+    addTearDown(container.dispose);
+
+    final initialLoad = container.read(customerControllerProvider.future);
+    final retry = container.read(customerControllerProvider.notifier).retry();
+    retryPending.complete([_result('new')]);
+    await retry;
+    initial.complete([_result('old')]);
+    await initialLoad;
+
+    expect(
+      container
+          .read(customerControllerProvider)
+          .value!
+          .results
+          .single
+          .customer
+          .id,
+      'new',
+    );
+  });
 }
 
 CustomerSearchResult _result(String id) => CustomerSearchResult(
@@ -72,11 +170,15 @@ CustomerSearchResult _result(String id) => CustomerSearchResult(
 final class _FakeCustomerUseCases implements CustomerUseCases {
   final Map<String, List<Future<List<CustomerSearchResult>>>> responses = {};
   final List<CustomerDraft> saved = [];
+  final List<Future<void>> saveResults = [];
 
   @override
   Future<List<CustomerSearchResult>> load(String query) =>
       responses[query]!.removeAt(0);
 
   @override
-  Future<void> save(CustomerDraft draft) async => saved.add(draft);
+  Future<void> save(CustomerDraft draft) async {
+    saved.add(draft);
+    if (saveResults.isNotEmpty) await saveResults.removeAt(0);
+  }
 }

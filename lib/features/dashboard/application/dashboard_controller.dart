@@ -56,21 +56,22 @@ final class DashboardController extends AsyncNotifier<DashboardSnapshot> {
   @override
   Future<DashboardSnapshot> build() {
     _bindLifecycle();
-    ++_requestGeneration;
-    return _useCases.load();
+    final generation = ++_requestGeneration;
+    return _load(generation);
   }
 
   Future<void> retry() => _refresh();
 
   Future<void> saveAndRefresh(DashboardCommand command) async {
-    final generation = ++_requestGeneration;
+    var generation = ++_requestGeneration;
     if (_disposed) return;
     state = const AsyncLoading<DashboardSnapshot>();
     try {
       await _useCases.save(command);
-      if (!_isCurrent(generation)) return;
-      final snapshot = await _useCases.load();
-      if (_isCurrent(generation)) state = AsyncData(snapshot);
+      if (_disposed) return;
+      generation = ++_requestGeneration;
+      state = const AsyncLoading<DashboardSnapshot>();
+      await _load(generation);
     } catch (error, stack) {
       if (_isCurrent(generation)) state = AsyncError(error, stack);
     }
@@ -81,11 +82,16 @@ final class DashboardController extends AsyncNotifier<DashboardSnapshot> {
     if (_disposed) return;
     state = const AsyncLoading<DashboardSnapshot>();
     try {
-      final snapshot = await _useCases.load();
-      if (_isCurrent(generation)) state = AsyncData(snapshot);
+      await _load(generation);
     } catch (error, stack) {
       if (_isCurrent(generation)) state = AsyncError(error, stack);
     }
+  }
+
+  Future<DashboardSnapshot> _load(int generation) async {
+    final snapshot = await _useCases.load();
+    if (_isCurrent(generation)) state = AsyncData(snapshot);
+    return _isCurrent(generation) ? snapshot : (state.value ?? snapshot);
   }
 
   void _bindLifecycle() {

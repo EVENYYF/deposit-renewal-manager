@@ -15,55 +15,57 @@ abstract final class AppRouteNames {
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final router = GoRouter(
-    initialLocation: '/',
-    routes: [
-      StatefulShellRoute.indexedStack(
-        builder: (context, state, shell) =>
-            ResponsiveAppShell(navigationShell: shell),
-        branches: [
-          _branch(
-            AppRouteNames.dashboard,
-            '/',
-            const DashboardPage(),
-            routes: [
-              GoRoute(
-                name: AppRouteNames.notification,
-                path: 'notifications/:notificationId',
-                builder: (context, state) => _PlaceholderPage(
-                  title: '通知',
-                  subtitle: state.pathParameters['notificationId'],
-                ),
-              ),
-            ],
-          ),
-          _branch(
-            AppRouteNames.customers,
-            '/customers',
-            const _PlaceholderPage(title: '客户'),
-          ),
-          _branch(
-            AppRouteNames.addDeposit,
-            '/deposits/new',
-            const _PlaceholderPage(title: '新增存款'),
-          ),
-          _branch(
-            AppRouteNames.templates,
-            '/templates',
-            const _PlaceholderPage(title: '模板'),
-          ),
-          _branch(
-            AppRouteNames.settings,
-            '/settings',
-            const _PlaceholderPage(title: '设置'),
-          ),
-        ],
-      ),
-    ],
-  );
+  final router = createAppRouter();
   ref.onDispose(router.dispose);
   return router;
 });
+
+GoRouter createAppRouter({String initialLocation = '/'}) => GoRouter(
+  initialLocation: initialLocation,
+  routes: [
+    StatefulShellRoute.indexedStack(
+      builder: (context, state, shell) =>
+          ResponsiveAppShell(navigationShell: shell),
+      branches: [
+        _branch(
+          AppRouteNames.dashboard,
+          '/',
+          const DashboardPage(),
+          routes: [
+            GoRoute(
+              name: AppRouteNames.notification,
+              path: 'notifications/:notificationId',
+              builder: (context, state) => _PlaceholderPage(
+                title: '通知',
+                subtitle: state.pathParameters['notificationId'],
+              ),
+            ),
+          ],
+        ),
+        _branch(
+          AppRouteNames.customers,
+          '/customers',
+          const _PlaceholderPage(title: '客户'),
+        ),
+        _branch(
+          AppRouteNames.addDeposit,
+          '/deposits/new',
+          const _PlaceholderPage(title: '新增存款'),
+        ),
+        _branch(
+          AppRouteNames.templates,
+          '/templates',
+          const _PlaceholderPage(title: '模板'),
+        ),
+        _branch(
+          AppRouteNames.settings,
+          '/settings',
+          const _PlaceholderPage(title: '设置'),
+        ),
+      ],
+    ),
+  ],
+);
 
 StatefulShellBranch _branch(
   String name,

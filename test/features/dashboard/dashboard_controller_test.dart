@@ -93,11 +93,61 @@ void main() {
 
     expect(container.read(dashboardControllerProvider).value?.customerCount, 7);
   });
+
+  test('a retry during save cannot suppress the post-save refresh', () async {
+    const command = DashboardCommand('deposit-3');
+    final savePending = Completer<void>();
+    final retryPending = Completer<DashboardSnapshot>();
+    final useCases = _FakeDashboardUseCases()
+      ..loadResults.add(Future.value(const DashboardSnapshot()))
+      ..loadResults.add(retryPending.future)
+      ..loadResults.add(Future.value(const DashboardSnapshot(customerCount: 9)))
+      ..saveResults.add(savePending.future);
+    final container = ProviderContainer(
+      overrides: [dashboardUseCasesProvider.overrideWithValue(useCases)],
+    );
+    addTearDown(container.dispose);
+    await container.read(dashboardControllerProvider.future);
+
+    final save = container
+        .read(dashboardControllerProvider.notifier)
+        .saveAndRefresh(command);
+    final retry = container.read(dashboardControllerProvider.notifier).retry();
+    retryPending.complete(const DashboardSnapshot(customerCount: 1));
+    await retry;
+    savePending.complete();
+    await save;
+
+    expect(useCases.loadCalls, 3);
+    expect(container.read(dashboardControllerProvider).value?.customerCount, 9);
+  });
+
+  test('initial load cannot overwrite a manual retry', () async {
+    final initial = Completer<DashboardSnapshot>();
+    final retryPending = Completer<DashboardSnapshot>();
+    final useCases = _FakeDashboardUseCases()
+      ..loadResults.add(initial.future)
+      ..loadResults.add(retryPending.future);
+    final container = ProviderContainer(
+      overrides: [dashboardUseCasesProvider.overrideWithValue(useCases)],
+    );
+    addTearDown(container.dispose);
+
+    final initialLoad = container.read(dashboardControllerProvider.future);
+    final retry = container.read(dashboardControllerProvider.notifier).retry();
+    retryPending.complete(const DashboardSnapshot(customerCount: 8));
+    await retry;
+    initial.complete(const DashboardSnapshot(customerCount: 1));
+    await initialLoad;
+
+    expect(container.read(dashboardControllerProvider).value?.customerCount, 8);
+  });
 }
 
 final class _FakeDashboardUseCases implements DashboardUseCases {
   final List<Future<DashboardSnapshot>> loadResults = [];
   final List<DashboardCommand> savedCommands = [];
+  final List<Future<void>> saveResults = [];
   int loadCalls = 0;
 
   @override
@@ -110,5 +160,6 @@ final class _FakeDashboardUseCases implements DashboardUseCases {
   @override
   Future<void> save(DashboardCommand command) async {
     savedCommands.add(command);
+    if (saveResults.isNotEmpty) await saveResults.removeAt(0);
   }
 }
