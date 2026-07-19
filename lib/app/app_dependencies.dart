@@ -103,12 +103,17 @@ class ApplicationProviderScope extends StatelessWidget {
         return ExcelImportBindings(
           preview: preview.previewBytes,
           resolve: resolver.resolvePreview,
-          commit: (file, result, decisions) => commit.commit(
-            fileName: file.name,
-            fileBytes: file.bytes,
-            preview: result,
-            decisions: decisions,
-          ),
+          commit: (file, result, decisions) async {
+            final imported = await commit.commit(
+              fileName: file.name,
+              fileBytes: file.bytes,
+              preview: result,
+              decisions: decisions,
+            );
+            ref.invalidate(customerControllerProvider);
+            ref.invalidate(dashboardControllerProvider);
+            return imported;
+          },
         );
       }),
       confirmedTextImportProvider.overrideWith((ref) {

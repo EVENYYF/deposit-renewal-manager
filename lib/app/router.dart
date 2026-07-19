@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/notifications/notification_scheduler.dart';
+import '../features/customers/application/customer_controller.dart';
 import '../features/customers/presentation/customer_pages.dart';
+import '../features/dashboard/application/dashboard_controller.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
 import '../features/deposits/presentation/deposit_form_page.dart';
 import '../features/excel_import/presentation/import_wizard.dart';
@@ -185,8 +187,16 @@ class _SettingsPage extends ConsumerWidget {
         trailing: const Icon(Icons.chevron_right),
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute<void>(
-            builder: (_) =>
-                BackupSettingsPage(backup: ref.read(backupServiceProvider)),
+            builder: (_) => BackupSettingsPage(
+              backup: ref.read(backupServiceProvider),
+              afterRestore: () async {
+                ref.invalidate(customerControllerProvider);
+                ref.invalidate(dashboardControllerProvider);
+                await ref
+                    .read(notificationMutationCoordinatorProvider)
+                    .reconcileAll();
+              },
+            ),
           ),
         ),
       ),

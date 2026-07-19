@@ -23,6 +23,7 @@ class _TextImportPageState extends State<TextImportPage> {
   ParseResult? _result;
   bool _confirmed = false;
   bool _saving = false;
+  bool _saved = false;
 
   @override
   void dispose() {
@@ -36,6 +37,7 @@ class _TextImportPageState extends State<TextImportPage> {
           ? null
           : widget.parse(_controller.text);
       _confirmed = false;
+      _saved = false;
     });
   }
 
@@ -46,6 +48,12 @@ class _TextImportPageState extends State<TextImportPage> {
     try {
       await widget.onConfirmedSave!(result);
       if (mounted) {
+        setState(() {
+          _result = null;
+          _confirmed = false;
+          _saved = true;
+          _controller.clear();
+        });
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('已保存客户存款信息')));
@@ -58,7 +66,7 @@ class _TextImportPageState extends State<TextImportPage> {
   @override
   Widget build(BuildContext context) {
     final result = _result;
-    final canSave = _confirmed && result != null && !_saving;
+    final canSave = _confirmed && result != null && !_saving && !_saved;
     return Scaffold(
       appBar: AppBar(title: const Text('文字识别导入')),
       body: ListView(

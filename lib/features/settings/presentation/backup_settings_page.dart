@@ -19,34 +19,45 @@ final class BackupSettingsBindings {
   final Future<InspectedBackup> Function(String path) inspectBackup;
   final Future<void> Function(InspectedBackup backup) restoreBackup;
 
-  static BackupSettingsBindings fromService(BackupService backup) =>
-      BackupSettingsBindings(
-        listSnapshots: backup.listSnapshots,
-        exportBackup: () async {
-          final path = await FilePicker.platform.saveFile(
-            dialogTitle: '导出备份',
-            fileName: 'deposit-backup.drbackup',
-            type: FileType.custom,
-            allowedExtensions: const ['drbackup'],
-          );
-          if (path == null) return null;
-          return (await backup.exportBackup(outputPath: path)).path;
-        },
-        pickBackup: () async {
-          final result = await FilePicker.platform.pickFiles(
-            type: FileType.custom,
-            allowedExtensions: const ['drbackup'],
-          );
-          return result?.files.single.path;
-        },
-        inspectBackup: backup.inspectBackup,
-        restoreBackup: backup.restore,
+  static BackupSettingsBindings fromService(
+    BackupService backup, {
+    Future<void> Function()? afterRestore,
+  }) => BackupSettingsBindings(
+    listSnapshots: backup.listSnapshots,
+    exportBackup: () async {
+      final path = await FilePicker.platform.saveFile(
+        dialogTitle: '导出备份',
+        fileName: 'deposit-backup.drbackup',
+        type: FileType.custom,
+        allowedExtensions: const ['drbackup'],
       );
+      if (path == null) return null;
+      return (await backup.exportBackup(outputPath: path)).path;
+    },
+    pickBackup: () async {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['drbackup'],
+      );
+      return result?.files.single.path;
+    },
+    inspectBackup: backup.inspectBackup,
+    restoreBackup: (inspected) async {
+      await backup.restore(inspected);
+      await afterRestore?.call();
+    },
+  );
 }
 
 class BackupSettingsPage extends StatefulWidget {
-  BackupSettingsPage({super.key, required BackupService backup})
-    : bindings = BackupSettingsBindings.fromService(backup);
+  BackupSettingsPage({
+    super.key,
+    required BackupService backup,
+    Future<void> Function()? afterRestore,
+  }) : bindings = BackupSettingsBindings.fromService(
+         backup,
+         afterRestore: afterRestore,
+       );
 
   const BackupSettingsPage.withBindings({super.key, required this.bindings});
 
