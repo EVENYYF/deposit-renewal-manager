@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:deposit_renewal_manager/core/notifications/notification_scheduler.dart';
 
 final class DashboardSnapshot {
   const DashboardSnapshot({
@@ -68,6 +69,9 @@ final class DashboardController extends AsyncNotifier<DashboardSnapshot> {
     state = const AsyncLoading<DashboardSnapshot>();
     try {
       await _useCases.save(command);
+      await ref
+          .read(notificationMutationCoordinatorProvider)
+          .reconcileDeposit(command.depositId);
       if (_disposed) return;
       generation = ++_requestGeneration;
       state = const AsyncLoading<DashboardSnapshot>();

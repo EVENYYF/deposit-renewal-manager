@@ -1,4 +1,9 @@
+import 'dart:ui';
+
+import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
@@ -19,6 +24,7 @@ final class AndroidNotificationScheduler extends NotificationReconciler {
     required this.timezoneClock,
     required super.gateway,
     super.settings,
+    super.dailySummaryScheduler,
   }) : super(clock: timezoneClock);
 
   final TimezoneNotificationClock timezoneClock;
@@ -28,15 +34,22 @@ final class AndroidNotificationScheduler extends NotificationReconciler {
     NotificationTapCallback? onTap,
     NotificationPlanSettings settings = const NotificationPlanSettings(),
   }) async {
+    await AndroidAlarmManager.initialize();
     final timezone = await _initializeTimezone();
     final gateway = AndroidNotificationGateway(onTap: onTap);
     await gateway.initialize();
+    final clock = TimezoneNotificationClock(timezone);
     return AndroidNotificationScheduler(
       dataSource: DatabaseNotificationDataSource(database),
       idStore: StableNotificationIdStore(database),
-      timezoneClock: TimezoneNotificationClock(timezone),
+      timezoneClock: clock,
       gateway: gateway,
       settings: settings,
+      dailySummaryScheduler: AndroidDailySummaryScheduler(
+        clock: clock,
+        capability: gateway.capability,
+        settings: settings,
+      ),
     );
   }
 
@@ -67,6 +80,9 @@ final class AndroidNotificationGateway implements NotificationGateway {
   final NotificationTapCallback? onTap;
   final FlutterLocalNotificationsPlugin plugin =
       FlutterLocalNotificationsPlugin();
+  static const _settingsChannel = MethodChannel(
+    'deposit_renewal_manager/settings',
+  );
   AndroidFlutterLocalNotificationsPlugin? get android => plugin
       .resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin
@@ -75,7 +91,7 @@ final class AndroidNotificationGateway implements NotificationGateway {
   Future<void> initialize() async {
     await plugin.initialize(
       settings: const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        android: AndroidInitializationSettings('@drawable/ic_notification'),
       ),
       onDidReceiveNotificationResponse: (response) =>
           _handlePayload(response.payload),
@@ -114,6 +130,18 @@ final class AndroidNotificationGateway implements NotificationGateway {
   }
 
   @override
+  Future<bool> requestNotificationPermission() async =>
+      await android?.requestNotificationsPermission() ?? false;
+
+  @override
+  Future<bool> requestExactAlarmPermission() async =>
+      await android?.requestExactAlarmsPermission() ?? false;
+
+  @override
+  Future<void> openSettings() =>
+      _settingsChannel.invokeMethod<void>('openAppSettings');
+
+  @override
   Future<void> schedule(ScheduledNotificationRequest request) {
     final mode =
         request.precision == NotificationSchedulePrecision.exactAllowWhileIdle
@@ -131,6 +159,7 @@ final class AndroidNotificationGateway implements NotificationGateway {
           channelDescription: 'Deposit renewal reminders',
           importance: Importance.high,
           priority: Priority.high,
+          icon: '@drawable/ic_notification',
         ),
       ),
       androidScheduleMode: mode,
@@ -140,6 +169,104 @@ final class AndroidNotificationGateway implements NotificationGateway {
 
   @override
   Future<void> cancel(int notificationId) => plugin.cancel(id: notificationId);
+
+  Future<void> showSummary(String body) => plugin.show(
+    id: AndroidDailySummaryScheduler.notificationId,
+    title: '存款到期汇总',
+    body: body,
+    notificationDetails: const NotificationDetails(
+      android: AndroidNotificationDetails(
+        'deposit_reminders',
+        'Deposit reminders',
+        channelDescription: 'Deposit renewal reminders',
+        importance: Importance.high,
+        priority: Priority.high,
+        icon: '@drawable/ic_notification',
+      ),
+    ),
+    payload: const NotificationPayload(customerId: '', depositId: '').toJson(),
+  );
+}
+
+typedef AndroidAlarmOneShotAt =
+    Future<bool> Function(
+      DateTime time,
+      int id,
+      Function callback, {
+      bool exact,
+      bool wakeup,
+      bool rescheduleOnReboot,
+    });
+
+final class AndroidDailySummaryScheduler implements DailySummaryScheduler {
+  AndroidDailySummaryScheduler({
+    required this.clock,
+    required this.capability,
+    this.settings = const NotificationPlanSettings(),
+    AndroidAlarmOneShotAt? oneShotAt,
+  }) : _oneShotAt = oneShotAt ?? AndroidAlarmManager.oneShotAt;
+
+  static const alarmId = 0x5da11;
+  static const notificationId = 0x5da12;
+
+  final NotificationLocalClock clock;
+  final Future<NotificationCapability> Function() capability;
+  final NotificationPlanSettings settings;
+  final AndroidAlarmOneShotAt _oneShotAt;
+
+  @override
+  Future<void> scheduleNext() async {
+    final now = clock.now();
+    var date = clock.today();
+    var target = clock.at(date, settings.summaryHour, settings.summaryMinute);
+    if (!target.isAfter(now)) {
+      date = date.addDays(1);
+      target = clock.at(date, settings.summaryHour, settings.summaryMinute);
+    }
+    final currentCapability = await capability();
+    final accepted = await _oneShotAt(
+      target,
+      alarmId,
+      dailySummaryAlarmCallback,
+      exact: currentCapability.canScheduleExact,
+      wakeup: true,
+      rescheduleOnReboot: true,
+    );
+    if (!accepted) throw StateError('Android rejected daily summary alarm');
+  }
+}
+
+@pragma('vm:entry-point')
+Future<void> dailySummaryAlarmCallback() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  DartPluginRegistrant.ensureInitialized();
+  await AndroidAlarmManager.initialize();
+  final database = AppDatabase();
+  try {
+    final timezone = await AndroidNotificationScheduler._initializeTimezone();
+    final clock = TimezoneNotificationClock(timezone);
+    final gateway = AndroidNotificationGateway();
+    await gateway.initialize();
+    final deposits = await DatabaseNotificationDataSource(
+      database,
+    ).activeDeposits();
+    final plan = NotificationPlan.build(
+      deposits: deposits,
+      today: clock.today(),
+      settings: const NotificationPlanSettings(summaryHorizonDays: 1),
+    );
+    final counts = plan.summaries.first.counts;
+    await gateway.showSummary(
+      '今日 ${counts.today}，未来三天 ${counts.nextThreeDays}，'
+      '本周 ${counts.thisWeek}，逾期 ${counts.overdue}',
+    );
+    await AndroidDailySummaryScheduler(
+      clock: clock,
+      capability: gateway.capability,
+    ).scheduleNext();
+  } finally {
+    await database.close();
+  }
 }
 
 final class TimezoneNotificationClock implements NotificationLocalClock {

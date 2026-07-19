@@ -1,15 +1,23 @@
 import 'dart:convert';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/notifications/notification_scheduler.dart';
 import '../../../features/customers/domain/name_search_index.dart';
 import '../domain/import_models.dart';
 import 'duplicate_resolver.dart';
 
 typedef ImportSnapshot = Future<File> Function();
 typedef NotificationReconcileHook = Future<void> Function(ImportResult result);
+
+final excelNotificationReconcileProvider = Provider<NotificationReconcileHook>(
+  (ref) =>
+      (_) => ref.read(notificationMutationCoordinatorProvider).reconcileAll(),
+);
 
 class ImportCommitService {
   ImportCommitService({

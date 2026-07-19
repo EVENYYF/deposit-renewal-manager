@@ -1,0 +1,153 @@
+import 'package:deposit_renewal_manager/app/app.dart';
+import 'package:deposit_renewal_manager/core/notifications/android_notification_scheduler.dart';
+import 'package:deposit_renewal_manager/core/notifications/notification_scheduler.dart';
+import 'package:deposit_renewal_manager/features/deposits/domain/local_date.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  test(
+    'denied permission requires user action then grant reconciles all',
+    () async {
+      final scheduler = _PermissionScheduler();
+      final container = ProviderContainer(
+        overrides: [notificationSchedulerProvider.overrideWithValue(scheduler)],
+      );
+      addTearDown(container.dispose);
+      final controller = container.read(
+        notificationCapabilityControllerProvider.notifier,
+      );
+
+      await controller.refresh();
+      expect(
+        container
+            .read(notificationCapabilityControllerProvider)
+            .needsNotificationPermission,
+        isTrue,
+      );
+      expect(scheduler.permissionRequests, 0);
+
+      await controller.requestNotificationPermission();
+      expect(scheduler.permissionRequests, 1);
+      expect(scheduler.reconcileCalls, 1);
+      expect(
+        container
+            .read(notificationCapabilityControllerProvider)
+            .capability
+            ?.notificationsAllowed,
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'daily summary schedules one next local alarm and requests reboot restore',
+    () async {
+      DateTime? scheduledAt;
+      bool? recordedExact;
+      bool? recordedRescheduleOnReboot;
+      final scheduler = AndroidDailySummaryScheduler(
+        clock: _Clock(),
+        capability: () async => const NotificationCapability(
+          support: NotificationSupport.supported,
+          notificationsAllowed: true,
+          canScheduleExact: false,
+        ),
+        oneShotAt:
+            (
+              time,
+              id,
+              callback, {
+              exact = false,
+              wakeup = false,
+              rescheduleOnReboot = false,
+            }) async {
+              scheduledAt = time;
+              recordedExact = exact;
+              recordedRescheduleOnReboot = rescheduleOnReboot;
+              return true;
+            },
+      );
+
+      await scheduler.scheduleNext();
+
+      expect(scheduledAt, DateTime(2026, 7, 21, 9));
+      expect(recordedExact, isFalse);
+      expect(recordedRescheduleOnReboot, isTrue);
+    },
+  );
+
+  testWidgets('resuming the app reconciles timezone-sensitive schedules', (
+    tester,
+  ) async {
+    final scheduler = _PermissionScheduler()..allowed = true;
+    await tester.pumpWidget(
+      DepositRenewalApp(notificationScheduler: scheduler),
+    );
+    await tester.pump();
+    expect(scheduler.reconcileCalls, 1);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+
+    expect(scheduler.reconcileCalls, 2);
+  });
+}
+
+final class _PermissionScheduler implements NotificationScheduler {
+  bool allowed = false;
+  int permissionRequests = 0;
+  int reconcileCalls = 0;
+
+  @override
+  Future<NotificationCapability> get capability async => NotificationCapability(
+    support: NotificationSupport.supported,
+    notificationsAllowed: allowed,
+    canScheduleExact: false,
+    reason: allowed ? null : 'denied',
+  );
+
+  @override
+  Future<bool> requestNotificationPermission() async {
+    permissionRequests++;
+    allowed = true;
+    return true;
+  }
+
+  @override
+  Future<NotificationReconcileResult> reconcileAll() async {
+    reconcileCalls++;
+    return NotificationReconcileResult(
+      capability: await capability,
+      scheduledCount: 1,
+      cancelledCount: 0,
+      status: NotificationReconcileStatus.degraded,
+      degradedReason: 'inexact',
+    );
+  }
+
+  @override
+  Future<NotificationReconcileResult> cancelDeposit(String depositId) =>
+      reconcileAll();
+  @override
+  Future<void> openSettings() async {}
+  @override
+  Future<NotificationReconcileResult> reconcileDeposit(String depositId) =>
+      reconcileAll();
+  @override
+  Future<NotificationReconcileResult> reconcileSummary() => reconcileAll();
+  @override
+  Future<bool> requestExactAlarmPermission() async => false;
+}
+
+final class _Clock implements NotificationLocalClock {
+  @override
+  DateTime at(LocalDate date, int hour, int minute) =>
+      DateTime(date.year, date.month, date.day, hour, minute);
+  @override
+  DateTime now() => DateTime(2026, 7, 20, 10);
+  @override
+  LocalDate today() => LocalDate(2026, 7, 20);
+}

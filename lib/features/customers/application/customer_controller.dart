@@ -1,4 +1,5 @@
 import 'package:deposit_renewal_manager/features/customers/domain/customer_repository.dart';
+import 'package:deposit_renewal_manager/core/notifications/notification_scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final class CustomerDirectoryState {
@@ -68,6 +69,7 @@ final class CustomerController extends AsyncNotifier<CustomerDirectoryState> {
     state = const AsyncLoading<CustomerDirectoryState>();
     try {
       await _useCases.save(draft);
+      await ref.read(notificationMutationCoordinatorProvider).reconcileAll();
       if (_disposed) return;
       generation = ++_requestGeneration;
       state = const AsyncLoading<CustomerDirectoryState>();

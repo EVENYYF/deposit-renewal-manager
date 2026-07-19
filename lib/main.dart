@@ -9,6 +9,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   NotificationScheduler scheduler = const UnsupportedNotificationScheduler();
   final taps = NotificationTapDispatcher();
+  String? notificationInitializationError;
   AppDatabase? database;
   if (defaultTargetPlatform == TargetPlatform.android) {
     database = AppDatabase();
@@ -17,7 +18,9 @@ Future<void> main() async {
         database: database,
         onTap: taps.dispatch,
       );
-    } catch (_) {
+    } catch (error, stack) {
+      notificationInitializationError = 'Android 通知初始化失败：$error';
+      debugPrint('$notificationInitializationError\n$stack');
       scheduler = const UnsupportedNotificationScheduler(
         'Android notification initialization failed',
       );
@@ -27,6 +30,7 @@ Future<void> main() async {
     DepositRenewalApp(
       notificationScheduler: scheduler,
       notificationTapDispatcher: taps,
+      notificationInitializationError: notificationInitializationError,
     ),
   );
 }

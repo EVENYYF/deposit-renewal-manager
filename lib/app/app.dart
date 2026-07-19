@@ -12,12 +12,14 @@ class DepositRenewalApp extends StatelessWidget {
     this.themeMode = ThemeMode.light,
     this.notificationScheduler,
     this.notificationTapDispatcher,
+    this.notificationInitializationError,
     super.key,
   });
 
   final ThemeMode themeMode;
   final NotificationScheduler? notificationScheduler;
   final NotificationTapDispatcher? notificationTapDispatcher;
+  final String? notificationInitializationError;
 
   @override
   Widget build(BuildContext context) => ProviderScope(
@@ -27,16 +29,22 @@ class DepositRenewalApp extends StatelessWidget {
     ],
     child: _NotificationLifecycle(
       tapDispatcher: notificationTapDispatcher,
+      initializationError: notificationInitializationError,
       child: _DepositRenewalMaterialApp(themeMode: themeMode),
     ),
   );
 }
 
 final class _NotificationLifecycle extends ConsumerStatefulWidget {
-  const _NotificationLifecycle({required this.child, this.tapDispatcher});
+  const _NotificationLifecycle({
+    required this.child,
+    this.tapDispatcher,
+    this.initializationError,
+  });
 
   final Widget child;
   final NotificationTapDispatcher? tapDispatcher;
+  final String? initializationError;
 
   @override
   ConsumerState<_NotificationLifecycle> createState() =>
@@ -52,7 +60,16 @@ final class _NotificationLifecycleState
     WidgetsBinding.instance.addObserver(this);
     widget.tapDispatcher?.addListener(_routeNotification);
     _routeNotification();
-    unawaited(_reconcile());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final initializationError = widget.initializationError;
+      if (initializationError != null) {
+        ref
+            .read(notificationCapabilityControllerProvider.notifier)
+            .warning(initializationError);
+      }
+      unawaited(_reconcile());
+    });
   }
 
   @override
@@ -73,11 +90,9 @@ final class _NotificationLifecycleState
   Widget build(BuildContext context) => widget.child;
 
   Future<void> _reconcile() async {
-    try {
-      await ref.read(notificationSchedulerProvider).reconcileAll();
-    } catch (_) {
-      // UI surfaces capability and retry controls; lifecycle work must not crash.
-    }
+    await ref
+        .read(notificationCapabilityControllerProvider.notifier)
+        .reconcileAll();
   }
 
   void _routeNotification() {

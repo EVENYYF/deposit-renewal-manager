@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:deposit_renewal_manager/features/dashboard/application/dashboard_controller.dart';
+import 'package:deposit_renewal_manager/core/notifications/notification_scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -53,8 +54,14 @@ void main() {
     final useCases = _FakeDashboardUseCases()
       ..loadResults.add(Future.value(const DashboardSnapshot()))
       ..loadResults.add(Future.value(const DashboardSnapshot(overdueCount: 1)));
+    final notifications = _FakeMutationCoordinator();
     final container = ProviderContainer(
-      overrides: [dashboardUseCasesProvider.overrideWithValue(useCases)],
+      overrides: [
+        dashboardUseCasesProvider.overrideWithValue(useCases),
+        notificationMutationCoordinatorProvider.overrideWithValue(
+          notifications,
+        ),
+      ],
     );
     addTearDown(container.dispose);
 
@@ -64,6 +71,7 @@ void main() {
         .saveAndRefresh(command);
 
     expect(useCases.savedCommands, [command]);
+    expect(notifications.reconciledDeposits, ['deposit-1']);
     expect(container.read(dashboardControllerProvider).value?.overdueCount, 1);
     expect(useCases.loadCalls, 2);
   });
@@ -142,6 +150,29 @@ void main() {
 
     expect(container.read(dashboardControllerProvider).value?.customerCount, 8);
   });
+}
+
+final class _FakeMutationCoordinator
+    implements NotificationMutationCoordinator {
+  final List<String> reconciledDeposits = [];
+  @override
+  Future<void> afterCreateOrUpdate(String depositId) async {}
+  @override
+  Future<void> afterRenew(
+    String sourceDepositId,
+    String targetDepositId,
+  ) async {}
+  @override
+  Future<void> afterStopOrDelete(String depositId) async {}
+  @override
+  Future<void> cancelDeposit(String depositId) async {}
+  @override
+  Future<void> reconcileAll() async {}
+  @override
+  Future<void> reconcileDeposit(String depositId) async =>
+      reconciledDeposits.add(depositId);
+  @override
+  Future<void> reconcileSummary() async {}
 }
 
 final class _FakeDashboardUseCases implements DashboardUseCases {

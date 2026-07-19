@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:deposit_renewal_manager/features/customers/application/customer_controller.dart';
+import 'package:deposit_renewal_manager/core/notifications/notification_scheduler.dart';
 import 'package:deposit_renewal_manager/features/customers/domain/customer_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -42,8 +43,14 @@ void main() {
         Future.value([_result('saved')]),
         Future.value([_result('saved')]),
       ];
+    final notifications = _FakeMutationCoordinator();
     final container = ProviderContainer(
-      overrides: [customerUseCasesProvider.overrideWithValue(useCases)],
+      overrides: [
+        customerUseCasesProvider.overrideWithValue(useCases),
+        notificationMutationCoordinatorProvider.overrideWithValue(
+          notifications,
+        ),
+      ],
     );
     addTearDown(container.dispose);
 
@@ -61,6 +68,7 @@ void main() {
         .read(customerControllerProvider.notifier)
         .saveAndRefresh(const CustomerDraft(id: 'new', name: 'New'));
     expect(useCases.saved, hasLength(1));
+    expect(notifications.reconcileAllCalls, 1);
   });
 
   test('a search during save is followed by a refresh of its query', () async {
@@ -160,6 +168,28 @@ void main() {
       'new',
     );
   });
+}
+
+final class _FakeMutationCoordinator
+    implements NotificationMutationCoordinator {
+  int reconcileAllCalls = 0;
+  @override
+  Future<void> afterCreateOrUpdate(String depositId) async {}
+  @override
+  Future<void> afterRenew(
+    String sourceDepositId,
+    String targetDepositId,
+  ) async {}
+  @override
+  Future<void> afterStopOrDelete(String depositId) async {}
+  @override
+  Future<void> cancelDeposit(String depositId) async {}
+  @override
+  Future<void> reconcileAll() async => reconcileAllCalls++;
+  @override
+  Future<void> reconcileDeposit(String depositId) async {}
+  @override
+  Future<void> reconcileSummary() async {}
 }
 
 CustomerSearchResult _result(String id) => CustomerSearchResult(

@@ -66,7 +66,7 @@ void main() {
   });
 
   test(
-    'reconcile replaces mapped notifications and cancelDeposit cancels its IDs',
+    'reconcile replaces active IDs without clearing and cancel removes mappings',
     () async {
       final gateway = _Gateway();
       final scheduler = _scheduler(database, gateway);
@@ -74,12 +74,48 @@ void main() {
       final firstIds = gateway.requests.map((item) => item.id).toSet();
 
       await scheduler.reconcileDeposit('deposit-1');
-      expect(gateway.cancelled, containsAll(firstIds));
+      expect(gateway.cancelled, isEmpty);
 
       final cancel = await scheduler.cancelDeposit('deposit-1');
       expect(cancel.cancelledCount, 3);
+      expect(gateway.cancelled, containsAll(firstIds));
+      expect(
+        await database.select(database.notificationIdMappings).get(),
+        isEmpty,
+      );
     },
   );
+
+  test('caps deposit alarms at 400 and reports truncation', () async {
+    final gateway = _Gateway();
+    final deposits = List.generate(
+      150,
+      (index) => _stored('d-$index', 'c-$index', LocalDate(2026, 7, 27)),
+    );
+    final result = await _scheduler(
+      database,
+      gateway,
+      deposits: deposits,
+    ).reconcileAll();
+
+    expect(gateway.requests, hasLength(400));
+    expect(result.truncatedCount, 50);
+    expect(result.status, NotificationReconcileStatus.degraded);
+  });
+
+  test('schedule failure keeps stale valid alarms and mappings', () async {
+    final store = StableNotificationIdStore(database);
+    final staleId = await store.idFor('deposit:stale:0');
+    final gateway = _Gateway(failAtSchedule: 0);
+    final result = await _scheduler(database, gateway).reconcileAll();
+
+    expect(result.status, NotificationReconcileStatus.error);
+    expect(gateway.cancelled, isNot(contains(staleId)));
+    expect(
+      (await store.mappingsWithPrefix('deposit:stale:')).single.notificationId,
+      staleId,
+    );
+  });
 
   test('notification payload JSON is strict and round trips', () {
     const payload = NotificationPayload(customerId: 'c-1', depositId: 'd-1');
@@ -96,31 +132,48 @@ void main() {
   });
 }
 
-NotificationScheduler _scheduler(AppDatabase database, _Gateway gateway) =>
-    NotificationReconciler(
-      dataSource: _DataSource([
-        _stored('deposit-1', 'customer-1', LocalDate(2026, 7, 27)),
-      ]),
-      gateway: gateway,
-      idStore: StableNotificationIdStore(
-        database,
-        nowUtc: () => DateTime.utc(2026),
-      ),
-      clock: _Clock(),
-      settings: const NotificationPlanSettings(summaryHorizonDays: 2),
-    );
+NotificationScheduler _scheduler(
+  AppDatabase database,
+  _Gateway gateway, {
+  List<StoredDeposit>? deposits,
+}) => NotificationReconciler(
+  dataSource: _DataSource(
+    deposits ?? [_stored('deposit-1', 'customer-1', LocalDate(2026, 7, 27))],
+  ),
+  gateway: gateway,
+  idStore: StableNotificationIdStore(
+    database,
+    nowUtc: () => DateTime.utc(2026),
+  ),
+  clock: _Clock(),
+  settings: const NotificationPlanSettings(summaryHorizonDays: 2),
+);
 
 final class _Gateway implements NotificationGateway {
-  _Gateway({this.notificationsAllowed = true, this.canExact = true});
+  _Gateway({
+    this.notificationsAllowed = true,
+    this.canExact = true,
+    this.failAtSchedule,
+  });
 
   final bool notificationsAllowed;
   final bool canExact;
+  final int? failAtSchedule;
   final List<ScheduledNotificationRequest> requests = [];
   final List<int> cancelled = [];
 
   @override
   Future<void> cancel(int notificationId) async =>
       cancelled.add(notificationId);
+
+  @override
+  Future<void> openSettings() async {}
+
+  @override
+  Future<bool> requestExactAlarmPermission() async => canExact;
+
+  @override
+  Future<bool> requestNotificationPermission() async => notificationsAllowed;
 
   @override
   Future<NotificationCapability> capability() async => NotificationCapability(
@@ -131,6 +184,7 @@ final class _Gateway implements NotificationGateway {
 
   @override
   Future<void> schedule(ScheduledNotificationRequest request) async {
+    if (requests.length == failAtSchedule) throw StateError('schedule failed');
     requests.add(request);
   }
 }

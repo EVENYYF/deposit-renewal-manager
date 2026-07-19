@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
+import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -11,6 +12,8 @@ import '../database/app_database.dart';
 import 'notification_plan.dart';
 
 enum NotificationSupport { supported, unsupported }
+
+enum NotificationReconcileStatus { success, degraded, partial, error }
 
 final class NotificationCapability {
   const NotificationCapability({
@@ -106,6 +109,12 @@ final class ScheduledNotificationRequest {
 abstract interface class NotificationGateway {
   Future<NotificationCapability> capability();
 
+  Future<bool> requestNotificationPermission();
+
+  Future<bool> requestExactAlarmPermission();
+
+  Future<void> openSettings();
+
   Future<void> schedule(ScheduledNotificationRequest request);
 
   Future<void> cancel(int notificationId);
@@ -130,15 +139,19 @@ final class NotificationReconcileResult {
     required this.capability,
     required this.scheduledCount,
     required this.cancelledCount,
+    this.status = NotificationReconcileStatus.success,
+    this.truncatedCount = 0,
     this.degradedReason,
   });
 
   final NotificationCapability capability;
   final int scheduledCount;
   final int cancelledCount;
+  final NotificationReconcileStatus status;
+  final int truncatedCount;
   final String? degradedReason;
 
-  bool get degraded => degradedReason != null;
+  bool get degraded => status != NotificationReconcileStatus.success;
 }
 
 abstract interface class NotificationScheduler {
@@ -149,6 +162,14 @@ abstract interface class NotificationScheduler {
   Future<NotificationReconcileResult> reconcileDeposit(String depositId);
 
   Future<NotificationReconcileResult> cancelDeposit(String depositId);
+
+  Future<NotificationReconcileResult> reconcileSummary();
+
+  Future<bool> requestNotificationPermission();
+
+  Future<bool> requestExactAlarmPermission();
+
+  Future<void> openSettings();
 }
 
 final notificationSchedulerProvider = Provider<NotificationScheduler>(
@@ -177,13 +198,128 @@ final class UnsupportedNotificationScheduler implements NotificationScheduler {
   Future<NotificationReconcileResult> reconcileDeposit(String depositId) =>
       _result();
 
+  @override
+  Future<NotificationReconcileResult> reconcileSummary() => _result();
+
+  @override
+  Future<bool> requestExactAlarmPermission() async => false;
+
+  @override
+  Future<bool> requestNotificationPermission() async => false;
+
+  @override
+  Future<void> openSettings() async {}
+
   Future<NotificationReconcileResult> _result() async =>
       NotificationReconcileResult(
         capability: NotificationCapability.unsupported(reason),
         scheduledCount: 0,
         cancelledCount: 0,
+        status: NotificationReconcileStatus.degraded,
         degradedReason: reason,
       );
+}
+
+final class NotificationCapabilityState {
+  const NotificationCapabilityState({
+    this.capability,
+    this.lastResult,
+    this.message,
+    this.busy = false,
+  });
+
+  final NotificationCapability? capability;
+  final NotificationReconcileResult? lastResult;
+  final String? message;
+  final bool busy;
+
+  bool get needsNotificationPermission =>
+      capability?.isSupported == true &&
+      capability?.notificationsAllowed == false;
+
+  NotificationCapabilityState copyWith({
+    NotificationCapability? capability,
+    NotificationReconcileResult? lastResult,
+    String? message,
+    bool? busy,
+  }) => NotificationCapabilityState(
+    capability: capability ?? this.capability,
+    lastResult: lastResult ?? this.lastResult,
+    message: message,
+    busy: busy ?? this.busy,
+  );
+}
+
+final notificationCapabilityControllerProvider =
+    NotifierProvider<
+      NotificationCapabilityController,
+      NotificationCapabilityState
+    >(NotificationCapabilityController.new);
+
+final class NotificationCapabilityController
+    extends Notifier<NotificationCapabilityState> {
+  NotificationScheduler get _scheduler =>
+      ref.read(notificationSchedulerProvider);
+
+  @override
+  NotificationCapabilityState build() => const NotificationCapabilityState();
+
+  Future<void> refresh() async {
+    state = state.copyWith(busy: true, message: state.message);
+    try {
+      final capability = await _scheduler.capability;
+      state = state.copyWith(
+        capability: capability,
+        busy: false,
+        message: capability.reason,
+      );
+    } catch (error) {
+      state = state.copyWith(busy: false, message: '通知状态读取失败：$error');
+    }
+  }
+
+  Future<void> reconcileAll() => _record(_scheduler.reconcileAll);
+
+  Future<void> requestNotificationPermission() async {
+    state = state.copyWith(busy: true, message: state.message);
+    try {
+      await _scheduler.requestNotificationPermission();
+      await _record(_scheduler.reconcileAll);
+    } catch (error) {
+      state = state.copyWith(busy: false, message: '通知授权失败：$error');
+    }
+  }
+
+  Future<void> requestExactAlarmPermission() async {
+    state = state.copyWith(busy: true, message: state.message);
+    try {
+      await _scheduler.requestExactAlarmPermission();
+      await _record(_scheduler.reconcileAll);
+    } catch (error) {
+      state = state.copyWith(busy: false, message: '精确提醒授权失败：$error');
+    }
+  }
+
+  Future<void> openSettings() => _scheduler.openSettings();
+
+  void warning(String message) => state = state.copyWith(message: message);
+
+  Future<void> _record(
+    Future<NotificationReconcileResult> Function() operation,
+  ) async {
+    state = state.copyWith(busy: true, message: state.message);
+    try {
+      final result = await operation();
+      state = state.copyWith(
+        capability: result.capability,
+        lastResult: result,
+        busy: false,
+        message: result.degradedReason,
+      );
+    } catch (error) {
+      state = state.copyWith(busy: false, message: '通知重排失败：$error');
+    }
+  }
 }
 
 typedef NotificationIdCandidate = int Function(String entityId, int attempt);
@@ -229,18 +365,37 @@ final class StableNotificationIdStore {
   });
 
   Future<List<NotificationIdMapping>> mappingsWithPrefix(String prefix) async {
-    final mappings = await database
-        .select(database.notificationIdMappings)
+    final escaped = prefix
+        .replaceAll(r'\', r'\\')
+        .replaceAll('%', r'\%')
+        .replaceAll('_', r'\_');
+    return (database.select(database.notificationIdMappings)..where(
+          (mapping) => mapping.entityId.like('$escaped%', escapeChar: r'\'),
+        ))
         .get();
-    return mappings
-        .where((mapping) => mapping.entityId.startsWith(prefix))
-        .toList(growable: false);
+  }
+
+  Future<void> remove(String entityId) async {
+    await (database.delete(
+      database.notificationIdMappings,
+    )..where((mapping) => mapping.entityId.equals(entityId))).go();
   }
 
   static int _sha256Candidate(String entityId, int attempt) {
     final digest = sha256.convert(utf8.encode('$entityId\u0000$attempt'));
     return ByteData.sublistView(Uint8List.fromList(digest.bytes)).getUint32(0);
   }
+}
+
+abstract interface class DailySummaryScheduler {
+  Future<void> scheduleNext();
+}
+
+final class NoopDailySummaryScheduler implements DailySummaryScheduler {
+  const NoopDailySummaryScheduler();
+
+  @override
+  Future<void> scheduleNext() async {}
 }
 
 final class DatabaseNotificationDataSource implements NotificationDataSource {
@@ -311,6 +466,8 @@ class NotificationReconciler implements NotificationScheduler {
     required this.idStore,
     required this.clock,
     this.settings = const NotificationPlanSettings(),
+    this.dailySummaryScheduler = const NoopDailySummaryScheduler(),
+    this.maxScheduledDepositAlarms = 400,
   });
 
   final NotificationDataSource dataSource;
@@ -318,6 +475,8 @@ class NotificationReconciler implements NotificationScheduler {
   final StableNotificationIdStore idStore;
   final NotificationLocalClock clock;
   final NotificationPlanSettings settings;
+  final DailySummaryScheduler dailySummaryScheduler;
+  final int maxScheduledDepositAlarms;
 
   @override
   Future<NotificationCapability> get capability => gateway.capability();
@@ -328,26 +487,47 @@ class NotificationReconciler implements NotificationScheduler {
     if (!cap.isSupported || !cap.notificationsAllowed) {
       return _degraded(cap, cap.reason ?? 'Notifications are not allowed');
     }
-    final mappings = await idStore.mappingsWithPrefix('deposit:');
-    final summaryMappings = await idStore.mappingsWithPrefix('summary:');
-    var cancelled = 0;
-    for (final mapping in [...mappings, ...summaryMappings]) {
-      await gateway.cancel(mapping.notificationId);
-      cancelled++;
-    }
     final plan = NotificationPlan.build(
       deposits: await dataSource.activeDeposits(),
       today: clock.today(),
       settings: settings,
     );
-    final scheduled = await _schedulePlan(plan, cap);
+    final outcome = await _schedulePlan(plan, cap);
+    if (outcome.error != null) {
+      return NotificationReconcileResult(
+        capability: cap,
+        scheduledCount: outcome.scheduled,
+        cancelledCount: 0,
+        status: outcome.scheduled == 0
+            ? NotificationReconcileStatus.error
+            : NotificationReconcileStatus.partial,
+        truncatedCount: outcome.truncated,
+        degradedReason: '部分提醒重排失败，已保留旧计划：${outcome.error}',
+      );
+    }
+
+    var cancelled = 0;
+    final mappings = await idStore.mappingsWithPrefix('deposit:');
+    for (final mapping in mappings) {
+      if (outcome.desiredKeys.contains(mapping.entityId)) continue;
+      await gateway.cancel(mapping.notificationId);
+      await idStore.remove(mapping.entityId);
+      cancelled++;
+    }
+    await dailySummaryScheduler.scheduleNext();
     return NotificationReconcileResult(
       capability: cap,
-      scheduledCount: scheduled,
+      scheduledCount: outcome.scheduled,
       cancelledCount: cancelled,
-      degradedReason: cap.canScheduleExact
+      status: cap.canScheduleExact && outcome.truncated == 0
+          ? NotificationReconcileStatus.success
+          : NotificationReconcileStatus.degraded,
+      truncatedCount: outcome.truncated,
+      degradedReason: outcome.truncated > 0
+          ? '提醒数量超过系统安全上限，已省略 ${outcome.truncated} 条较远提醒'
+          : cap.canScheduleExact
           ? null
-          : 'Exact alarm permission unavailable; using inexact scheduling',
+          : '未授权精确提醒，当前使用非精确调度',
     );
   }
 
@@ -363,6 +543,7 @@ class NotificationReconciler implements NotificationScheduler {
     final mappings = await idStore.mappingsWithPrefix('deposit:$depositId:');
     for (final mapping in mappings) {
       await gateway.cancel(mapping.notificationId);
+      await idStore.remove(mapping.entityId);
     }
     return NotificationReconcileResult(
       capability: cap,
@@ -371,63 +552,94 @@ class NotificationReconciler implements NotificationScheduler {
     );
   }
 
-  Future<int> _schedulePlan(
+  @override
+  Future<NotificationReconcileResult> reconcileSummary() async {
+    final cap = await capability;
+    try {
+      await dailySummaryScheduler.scheduleNext();
+      return NotificationReconcileResult(
+        capability: cap,
+        scheduledCount: 0,
+        cancelledCount: 0,
+        status: cap.notificationsAllowed
+            ? NotificationReconcileStatus.success
+            : NotificationReconcileStatus.degraded,
+        degradedReason: cap.notificationsAllowed ? null : cap.reason,
+      );
+    } catch (error) {
+      return NotificationReconcileResult(
+        capability: cap,
+        scheduledCount: 0,
+        cancelledCount: 0,
+        status: NotificationReconcileStatus.error,
+        degradedReason: '每日汇总重排失败：$error',
+      );
+    }
+  }
+
+  @override
+  Future<bool> requestNotificationPermission() =>
+      gateway.requestNotificationPermission();
+
+  @override
+  Future<bool> requestExactAlarmPermission() =>
+      gateway.requestExactAlarmPermission();
+
+  @override
+  Future<void> openSettings() => gateway.openSettings();
+
+  Future<_ScheduleOutcome> _schedulePlan(
     NotificationPlan plan,
     NotificationCapability cap,
   ) async {
     final precision = cap.canScheduleExact
         ? NotificationSchedulePrecision.exactAllowWhileIdle
         : NotificationSchedulePrecision.inexactAllowWhileIdle;
-    var count = 0;
     final now = clock.now();
-    for (final reminder in plan.depositReminders) {
+    final reminders = plan.depositReminders.where((reminder) {
+      return clock
+          .at(reminder.date, settings.reminderHour, settings.reminderMinute)
+          .isAfter(now);
+    }).toList()..sort((a, b) => a.date.compareTo(b.date));
+    final selected = reminders.take(maxScheduledDepositAlarms).toList();
+    final desired = <String>{};
+    var count = 0;
+    Object? error;
+    for (final reminder in selected) {
       final scheduledAt = clock.at(
         reminder.date,
         settings.reminderHour,
         settings.reminderMinute,
       );
-      if (!scheduledAt.isAfter(now)) continue;
-      final id = await idStore.idFor(
-        'deposit:${reminder.depositId}:${reminder.offset.inDays}',
-      );
-      await gateway.schedule(
-        ScheduledNotificationRequest(
-          id: id,
-          scheduledAt: scheduledAt,
-          title: '存款到期提醒',
-          body: '存款将在 ${reminder.offset.inDays} 天后到期',
-          payload: NotificationPayload(
-            customerId: reminder.customerId,
-            depositId: reminder.depositId,
+      final key = 'deposit:${reminder.depositId}:${reminder.offset.inDays}';
+      desired.add(key);
+      try {
+        final id = await idStore.idFor(key);
+        await gateway.schedule(
+          ScheduledNotificationRequest(
+            id: id,
+            scheduledAt: scheduledAt,
+            title: '存款到期提醒',
+            body: '存款将在 ${reminder.offset.inDays} 天后到期',
+            payload: NotificationPayload(
+              customerId: reminder.customerId,
+              depositId: reminder.depositId,
+            ),
+            precision: precision,
           ),
-          precision: precision,
-        ),
-      );
-      count++;
+        );
+        count++;
+      } catch (caught) {
+        error = caught;
+        break;
+      }
     }
-    for (final summary in plan.summaries) {
-      final scheduledAt = clock.at(
-        summary.date,
-        settings.summaryHour,
-        settings.summaryMinute,
-      );
-      if (!scheduledAt.isAfter(now)) continue;
-      final id = await idStore.idFor('summary:${summary.date}');
-      final c = summary.counts;
-      await gateway.schedule(
-        ScheduledNotificationRequest(
-          id: id,
-          scheduledAt: scheduledAt,
-          title: '存款到期汇总',
-          body:
-              '今日 ${c.today}，未来三天 ${c.nextThreeDays}，本周 ${c.thisWeek}，逾期 ${c.overdue}',
-          payload: const NotificationPayload(customerId: '', depositId: ''),
-          precision: precision,
-        ),
-      );
-      count++;
-    }
-    return count;
+    return _ScheduleOutcome(
+      scheduled: count,
+      truncated: reminders.length - selected.length,
+      desiredKeys: desired,
+      error: error,
+    );
   }
 
   NotificationReconcileResult _degraded(
@@ -437,6 +649,97 @@ class NotificationReconciler implements NotificationScheduler {
     capability: cap,
     scheduledCount: 0,
     cancelledCount: 0,
+    status: NotificationReconcileStatus.degraded,
     degradedReason: reason,
   );
+}
+
+final class _ScheduleOutcome {
+  const _ScheduleOutcome({
+    required this.scheduled,
+    required this.truncated,
+    required this.desiredKeys,
+    this.error,
+  });
+
+  final int scheduled;
+  final int truncated;
+  final Set<String> desiredKeys;
+  final Object? error;
+}
+
+abstract interface class NotificationMutationCoordinator {
+  /// Invoke after a successful create or update transaction.
+  Future<void> afterCreateOrUpdate(String depositId);
+
+  /// Invoke after a successful renewal transaction for both affected deposits.
+  Future<void> afterRenew(String sourceDepositId, String targetDepositId);
+
+  /// Invoke after a successful stop or delete transaction.
+  Future<void> afterStopOrDelete(String depositId);
+
+  Future<void> reconcileDeposit(String depositId);
+  Future<void> cancelDeposit(String depositId);
+  Future<void> reconcileSummary();
+  Future<void> reconcileAll();
+}
+
+final notificationMutationCoordinatorProvider =
+    Provider<NotificationMutationCoordinator>(
+      (ref) => SchedulerNotificationMutationCoordinator(
+        scheduler: ref.read(notificationSchedulerProvider),
+        onWarning: (message) => ref
+            .read(notificationCapabilityControllerProvider.notifier)
+            .warning(message),
+      ),
+    );
+
+final class SchedulerNotificationMutationCoordinator
+    implements NotificationMutationCoordinator {
+  const SchedulerNotificationMutationCoordinator({
+    required this.scheduler,
+    required this.onWarning,
+  });
+
+  final NotificationScheduler scheduler;
+  final void Function(String message) onWarning;
+
+  @override
+  Future<void> afterCreateOrUpdate(String depositId) =>
+      reconcileDeposit(depositId);
+
+  @override
+  Future<void> afterRenew(String sourceDepositId, String targetDepositId) =>
+      _run(() => scheduler.reconcileAll());
+
+  @override
+  Future<void> afterStopOrDelete(String depositId) => cancelDeposit(depositId);
+
+  @override
+  Future<void> reconcileDeposit(String depositId) =>
+      _run(() => scheduler.reconcileDeposit(depositId));
+
+  @override
+  Future<void> cancelDeposit(String depositId) =>
+      _run(() => scheduler.cancelDeposit(depositId));
+
+  @override
+  Future<void> reconcileSummary() => _run(scheduler.reconcileSummary);
+
+  @override
+  Future<void> reconcileAll() => _run(scheduler.reconcileAll);
+
+  Future<void> _run(
+    Future<NotificationReconcileResult> Function() action,
+  ) async {
+    try {
+      final result = await action();
+      if (result.status == NotificationReconcileStatus.partial ||
+          result.status == NotificationReconcileStatus.error) {
+        onWarning(result.degradedReason ?? '通知更新失败');
+      }
+    } catch (error) {
+      onWarning('业务已保存，但通知更新失败：$error');
+    }
+  }
 }
