@@ -7,6 +7,7 @@ final class DepositDraft {
     required this.customerId,
     required this.amountCents,
     this.bankName = '',
+    this.productName = '',
     required this.interestRateScaled,
     required this.ratePrecision,
     required this.startDate,
@@ -18,6 +19,7 @@ final class DepositDraft {
   final String customerId;
   final int amountCents;
   final String bankName;
+  final String productName;
   final int interestRateScaled;
   final int ratePrecision;
   final LocalDate startDate;
@@ -31,6 +33,7 @@ final class StoredDeposit {
     required this.customerId,
     required this.amountCents,
     required this.bankName,
+    this.productName = '',
     required this.interestRateScaled,
     required this.ratePrecision,
     required this.startDate,
@@ -40,6 +43,7 @@ final class StoredDeposit {
   final String customerId;
   final int amountCents;
   final String bankName;
+  final String productName;
   final int interestRateScaled;
   final int ratePrecision;
   final LocalDate startDate;

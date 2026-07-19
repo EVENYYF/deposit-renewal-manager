@@ -43,6 +43,10 @@ class Customers extends Table {
   'CREATE INDEX deposits_bank_name_idx '
   'ON deposits (bank_name COLLATE NOCASE)',
 )
+@TableIndex.sql(
+  'CREATE INDEX deposits_product_name_idx '
+  'ON deposits (product_name COLLATE NOCASE)',
+)
 @TableIndex(
   name: 'deposits_expiry_lifecycle_customer_idx',
   columns: {#finalExpiryDate, #lifecycle, #customerId},
@@ -54,6 +58,7 @@ class Deposits extends Table {
   IntColumn get amountCents =>
       integer().check(const CustomExpression<bool>('amount_cents > 0'))();
   TextColumn get bankName => text().withDefault(const Constant(''))();
+  TextColumn get productName => text().withDefault(const Constant(''))();
   IntColumn get interestRateScaled => integer().check(
     const CustomExpression<bool>('interest_rate_scaled >= 0'),
   )();
@@ -156,6 +161,40 @@ class BusinessSettings extends Table {
   IntColumn get businessRevision => integer()
       .withDefault(const Constant(0))
       .check(const CustomExpression<bool>('business_revision >= 0'))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {singletonId};
+}
+
+/// 设备本地策略，不参与跨设备业务备份。
+class DeviceSettings extends Table {
+  IntColumn get singletonId =>
+      integer().check(const CustomExpression<bool>('singleton_id = 1'))();
+  BoolColumn get autoSnapshotEnabled =>
+      boolean().withDefault(const Constant(true))();
+  IntColumn get snapshotIntervalDays => integer()
+      .withDefault(const Constant(1))
+      .check(const CustomExpression<bool>('snapshot_interval_days > 0'))();
+  IntColumn get snapshotRetentionCount => integer()
+      .withDefault(const Constant(10))
+      .check(
+        const CustomExpression<bool>(
+          'snapshot_retention_count BETWEEN 1 AND 50',
+        ),
+      )();
+  IntColumn get lastSnapshotAtUtc =>
+      integer().nullable().check(
+        const CustomExpression<bool>(
+          'last_snapshot_at_utc IS NULL OR '
+          '(typeof(last_snapshot_at_utc) = \'integer\' AND '
+          'last_snapshot_at_utc > 0)',
+        ),
+      )();
+  IntColumn get lastSnapshotBusinessRevision => integer()
+      .withDefault(const Constant(0))
+      .check(
+        const CustomExpression<bool>('last_snapshot_business_revision >= 0'),
+      )();
 
   @override
   Set<Column<Object>> get primaryKey => {singletonId};

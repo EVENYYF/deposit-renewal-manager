@@ -194,8 +194,7 @@ class BackupService {
       if (manifest.formatVersion != 1) {
         throw const BackupIntegrityException('Unsupported format version');
       }
-      if (manifest.schemaVersion != database.schemaVersion &&
-          manifest.schemaVersion != 3) {
+      if (!{3, 4, database.schemaVersion}.contains(manifest.schemaVersion)) {
         throw const BackupIntegrityException('Unsupported schema version');
       }
       final payload = entries['data.json']!;
@@ -244,6 +243,16 @@ class BackupService {
             );
           }
           row['is_default'] = 0;
+        }
+      }
+      if (manifest.schemaVersion < 5) {
+        for (final row in data['deposits']!) {
+          if (row.containsKey('product_name')) {
+            throw BackupIntegrityException(
+              'Invalid v${manifest.schemaVersion} deposit row structure',
+            );
+          }
+          row['product_name'] = '';
         }
       }
       _validateRows(data);
@@ -378,6 +387,7 @@ class BackupService {
         'customer_id',
         'amount_cents',
         'bank_name',
+        'product_name',
         'interest_rate_scaled',
         'rate_precision',
         'start_date',

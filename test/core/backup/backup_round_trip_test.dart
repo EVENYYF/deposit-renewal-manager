@@ -9,6 +9,7 @@ import 'package:deposit_renewal_manager/core/database/app_database.dart';
 import 'package:deposit_renewal_manager/core/database/daos/customer_dao.dart';
 import 'package:deposit_renewal_manager/features/customers/domain/customer_repository.dart';
 import 'package:drift/native.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:crypto/crypto.dart';
 
@@ -59,6 +60,14 @@ void main() {
         sourceDevice: 'Windows',
         snapshotsDirectory: temp,
       );
+      await target
+          .update(target.deviceSettings)
+          .write(
+            const DeviceSettingsCompanion(
+              snapshotRetentionCount: Value(23),
+              lastSnapshotBusinessRevision: Value(7),
+            ),
+          );
       await importer.restore(await importer.inspectBackup(backup.path));
       expect(
         (await target.select(target.customers).get()).map((r) => r.id),
@@ -70,6 +79,9 @@ void main() {
             .notificationId,
         7,
       );
+      final settings = await target.select(target.deviceSettings).getSingle();
+      expect(settings.snapshotRetentionCount, 23);
+      expect(settings.lastSnapshotBusinessRevision, 7);
     },
   );
 
@@ -94,6 +106,7 @@ void main() {
   });
 
   test('restores schema v3 backups by normalizing template defaults', () async {
+    await _insertDeposit(source, id: 'legacy-deposit');
     await source
         .into(source.messageTemplates)
         .insert(
@@ -120,6 +133,9 @@ void main() {
         for (final row in data['message_templates'] as List) {
           (row as Map<String, dynamic>).remove('is_default');
         }
+        for (final row in data['deposits'] as List) {
+          (row as Map<String, dynamic>).remove('product_name');
+        }
       },
       repairHash: true,
     );
@@ -134,6 +150,44 @@ void main() {
     final restored = await target.select(target.messageTemplates).getSingle();
     expect(restored.id, 'legacy-template');
     expect(restored.isDefault, isFalse);
+    expect(
+      (await target.select(target.deposits).getSingle()).productName,
+      isEmpty,
+    );
+  });
+
+  test('restores schema v4 backups by adding an empty product name', () async {
+    await _insertDeposit(source, id: 'v4-deposit');
+    final service = BackupService(
+      database: source,
+      sourceDevice: 'Android',
+      snapshotsDirectory: temp,
+    );
+    final path = (await service.exportBackup(
+      outputPath: '${temp.path}${Platform.pathSeparator}legacy-v4.drbackup',
+    )).path;
+    await _rewriteBackup(
+      path,
+      mutateManifest: (manifest) => manifest['schemaVersion'] = 4,
+      mutateDecodedData: (data) {
+        for (final row in data['deposits'] as List) {
+          (row as Map<String, dynamic>).remove('product_name');
+        }
+      },
+      repairHash: true,
+    );
+
+    final importer = BackupService(
+      database: target,
+      sourceDevice: 'Windows',
+      snapshotsDirectory: temp,
+    );
+    await importer.restore(await importer.inspectBackup(path));
+
+    expect(
+      (await target.select(target.deposits).getSingle()).productName,
+      isEmpty,
+    );
   });
 
   test(
@@ -595,6 +649,7 @@ void _populateValidRows(Map<String, dynamic> data) {
       'customer_id': 'c1',
       'amount_cents': 100,
       'bank_name': 'Bank',
+      'product_name': '',
       'interest_rate_scaled': 10,
       'rate_precision': 2,
       'start_date': '2026-07-19',
@@ -610,6 +665,7 @@ void _populateValidRows(Map<String, dynamic> data) {
       'customer_id': 'c1',
       'amount_cents': 100,
       'bank_name': 'Bank',
+      'product_name': '',
       'interest_rate_scaled': 10,
       'rate_precision': 2,
       'start_date': '2027-07-19',
@@ -665,4 +721,27 @@ void _populateValidRows(Map<String, dynamic> data) {
       'source_device_id': 'device',
     },
   ];
+}
+
+Future<void> _insertDeposit(AppDatabase database, {required String id}) async {
+  await database
+      .into(database.deposits)
+      .insert(
+        DepositsCompanion.insert(
+          id: id,
+          customerId: 'c1',
+          amountCents: 100,
+          bankName: const Value('Bank'),
+          productName: const Value(''),
+          interestRateScaled: 10,
+          ratePrecision: 2,
+          startDate: '2026-07-19',
+          calculatedExpiryDate: const Value(null),
+          finalExpiryDate: '2027-07-19',
+          lifecycle: 'active',
+          createdAtUtc: 1784419200000000,
+          updatedAtUtc: 1784419200000000,
+          sourceDeviceId: 'device',
+        ),
+      );
 }

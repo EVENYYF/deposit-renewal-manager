@@ -15,6 +15,7 @@ part 'app_database.g.dart';
     MessageTemplates,
     ImportBatches,
     BusinessSettings,
+    DeviceSettings,
     NotificationIdMappings,
   ],
 )
@@ -25,7 +26,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : this(executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -37,6 +38,9 @@ class AppDatabase extends _$AppDatabase {
           businessRevision: const Value(0),
         ),
       );
+      await into(
+        deviceSettings,
+      ).insert(DeviceSettingsCompanion.insert(singletonId: const Value(1)));
     },
     onUpgrade: (migrator, from, to) async {
       if (from < 2) {
@@ -117,6 +121,19 @@ WHERE duplicate_rank > 1
             'message_templates_single_default_idx '
             'ON message_templates (is_default) WHERE is_default = 1',
           );
+        });
+      }
+      if (from < 5) {
+        await transaction(() async {
+          await migrator.addColumn(deposits, deposits.productName);
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS deposits_product_name_idx '
+            'ON deposits (product_name COLLATE NOCASE)',
+          );
+          await migrator.createTable(deviceSettings);
+          await into(
+            deviceSettings,
+          ).insert(DeviceSettingsCompanion.insert(singletonId: const Value(1)));
         });
       }
     },

@@ -678,6 +678,18 @@ class $DepositsTable extends Deposits with TableInfo<$DepositsTable, Deposit> {
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _productNameMeta = const VerificationMeta(
+    'productName',
+  );
+  @override
+  late final GeneratedColumn<String> productName = GeneratedColumn<String>(
+    'product_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
   static const VerificationMeta _interestRateScaledMeta =
       const VerificationMeta('interestRateScaled');
   @override
@@ -792,6 +804,7 @@ class $DepositsTable extends Deposits with TableInfo<$DepositsTable, Deposit> {
     customerId,
     amountCents,
     bankName,
+    productName,
     interestRateScaled,
     ratePrecision,
     startDate,
@@ -842,6 +855,15 @@ class $DepositsTable extends Deposits with TableInfo<$DepositsTable, Deposit> {
       context.handle(
         _bankNameMeta,
         bankName.isAcceptableOrUnknown(data['bank_name']!, _bankNameMeta),
+      );
+    }
+    if (data.containsKey('product_name')) {
+      context.handle(
+        _productNameMeta,
+        productName.isAcceptableOrUnknown(
+          data['product_name']!,
+          _productNameMeta,
+        ),
       );
     }
     if (data.containsKey('interest_rate_scaled')) {
@@ -960,6 +982,10 @@ class $DepositsTable extends Deposits with TableInfo<$DepositsTable, Deposit> {
         DriftSqlType.string,
         data['${effectivePrefix}bank_name'],
       )!,
+      productName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}product_name'],
+      )!,
       interestRateScaled: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}interest_rate_scaled'],
@@ -1010,6 +1036,7 @@ class Deposit extends DataClass implements Insertable<Deposit> {
   final String customerId;
   final int amountCents;
   final String bankName;
+  final String productName;
   final int interestRateScaled;
   final int ratePrecision;
   final String startDate;
@@ -1024,6 +1051,7 @@ class Deposit extends DataClass implements Insertable<Deposit> {
     required this.customerId,
     required this.amountCents,
     required this.bankName,
+    required this.productName,
     required this.interestRateScaled,
     required this.ratePrecision,
     required this.startDate,
@@ -1041,6 +1069,7 @@ class Deposit extends DataClass implements Insertable<Deposit> {
     map['customer_id'] = Variable<String>(customerId);
     map['amount_cents'] = Variable<int>(amountCents);
     map['bank_name'] = Variable<String>(bankName);
+    map['product_name'] = Variable<String>(productName);
     map['interest_rate_scaled'] = Variable<int>(interestRateScaled);
     map['rate_precision'] = Variable<int>(ratePrecision);
     map['start_date'] = Variable<String>(startDate);
@@ -1061,6 +1090,7 @@ class Deposit extends DataClass implements Insertable<Deposit> {
       customerId: Value(customerId),
       amountCents: Value(amountCents),
       bankName: Value(bankName),
+      productName: Value(productName),
       interestRateScaled: Value(interestRateScaled),
       ratePrecision: Value(ratePrecision),
       startDate: Value(startDate),
@@ -1085,6 +1115,7 @@ class Deposit extends DataClass implements Insertable<Deposit> {
       customerId: serializer.fromJson<String>(json['customerId']),
       amountCents: serializer.fromJson<int>(json['amountCents']),
       bankName: serializer.fromJson<String>(json['bankName']),
+      productName: serializer.fromJson<String>(json['productName']),
       interestRateScaled: serializer.fromJson<int>(json['interestRateScaled']),
       ratePrecision: serializer.fromJson<int>(json['ratePrecision']),
       startDate: serializer.fromJson<String>(json['startDate']),
@@ -1106,6 +1137,7 @@ class Deposit extends DataClass implements Insertable<Deposit> {
       'customerId': serializer.toJson<String>(customerId),
       'amountCents': serializer.toJson<int>(amountCents),
       'bankName': serializer.toJson<String>(bankName),
+      'productName': serializer.toJson<String>(productName),
       'interestRateScaled': serializer.toJson<int>(interestRateScaled),
       'ratePrecision': serializer.toJson<int>(ratePrecision),
       'startDate': serializer.toJson<String>(startDate),
@@ -1123,6 +1155,7 @@ class Deposit extends DataClass implements Insertable<Deposit> {
     String? customerId,
     int? amountCents,
     String? bankName,
+    String? productName,
     int? interestRateScaled,
     int? ratePrecision,
     String? startDate,
@@ -1137,6 +1170,7 @@ class Deposit extends DataClass implements Insertable<Deposit> {
     customerId: customerId ?? this.customerId,
     amountCents: amountCents ?? this.amountCents,
     bankName: bankName ?? this.bankName,
+    productName: productName ?? this.productName,
     interestRateScaled: interestRateScaled ?? this.interestRateScaled,
     ratePrecision: ratePrecision ?? this.ratePrecision,
     startDate: startDate ?? this.startDate,
@@ -1159,6 +1193,9 @@ class Deposit extends DataClass implements Insertable<Deposit> {
           ? data.amountCents.value
           : this.amountCents,
       bankName: data.bankName.present ? data.bankName.value : this.bankName,
+      productName: data.productName.present
+          ? data.productName.value
+          : this.productName,
       interestRateScaled: data.interestRateScaled.present
           ? data.interestRateScaled.value
           : this.interestRateScaled,
@@ -1192,6 +1229,7 @@ class Deposit extends DataClass implements Insertable<Deposit> {
           ..write('customerId: $customerId, ')
           ..write('amountCents: $amountCents, ')
           ..write('bankName: $bankName, ')
+          ..write('productName: $productName, ')
           ..write('interestRateScaled: $interestRateScaled, ')
           ..write('ratePrecision: $ratePrecision, ')
           ..write('startDate: $startDate, ')
@@ -1211,6 +1249,7 @@ class Deposit extends DataClass implements Insertable<Deposit> {
     customerId,
     amountCents,
     bankName,
+    productName,
     interestRateScaled,
     ratePrecision,
     startDate,
@@ -1229,6 +1268,7 @@ class Deposit extends DataClass implements Insertable<Deposit> {
           other.customerId == this.customerId &&
           other.amountCents == this.amountCents &&
           other.bankName == this.bankName &&
+          other.productName == this.productName &&
           other.interestRateScaled == this.interestRateScaled &&
           other.ratePrecision == this.ratePrecision &&
           other.startDate == this.startDate &&
@@ -1245,6 +1285,7 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
   final Value<String> customerId;
   final Value<int> amountCents;
   final Value<String> bankName;
+  final Value<String> productName;
   final Value<int> interestRateScaled;
   final Value<int> ratePrecision;
   final Value<String> startDate;
@@ -1260,6 +1301,7 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
     this.customerId = const Value.absent(),
     this.amountCents = const Value.absent(),
     this.bankName = const Value.absent(),
+    this.productName = const Value.absent(),
     this.interestRateScaled = const Value.absent(),
     this.ratePrecision = const Value.absent(),
     this.startDate = const Value.absent(),
@@ -1276,6 +1318,7 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
     required String customerId,
     required int amountCents,
     this.bankName = const Value.absent(),
+    this.productName = const Value.absent(),
     required int interestRateScaled,
     required int ratePrecision,
     required String startDate,
@@ -1302,6 +1345,7 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
     Expression<String>? customerId,
     Expression<int>? amountCents,
     Expression<String>? bankName,
+    Expression<String>? productName,
     Expression<int>? interestRateScaled,
     Expression<int>? ratePrecision,
     Expression<String>? startDate,
@@ -1318,6 +1362,7 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
       if (customerId != null) 'customer_id': customerId,
       if (amountCents != null) 'amount_cents': amountCents,
       if (bankName != null) 'bank_name': bankName,
+      if (productName != null) 'product_name': productName,
       if (interestRateScaled != null)
         'interest_rate_scaled': interestRateScaled,
       if (ratePrecision != null) 'rate_precision': ratePrecision,
@@ -1338,6 +1383,7 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
     Value<String>? customerId,
     Value<int>? amountCents,
     Value<String>? bankName,
+    Value<String>? productName,
     Value<int>? interestRateScaled,
     Value<int>? ratePrecision,
     Value<String>? startDate,
@@ -1354,6 +1400,7 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
       customerId: customerId ?? this.customerId,
       amountCents: amountCents ?? this.amountCents,
       bankName: bankName ?? this.bankName,
+      productName: productName ?? this.productName,
       interestRateScaled: interestRateScaled ?? this.interestRateScaled,
       ratePrecision: ratePrecision ?? this.ratePrecision,
       startDate: startDate ?? this.startDate,
@@ -1381,6 +1428,9 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
     }
     if (bankName.present) {
       map['bank_name'] = Variable<String>(bankName.value);
+    }
+    if (productName.present) {
+      map['product_name'] = Variable<String>(productName.value);
     }
     if (interestRateScaled.present) {
       map['interest_rate_scaled'] = Variable<int>(interestRateScaled.value);
@@ -1424,6 +1474,7 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
           ..write('customerId: $customerId, ')
           ..write('amountCents: $amountCents, ')
           ..write('bankName: $bankName, ')
+          ..write('productName: $productName, ')
           ..write('interestRateScaled: $interestRateScaled, ')
           ..write('ratePrecision: $ratePrecision, ')
           ..write('startDate: $startDate, ')
@@ -3597,6 +3648,477 @@ class BusinessSettingsCompanion extends UpdateCompanion<BusinessSetting> {
   }
 }
 
+class $DeviceSettingsTable extends DeviceSettings
+    with TableInfo<$DeviceSettingsTable, DeviceSetting> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DeviceSettingsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _singletonIdMeta = const VerificationMeta(
+    'singletonId',
+  );
+  @override
+  late final GeneratedColumn<int> singletonId = GeneratedColumn<int>(
+    'singleton_id',
+    aliasedName,
+    false,
+    check: () => const CustomExpression<bool>('singleton_id = 1'),
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _autoSnapshotEnabledMeta =
+      const VerificationMeta('autoSnapshotEnabled');
+  @override
+  late final GeneratedColumn<bool> autoSnapshotEnabled = GeneratedColumn<bool>(
+    'auto_snapshot_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("auto_snapshot_enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _snapshotIntervalDaysMeta =
+      const VerificationMeta('snapshotIntervalDays');
+  @override
+  late final GeneratedColumn<int> snapshotIntervalDays = GeneratedColumn<int>(
+    'snapshot_interval_days',
+    aliasedName,
+    false,
+    check: () => const CustomExpression<bool>('snapshot_interval_days > 0'),
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _snapshotRetentionCountMeta =
+      const VerificationMeta('snapshotRetentionCount');
+  @override
+  late final GeneratedColumn<int> snapshotRetentionCount = GeneratedColumn<int>(
+    'snapshot_retention_count',
+    aliasedName,
+    false,
+    check: () => const CustomExpression<bool>(
+      'snapshot_retention_count BETWEEN 1 AND 50',
+    ),
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(10),
+  );
+  static const VerificationMeta _lastSnapshotAtUtcMeta = const VerificationMeta(
+    'lastSnapshotAtUtc',
+  );
+  @override
+  late final GeneratedColumn<int> lastSnapshotAtUtc = GeneratedColumn<int>(
+    'last_snapshot_at_utc',
+    aliasedName,
+    true,
+    check: () => const CustomExpression<bool>(
+      'last_snapshot_at_utc IS NULL OR '
+      '(typeof(last_snapshot_at_utc) = \'integer\' AND '
+      'last_snapshot_at_utc > 0)',
+    ),
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastSnapshotBusinessRevisionMeta =
+      const VerificationMeta('lastSnapshotBusinessRevision');
+  @override
+  late final GeneratedColumn<int> lastSnapshotBusinessRevision =
+      GeneratedColumn<int>(
+        'last_snapshot_business_revision',
+        aliasedName,
+        false,
+        check: () => const CustomExpression<bool>(
+          'last_snapshot_business_revision >= 0',
+        ),
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(0),
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    singletonId,
+    autoSnapshotEnabled,
+    snapshotIntervalDays,
+    snapshotRetentionCount,
+    lastSnapshotAtUtc,
+    lastSnapshotBusinessRevision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'device_settings';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DeviceSetting> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('singleton_id')) {
+      context.handle(
+        _singletonIdMeta,
+        singletonId.isAcceptableOrUnknown(
+          data['singleton_id']!,
+          _singletonIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('auto_snapshot_enabled')) {
+      context.handle(
+        _autoSnapshotEnabledMeta,
+        autoSnapshotEnabled.isAcceptableOrUnknown(
+          data['auto_snapshot_enabled']!,
+          _autoSnapshotEnabledMeta,
+        ),
+      );
+    }
+    if (data.containsKey('snapshot_interval_days')) {
+      context.handle(
+        _snapshotIntervalDaysMeta,
+        snapshotIntervalDays.isAcceptableOrUnknown(
+          data['snapshot_interval_days']!,
+          _snapshotIntervalDaysMeta,
+        ),
+      );
+    }
+    if (data.containsKey('snapshot_retention_count')) {
+      context.handle(
+        _snapshotRetentionCountMeta,
+        snapshotRetentionCount.isAcceptableOrUnknown(
+          data['snapshot_retention_count']!,
+          _snapshotRetentionCountMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_snapshot_at_utc')) {
+      context.handle(
+        _lastSnapshotAtUtcMeta,
+        lastSnapshotAtUtc.isAcceptableOrUnknown(
+          data['last_snapshot_at_utc']!,
+          _lastSnapshotAtUtcMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_snapshot_business_revision')) {
+      context.handle(
+        _lastSnapshotBusinessRevisionMeta,
+        lastSnapshotBusinessRevision.isAcceptableOrUnknown(
+          data['last_snapshot_business_revision']!,
+          _lastSnapshotBusinessRevisionMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {singletonId};
+  @override
+  DeviceSetting map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DeviceSetting(
+      singletonId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}singleton_id'],
+      )!,
+      autoSnapshotEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}auto_snapshot_enabled'],
+      )!,
+      snapshotIntervalDays: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}snapshot_interval_days'],
+      )!,
+      snapshotRetentionCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}snapshot_retention_count'],
+      )!,
+      lastSnapshotAtUtc: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_snapshot_at_utc'],
+      ),
+      lastSnapshotBusinessRevision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_snapshot_business_revision'],
+      )!,
+    );
+  }
+
+  @override
+  $DeviceSettingsTable createAlias(String alias) {
+    return $DeviceSettingsTable(attachedDatabase, alias);
+  }
+}
+
+class DeviceSetting extends DataClass implements Insertable<DeviceSetting> {
+  final int singletonId;
+  final bool autoSnapshotEnabled;
+  final int snapshotIntervalDays;
+  final int snapshotRetentionCount;
+  final int? lastSnapshotAtUtc;
+  final int lastSnapshotBusinessRevision;
+  const DeviceSetting({
+    required this.singletonId,
+    required this.autoSnapshotEnabled,
+    required this.snapshotIntervalDays,
+    required this.snapshotRetentionCount,
+    this.lastSnapshotAtUtc,
+    required this.lastSnapshotBusinessRevision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['singleton_id'] = Variable<int>(singletonId);
+    map['auto_snapshot_enabled'] = Variable<bool>(autoSnapshotEnabled);
+    map['snapshot_interval_days'] = Variable<int>(snapshotIntervalDays);
+    map['snapshot_retention_count'] = Variable<int>(snapshotRetentionCount);
+    if (!nullToAbsent || lastSnapshotAtUtc != null) {
+      map['last_snapshot_at_utc'] = Variable<int>(lastSnapshotAtUtc);
+    }
+    map['last_snapshot_business_revision'] = Variable<int>(
+      lastSnapshotBusinessRevision,
+    );
+    return map;
+  }
+
+  DeviceSettingsCompanion toCompanion(bool nullToAbsent) {
+    return DeviceSettingsCompanion(
+      singletonId: Value(singletonId),
+      autoSnapshotEnabled: Value(autoSnapshotEnabled),
+      snapshotIntervalDays: Value(snapshotIntervalDays),
+      snapshotRetentionCount: Value(snapshotRetentionCount),
+      lastSnapshotAtUtc: lastSnapshotAtUtc == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastSnapshotAtUtc),
+      lastSnapshotBusinessRevision: Value(lastSnapshotBusinessRevision),
+    );
+  }
+
+  factory DeviceSetting.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DeviceSetting(
+      singletonId: serializer.fromJson<int>(json['singletonId']),
+      autoSnapshotEnabled: serializer.fromJson<bool>(
+        json['autoSnapshotEnabled'],
+      ),
+      snapshotIntervalDays: serializer.fromJson<int>(
+        json['snapshotIntervalDays'],
+      ),
+      snapshotRetentionCount: serializer.fromJson<int>(
+        json['snapshotRetentionCount'],
+      ),
+      lastSnapshotAtUtc: serializer.fromJson<int?>(json['lastSnapshotAtUtc']),
+      lastSnapshotBusinessRevision: serializer.fromJson<int>(
+        json['lastSnapshotBusinessRevision'],
+      ),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'singletonId': serializer.toJson<int>(singletonId),
+      'autoSnapshotEnabled': serializer.toJson<bool>(autoSnapshotEnabled),
+      'snapshotIntervalDays': serializer.toJson<int>(snapshotIntervalDays),
+      'snapshotRetentionCount': serializer.toJson<int>(snapshotRetentionCount),
+      'lastSnapshotAtUtc': serializer.toJson<int?>(lastSnapshotAtUtc),
+      'lastSnapshotBusinessRevision': serializer.toJson<int>(
+        lastSnapshotBusinessRevision,
+      ),
+    };
+  }
+
+  DeviceSetting copyWith({
+    int? singletonId,
+    bool? autoSnapshotEnabled,
+    int? snapshotIntervalDays,
+    int? snapshotRetentionCount,
+    Value<int?> lastSnapshotAtUtc = const Value.absent(),
+    int? lastSnapshotBusinessRevision,
+  }) => DeviceSetting(
+    singletonId: singletonId ?? this.singletonId,
+    autoSnapshotEnabled: autoSnapshotEnabled ?? this.autoSnapshotEnabled,
+    snapshotIntervalDays: snapshotIntervalDays ?? this.snapshotIntervalDays,
+    snapshotRetentionCount:
+        snapshotRetentionCount ?? this.snapshotRetentionCount,
+    lastSnapshotAtUtc: lastSnapshotAtUtc.present
+        ? lastSnapshotAtUtc.value
+        : this.lastSnapshotAtUtc,
+    lastSnapshotBusinessRevision:
+        lastSnapshotBusinessRevision ?? this.lastSnapshotBusinessRevision,
+  );
+  DeviceSetting copyWithCompanion(DeviceSettingsCompanion data) {
+    return DeviceSetting(
+      singletonId: data.singletonId.present
+          ? data.singletonId.value
+          : this.singletonId,
+      autoSnapshotEnabled: data.autoSnapshotEnabled.present
+          ? data.autoSnapshotEnabled.value
+          : this.autoSnapshotEnabled,
+      snapshotIntervalDays: data.snapshotIntervalDays.present
+          ? data.snapshotIntervalDays.value
+          : this.snapshotIntervalDays,
+      snapshotRetentionCount: data.snapshotRetentionCount.present
+          ? data.snapshotRetentionCount.value
+          : this.snapshotRetentionCount,
+      lastSnapshotAtUtc: data.lastSnapshotAtUtc.present
+          ? data.lastSnapshotAtUtc.value
+          : this.lastSnapshotAtUtc,
+      lastSnapshotBusinessRevision: data.lastSnapshotBusinessRevision.present
+          ? data.lastSnapshotBusinessRevision.value
+          : this.lastSnapshotBusinessRevision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DeviceSetting(')
+          ..write('singletonId: $singletonId, ')
+          ..write('autoSnapshotEnabled: $autoSnapshotEnabled, ')
+          ..write('snapshotIntervalDays: $snapshotIntervalDays, ')
+          ..write('snapshotRetentionCount: $snapshotRetentionCount, ')
+          ..write('lastSnapshotAtUtc: $lastSnapshotAtUtc, ')
+          ..write('lastSnapshotBusinessRevision: $lastSnapshotBusinessRevision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    singletonId,
+    autoSnapshotEnabled,
+    snapshotIntervalDays,
+    snapshotRetentionCount,
+    lastSnapshotAtUtc,
+    lastSnapshotBusinessRevision,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DeviceSetting &&
+          other.singletonId == this.singletonId &&
+          other.autoSnapshotEnabled == this.autoSnapshotEnabled &&
+          other.snapshotIntervalDays == this.snapshotIntervalDays &&
+          other.snapshotRetentionCount == this.snapshotRetentionCount &&
+          other.lastSnapshotAtUtc == this.lastSnapshotAtUtc &&
+          other.lastSnapshotBusinessRevision ==
+              this.lastSnapshotBusinessRevision);
+}
+
+class DeviceSettingsCompanion extends UpdateCompanion<DeviceSetting> {
+  final Value<int> singletonId;
+  final Value<bool> autoSnapshotEnabled;
+  final Value<int> snapshotIntervalDays;
+  final Value<int> snapshotRetentionCount;
+  final Value<int?> lastSnapshotAtUtc;
+  final Value<int> lastSnapshotBusinessRevision;
+  const DeviceSettingsCompanion({
+    this.singletonId = const Value.absent(),
+    this.autoSnapshotEnabled = const Value.absent(),
+    this.snapshotIntervalDays = const Value.absent(),
+    this.snapshotRetentionCount = const Value.absent(),
+    this.lastSnapshotAtUtc = const Value.absent(),
+    this.lastSnapshotBusinessRevision = const Value.absent(),
+  });
+  DeviceSettingsCompanion.insert({
+    this.singletonId = const Value.absent(),
+    this.autoSnapshotEnabled = const Value.absent(),
+    this.snapshotIntervalDays = const Value.absent(),
+    this.snapshotRetentionCount = const Value.absent(),
+    this.lastSnapshotAtUtc = const Value.absent(),
+    this.lastSnapshotBusinessRevision = const Value.absent(),
+  });
+  static Insertable<DeviceSetting> custom({
+    Expression<int>? singletonId,
+    Expression<bool>? autoSnapshotEnabled,
+    Expression<int>? snapshotIntervalDays,
+    Expression<int>? snapshotRetentionCount,
+    Expression<int>? lastSnapshotAtUtc,
+    Expression<int>? lastSnapshotBusinessRevision,
+  }) {
+    return RawValuesInsertable({
+      if (singletonId != null) 'singleton_id': singletonId,
+      if (autoSnapshotEnabled != null)
+        'auto_snapshot_enabled': autoSnapshotEnabled,
+      if (snapshotIntervalDays != null)
+        'snapshot_interval_days': snapshotIntervalDays,
+      if (snapshotRetentionCount != null)
+        'snapshot_retention_count': snapshotRetentionCount,
+      if (lastSnapshotAtUtc != null) 'last_snapshot_at_utc': lastSnapshotAtUtc,
+      if (lastSnapshotBusinessRevision != null)
+        'last_snapshot_business_revision': lastSnapshotBusinessRevision,
+    });
+  }
+
+  DeviceSettingsCompanion copyWith({
+    Value<int>? singletonId,
+    Value<bool>? autoSnapshotEnabled,
+    Value<int>? snapshotIntervalDays,
+    Value<int>? snapshotRetentionCount,
+    Value<int?>? lastSnapshotAtUtc,
+    Value<int>? lastSnapshotBusinessRevision,
+  }) {
+    return DeviceSettingsCompanion(
+      singletonId: singletonId ?? this.singletonId,
+      autoSnapshotEnabled: autoSnapshotEnabled ?? this.autoSnapshotEnabled,
+      snapshotIntervalDays: snapshotIntervalDays ?? this.snapshotIntervalDays,
+      snapshotRetentionCount:
+          snapshotRetentionCount ?? this.snapshotRetentionCount,
+      lastSnapshotAtUtc: lastSnapshotAtUtc ?? this.lastSnapshotAtUtc,
+      lastSnapshotBusinessRevision:
+          lastSnapshotBusinessRevision ?? this.lastSnapshotBusinessRevision,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (singletonId.present) {
+      map['singleton_id'] = Variable<int>(singletonId.value);
+    }
+    if (autoSnapshotEnabled.present) {
+      map['auto_snapshot_enabled'] = Variable<bool>(autoSnapshotEnabled.value);
+    }
+    if (snapshotIntervalDays.present) {
+      map['snapshot_interval_days'] = Variable<int>(snapshotIntervalDays.value);
+    }
+    if (snapshotRetentionCount.present) {
+      map['snapshot_retention_count'] = Variable<int>(
+        snapshotRetentionCount.value,
+      );
+    }
+    if (lastSnapshotAtUtc.present) {
+      map['last_snapshot_at_utc'] = Variable<int>(lastSnapshotAtUtc.value);
+    }
+    if (lastSnapshotBusinessRevision.present) {
+      map['last_snapshot_business_revision'] = Variable<int>(
+        lastSnapshotBusinessRevision.value,
+      );
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DeviceSettingsCompanion(')
+          ..write('singletonId: $singletonId, ')
+          ..write('autoSnapshotEnabled: $autoSnapshotEnabled, ')
+          ..write('snapshotIntervalDays: $snapshotIntervalDays, ')
+          ..write('snapshotRetentionCount: $snapshotRetentionCount, ')
+          ..write('lastSnapshotAtUtc: $lastSnapshotAtUtc, ')
+          ..write('lastSnapshotBusinessRevision: $lastSnapshotBusinessRevision')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $NotificationIdMappingsTable extends NotificationIdMappings
     with TableInfo<$NotificationIdMappingsTable, NotificationIdMapping> {
   @override
@@ -3900,6 +4422,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $BusinessSettingsTable businessSettings = $BusinessSettingsTable(
     this,
   );
+  late final $DeviceSettingsTable deviceSettings = $DeviceSettingsTable(this);
   late final $NotificationIdMappingsTable notificationIdMappings =
       $NotificationIdMappingsTable(this);
   late final Index customersNormalizedNameIdx = Index(
@@ -3921,6 +4444,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final Index depositsBankNameIdx = Index(
     'deposits_bank_name_idx',
     'CREATE INDEX deposits_bank_name_idx ON deposits (bank_name COLLATE NOCASE)',
+  );
+  late final Index depositsProductNameIdx = Index(
+    'deposits_product_name_idx',
+    'CREATE INDEX deposits_product_name_idx ON deposits (product_name COLLATE NOCASE)',
   );
   late final Index depositsExpiryLifecycleCustomerIdx = Index(
     'deposits_expiry_lifecycle_customer_idx',
@@ -3946,12 +4473,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     messageTemplates,
     importBatches,
     businessSettings,
+    deviceSettings,
     notificationIdMappings,
     customersNormalizedNameIdx,
     customersFullPinyinIdx,
     customersInitialsIdx,
     customersNormalizedPhoneIdx,
     depositsBankNameIdx,
+    depositsProductNameIdx,
     depositsExpiryLifecycleCustomerIdx,
     messageTemplatesSingleDefaultIdx,
     importBatchesContentHashIdx,
@@ -4371,6 +4900,7 @@ typedef $$DepositsTableCreateCompanionBuilder =
       required String customerId,
       required int amountCents,
       Value<String> bankName,
+      Value<String> productName,
       required int interestRateScaled,
       required int ratePrecision,
       required String startDate,
@@ -4388,6 +4918,7 @@ typedef $$DepositsTableUpdateCompanionBuilder =
       Value<String> customerId,
       Value<int> amountCents,
       Value<String> bankName,
+      Value<String> productName,
       Value<int> interestRateScaled,
       Value<int> ratePrecision,
       Value<String> startDate,
@@ -4486,6 +5017,11 @@ class $$DepositsTableFilterComposer
 
   ColumnFilters<String> get bankName => $composableBuilder(
     column: $table.bankName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get productName => $composableBuilder(
+    column: $table.productName,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4632,6 +5168,11 @@ class $$DepositsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get productName => $composableBuilder(
+    column: $table.productName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get interestRateScaled => $composableBuilder(
     column: $table.interestRateScaled,
     builder: (column) => ColumnOrderings(column),
@@ -4720,6 +5261,11 @@ class $$DepositsTableAnnotationComposer
 
   GeneratedColumn<String> get bankName =>
       $composableBuilder(column: $table.bankName, builder: (column) => column);
+
+  GeneratedColumn<String> get productName => $composableBuilder(
+    column: $table.productName,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<int> get interestRateScaled => $composableBuilder(
     column: $table.interestRateScaled,
@@ -4872,6 +5418,7 @@ class $$DepositsTableTableManager
                 Value<String> customerId = const Value.absent(),
                 Value<int> amountCents = const Value.absent(),
                 Value<String> bankName = const Value.absent(),
+                Value<String> productName = const Value.absent(),
                 Value<int> interestRateScaled = const Value.absent(),
                 Value<int> ratePrecision = const Value.absent(),
                 Value<String> startDate = const Value.absent(),
@@ -4887,6 +5434,7 @@ class $$DepositsTableTableManager
                 customerId: customerId,
                 amountCents: amountCents,
                 bankName: bankName,
+                productName: productName,
                 interestRateScaled: interestRateScaled,
                 ratePrecision: ratePrecision,
                 startDate: startDate,
@@ -4904,6 +5452,7 @@ class $$DepositsTableTableManager
                 required String customerId,
                 required int amountCents,
                 Value<String> bankName = const Value.absent(),
+                Value<String> productName = const Value.absent(),
                 required int interestRateScaled,
                 required int ratePrecision,
                 required String startDate,
@@ -4919,6 +5468,7 @@ class $$DepositsTableTableManager
                 customerId: customerId,
                 amountCents: amountCents,
                 bankName: bankName,
+                productName: productName,
                 interestRateScaled: interestRateScaled,
                 ratePrecision: ratePrecision,
                 startDate: startDate,
@@ -6393,6 +6943,233 @@ typedef $$BusinessSettingsTableProcessedTableManager =
       BusinessSetting,
       PrefetchHooks Function()
     >;
+typedef $$DeviceSettingsTableCreateCompanionBuilder =
+    DeviceSettingsCompanion Function({
+      Value<int> singletonId,
+      Value<bool> autoSnapshotEnabled,
+      Value<int> snapshotIntervalDays,
+      Value<int> snapshotRetentionCount,
+      Value<int?> lastSnapshotAtUtc,
+      Value<int> lastSnapshotBusinessRevision,
+    });
+typedef $$DeviceSettingsTableUpdateCompanionBuilder =
+    DeviceSettingsCompanion Function({
+      Value<int> singletonId,
+      Value<bool> autoSnapshotEnabled,
+      Value<int> snapshotIntervalDays,
+      Value<int> snapshotRetentionCount,
+      Value<int?> lastSnapshotAtUtc,
+      Value<int> lastSnapshotBusinessRevision,
+    });
+
+class $$DeviceSettingsTableFilterComposer
+    extends Composer<_$AppDatabase, $DeviceSettingsTable> {
+  $$DeviceSettingsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get singletonId => $composableBuilder(
+    column: $table.singletonId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get autoSnapshotEnabled => $composableBuilder(
+    column: $table.autoSnapshotEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get snapshotIntervalDays => $composableBuilder(
+    column: $table.snapshotIntervalDays,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get snapshotRetentionCount => $composableBuilder(
+    column: $table.snapshotRetentionCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lastSnapshotAtUtc => $composableBuilder(
+    column: $table.lastSnapshotAtUtc,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lastSnapshotBusinessRevision => $composableBuilder(
+    column: $table.lastSnapshotBusinessRevision,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$DeviceSettingsTableOrderingComposer
+    extends Composer<_$AppDatabase, $DeviceSettingsTable> {
+  $$DeviceSettingsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get singletonId => $composableBuilder(
+    column: $table.singletonId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get autoSnapshotEnabled => $composableBuilder(
+    column: $table.autoSnapshotEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get snapshotIntervalDays => $composableBuilder(
+    column: $table.snapshotIntervalDays,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get snapshotRetentionCount => $composableBuilder(
+    column: $table.snapshotRetentionCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get lastSnapshotAtUtc => $composableBuilder(
+    column: $table.lastSnapshotAtUtc,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get lastSnapshotBusinessRevision => $composableBuilder(
+    column: $table.lastSnapshotBusinessRevision,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DeviceSettingsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DeviceSettingsTable> {
+  $$DeviceSettingsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get singletonId => $composableBuilder(
+    column: $table.singletonId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get autoSnapshotEnabled => $composableBuilder(
+    column: $table.autoSnapshotEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get snapshotIntervalDays => $composableBuilder(
+    column: $table.snapshotIntervalDays,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get snapshotRetentionCount => $composableBuilder(
+    column: $table.snapshotRetentionCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get lastSnapshotAtUtc => $composableBuilder(
+    column: $table.lastSnapshotAtUtc,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get lastSnapshotBusinessRevision => $composableBuilder(
+    column: $table.lastSnapshotBusinessRevision,
+    builder: (column) => column,
+  );
+}
+
+class $$DeviceSettingsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DeviceSettingsTable,
+          DeviceSetting,
+          $$DeviceSettingsTableFilterComposer,
+          $$DeviceSettingsTableOrderingComposer,
+          $$DeviceSettingsTableAnnotationComposer,
+          $$DeviceSettingsTableCreateCompanionBuilder,
+          $$DeviceSettingsTableUpdateCompanionBuilder,
+          (
+            DeviceSetting,
+            BaseReferences<_$AppDatabase, $DeviceSettingsTable, DeviceSetting>,
+          ),
+          DeviceSetting,
+          PrefetchHooks Function()
+        > {
+  $$DeviceSettingsTableTableManager(
+    _$AppDatabase db,
+    $DeviceSettingsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DeviceSettingsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DeviceSettingsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DeviceSettingsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> singletonId = const Value.absent(),
+                Value<bool> autoSnapshotEnabled = const Value.absent(),
+                Value<int> snapshotIntervalDays = const Value.absent(),
+                Value<int> snapshotRetentionCount = const Value.absent(),
+                Value<int?> lastSnapshotAtUtc = const Value.absent(),
+                Value<int> lastSnapshotBusinessRevision = const Value.absent(),
+              }) => DeviceSettingsCompanion(
+                singletonId: singletonId,
+                autoSnapshotEnabled: autoSnapshotEnabled,
+                snapshotIntervalDays: snapshotIntervalDays,
+                snapshotRetentionCount: snapshotRetentionCount,
+                lastSnapshotAtUtc: lastSnapshotAtUtc,
+                lastSnapshotBusinessRevision: lastSnapshotBusinessRevision,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> singletonId = const Value.absent(),
+                Value<bool> autoSnapshotEnabled = const Value.absent(),
+                Value<int> snapshotIntervalDays = const Value.absent(),
+                Value<int> snapshotRetentionCount = const Value.absent(),
+                Value<int?> lastSnapshotAtUtc = const Value.absent(),
+                Value<int> lastSnapshotBusinessRevision = const Value.absent(),
+              }) => DeviceSettingsCompanion.insert(
+                singletonId: singletonId,
+                autoSnapshotEnabled: autoSnapshotEnabled,
+                snapshotIntervalDays: snapshotIntervalDays,
+                snapshotRetentionCount: snapshotRetentionCount,
+                lastSnapshotAtUtc: lastSnapshotAtUtc,
+                lastSnapshotBusinessRevision: lastSnapshotBusinessRevision,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$DeviceSettingsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DeviceSettingsTable,
+      DeviceSetting,
+      $$DeviceSettingsTableFilterComposer,
+      $$DeviceSettingsTableOrderingComposer,
+      $$DeviceSettingsTableAnnotationComposer,
+      $$DeviceSettingsTableCreateCompanionBuilder,
+      $$DeviceSettingsTableUpdateCompanionBuilder,
+      (
+        DeviceSetting,
+        BaseReferences<_$AppDatabase, $DeviceSettingsTable, DeviceSetting>,
+      ),
+      DeviceSetting,
+      PrefetchHooks Function()
+    >;
 typedef $$NotificationIdMappingsTableCreateCompanionBuilder =
     NotificationIdMappingsCompanion Function({
       required String entityId,
@@ -6596,6 +7373,8 @@ class $AppDatabaseManager {
       $$ImportBatchesTableTableManager(_db, _db.importBatches);
   $$BusinessSettingsTableTableManager get businessSettings =>
       $$BusinessSettingsTableTableManager(_db, _db.businessSettings);
+  $$DeviceSettingsTableTableManager get deviceSettings =>
+      $$DeviceSettingsTableTableManager(_db, _db.deviceSettings);
   $$NotificationIdMappingsTableTableManager get notificationIdMappings =>
       $$NotificationIdMappingsTableTableManager(
         _db,

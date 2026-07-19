@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:deposit_renewal_manager/core/database/app_database.dart';
 import 'package:deposit_renewal_manager/core/database/daos/customer_dao.dart';
 import 'package:deposit_renewal_manager/core/database/daos/deposit_dao.dart';
@@ -7,6 +9,7 @@ import 'package:deposit_renewal_manager/features/deposits/domain/local_date.dart
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 void main() {
   late AppDatabase database;
@@ -30,7 +33,7 @@ void main() {
   tearDown(() => database.close());
 
   test('schema version, primary keys and foreign keys are enabled', () async {
-    expect(database.schemaVersion, 4);
+    expect(database.schemaVersion, 5);
     final pragma = await database
         .customSelect('PRAGMA foreign_keys')
         .getSingle();
@@ -52,6 +55,7 @@ void main() {
         'message_templates',
         'import_batches',
         'business_settings',
+        'device_settings',
         'notification_id_mappings',
       }),
     );
@@ -63,6 +67,63 @@ void main() {
     );
     expect(await database.businessRevision(), 1);
     expect(await database.auditEntryCount(), 1);
+    final settings = await database.select(database.deviceSettings).getSingle();
+    expect(settings.autoSnapshotEnabled, isTrue);
+    expect(settings.snapshotIntervalDays, 1);
+    expect(settings.snapshotRetentionCount, 10);
+    expect(settings.lastSnapshotAtUtc, isNull);
+    expect(settings.lastSnapshotBusinessRevision, 0);
+  });
+
+  test('migrates schema v4 deposits and initializes device settings', () async {
+    final temp = await Directory.systemTemp.createTemp('schema-v4-');
+    final file = File('${temp.path}${Platform.pathSeparator}legacy.sqlite');
+    final legacy = sqlite.sqlite3.open(file.path);
+    legacy.execute('''
+CREATE TABLE deposits (
+  id TEXT NOT NULL PRIMARY KEY,
+  customer_id TEXT NOT NULL,
+  amount_cents INTEGER NOT NULL,
+  bank_name TEXT NOT NULL DEFAULT '',
+  interest_rate_scaled INTEGER NOT NULL,
+  rate_precision INTEGER NOT NULL,
+  start_date TEXT NOT NULL,
+  calculated_expiry_date TEXT,
+  final_expiry_date TEXT NOT NULL,
+  lifecycle TEXT NOT NULL,
+  created_at_utc INTEGER NOT NULL,
+  updated_at_utc INTEGER NOT NULL,
+  source_device_id TEXT NOT NULL
+)
+''');
+    legacy.execute('''
+INSERT INTO deposits VALUES (
+  'd1', 'c1', 100, 'Bank', 10, 2, '2026-07-19', NULL,
+  '2027-07-19', 'active', 1784419200000000, 1784419200000000, 'device'
+)
+''');
+    legacy.userVersion = 4;
+    legacy.dispose();
+
+    final migrated = AppDatabase.forTesting(NativeDatabase(file));
+    try {
+      final row = await migrated.select(migrated.deposits).getSingle();
+      expect(row.productName, isEmpty);
+      expect(
+        await migrated.select(migrated.deviceSettings).getSingle(),
+        isA<DeviceSetting>(),
+      );
+      final index = await migrated
+          .customSelect(
+            "SELECT name FROM sqlite_master WHERE type = 'index' "
+            "AND name = 'deposits_product_name_idx'",
+          )
+          .getSingle();
+      expect(index.read<String>('name'), 'deposits_product_name_idx');
+    } finally {
+      await migrated.close();
+      await temp.delete(recursive: true);
+    }
   });
 
   test('import batch content hashes are case-insensitively unique', () async {
@@ -414,12 +475,14 @@ void main() {
       final stored = await deposits.get('deposit-1');
       final audit = await database.auditEntriesFor('deposit', 'deposit-1');
       expect(stored!.amountCents, 250000);
+      expect(stored.productName, '整存整取');
       expect(stored.deposit.calculatedExpiryDate, LocalDate(2027, 7, 18));
       expect(stored.deposit.finalExpiryDate, LocalDate(2027, 7, 20));
       expect(await database.businessRevision(), 3);
       expect(audit, hasLength(2));
       expect(audit.last.beforeJson, contains('100000'));
       expect(audit.last.afterJson, contains('250000'));
+      expect(audit.last.afterJson, contains('整存整取'));
       expect(
         DateTime.fromMicrosecondsSinceEpoch(
           audit.last.occurredAtUtc,
@@ -438,6 +501,7 @@ DepositDraft _draft({
   required String id,
   required String customerId,
   int amountCents = 100000,
+  String productName = '整存整取',
   int ratePrecision = 4,
   LocalDate? calculatedExpiryDate,
   LocalDate? finalExpiryDate,
@@ -446,6 +510,7 @@ DepositDraft _draft({
     id: id,
     customerId: customerId,
     amountCents: amountCents,
+    productName: productName,
     interestRateScaled: 215,
     ratePrecision: ratePrecision,
     startDate: LocalDate(2026, 7, 18),
