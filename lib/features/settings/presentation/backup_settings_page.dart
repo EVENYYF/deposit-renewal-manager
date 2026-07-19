@@ -20,7 +20,11 @@ final class BackupSettingsBindings {
   final Future<InspectedBackup> Function(String path) inspectBackup;
   final Future<RestoreImpact> Function(InspectedBackup backup)
   inspectRestoreImpact;
-  final Future<void> Function(InspectedBackup backup) restoreBackup;
+  final Future<void> Function(
+    InspectedBackup backup,
+    int expectedBusinessRevision,
+  )
+  restoreBackup;
 
   static BackupSettingsBindings fromService(
     BackupService backup, {
@@ -46,8 +50,11 @@ final class BackupSettingsBindings {
     },
     inspectBackup: backup.inspectBackup,
     inspectRestoreImpact: backup.inspectRestoreImpact,
-    restoreBackup: (inspected) async {
-      await backup.restore(inspected);
+    restoreBackup: (inspected, expectedBusinessRevision) async {
+      await backup.restore(
+        inspected,
+        expectedBusinessRevision: expectedBusinessRevision,
+      );
       await afterRestore?.call();
     },
   );
@@ -133,7 +140,7 @@ class _BackupSettingsPageState extends State<BackupSettingsPage> {
         ),
       );
       if (proceed != true) return;
-      await widget.bindings.restoreBackup(inspected);
+      await widget.bindings.restoreBackup(inspected, impact.businessRevision);
       if (mounted) setState(() => _message = '恢复完成，请重新打开需要刷新的页面');
       await _loadSnapshots();
     } catch (error) {

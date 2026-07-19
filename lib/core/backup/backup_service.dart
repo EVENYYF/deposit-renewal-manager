@@ -44,10 +44,13 @@ class InspectedBackup {
 }
 
 final class RestoreImpact {
-  RestoreImpact({required Map<String, int> lostRecords})
-    : lostRecords = UnmodifiableMapView(Map<String, int>.from(lostRecords));
+  RestoreImpact({
+    required Map<String, int> lostRecords,
+    required this.businessRevision,
+  }) : lostRecords = UnmodifiableMapView(Map<String, int>.from(lostRecords));
 
   final Map<String, int> lostRecords;
+  final int businessRevision;
   int get totalLost => lostRecords.values.fold(0, (sum, value) => sum + value);
 }
 
@@ -166,7 +169,8 @@ class BackupService {
       if (manifest.formatVersion != 1) {
         throw const BackupIntegrityException('Unsupported format version');
       }
-      if (manifest.schemaVersion != database.schemaVersion) {
+      if (manifest.schemaVersion != database.schemaVersion &&
+          manifest.schemaVersion != 3) {
         throw const BackupIntegrityException('Unsupported schema version');
       }
       final payload = entries['data.json']!;
@@ -207,6 +211,16 @@ class BackupService {
           throw const BackupIntegrityException('Row count mismatch');
         }
       }
+      if (manifest.schemaVersion == 3) {
+        for (final row in data['message_templates']!) {
+          if (row.containsKey('is_default')) {
+            throw const BackupIntegrityException(
+              'Invalid v3 template row structure',
+            );
+          }
+          row['is_default'] = 0;
+        }
+      }
       _validateRows(data);
       return InspectedBackup._trusted(
         path: path,
@@ -220,13 +234,17 @@ class BackupService {
     }
   }
 
-  Future<void> restore(InspectedBackup backup) async {
+  Future<void> restore(
+    InspectedBackup backup, {
+    int? expectedBusinessRevision,
+  }) async {
     if (!backup._trustedToken) {
       throw const BackupIntegrityException('Backup was not inspected');
     }
     final restorer = RestoreService(
       database: database,
       createAutomaticSnapshot: () => createAutomaticSnapshot('restore'),
+      expectedBusinessRevision: expectedBusinessRevision,
     );
     await restorer.restore(backup);
   }
@@ -244,7 +262,12 @@ class BackupService {
       'import_batches': 'id',
       'business_settings': 'singleton_id',
     };
-    final current = await database.exportBusinessData();
+    late Map<String, List<Map<String, Object?>>> current;
+    late int businessRevision;
+    await database.transaction(() async {
+      current = await database.exportBusinessData();
+      businessRevision = await database.businessRevision();
+    });
     final lost = <String, int>{};
     for (final entry in primaryKeys.entries) {
       final backupKeys = backup.data[entry.key]!
@@ -254,7 +277,7 @@ class BackupService {
           .where((row) => !backupKeys.contains(row[entry.value]))
           .length;
     }
-    return RestoreImpact(lostRecords: lost);
+    return RestoreImpact(lostRecords: lost, businessRevision: businessRevision);
   }
 
   Future<File> createAutomaticSnapshot(String operation) =>

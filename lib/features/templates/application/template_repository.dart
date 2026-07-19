@@ -55,12 +55,23 @@ final class TemplateRepository {
       final existing = await (_database.select(
         _database.messageTemplates,
       )..where((row) => row.id.equals(id))).getSingleOrNull();
-      if (draft.isDefault) {
-        await (_database.update(_database.messageTemplates)
-              ..where((row) => row.id.isNotValue(id)))
-            .write(const db.MessageTemplatesCompanion(isDefault: Value(false)));
-      }
       final timestamp = _nowUtc().toUtc().microsecondsSinceEpoch;
+      final demotedDefaults = draft.isDefault
+          ? await (_database.select(_database.messageTemplates)..where(
+                  (row) => row.isDefault.equals(true) & row.id.isNotValue(id),
+                ))
+                .get()
+          : const <db.MessageTemplate>[];
+      if (draft.isDefault) {
+        await (_database.update(
+          _database.messageTemplates,
+        )..where((row) => row.id.isNotValue(id))).write(
+          db.MessageTemplatesCompanion(
+            isDefault: const Value(false),
+            updatedAtUtc: Value(timestamp),
+          ),
+        );
+      }
       final saved = MessageTemplate(
         id: id,
         name: name,
@@ -82,6 +93,30 @@ final class TemplateRepository {
             ),
           );
       final revision = await _database.incrementBusinessRevision();
+      for (final demoted in demotedDefaults) {
+        final after = MessageTemplate(
+          id: demoted.id,
+          name: demoted.name,
+          body: demoted.content,
+          isEnabled: demoted.isActive,
+          isDefault: false,
+        );
+        await _database
+            .into(_database.auditHistory)
+            .insert(
+              db.AuditHistoryCompanion.insert(
+                id: _uuid.v4(),
+                entityType: 'message_template',
+                entityId: demoted.id,
+                operation: 'unset_default',
+                beforeJson: Value(_encodeRow(demoted)),
+                afterJson: Value(jsonEncode(_toJson(after))),
+                occurredAtUtc: timestamp,
+                sourceDeviceId: sourceDeviceId,
+                businessRevision: revision,
+              ),
+            );
+      }
       await _database
           .into(_database.auditHistory)
           .insert(

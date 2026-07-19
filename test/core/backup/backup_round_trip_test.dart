@@ -73,6 +73,49 @@ void main() {
     },
   );
 
+  test('restores schema v3 backups by normalizing template defaults', () async {
+    await source
+        .into(source.messageTemplates)
+        .insert(
+          MessageTemplatesCompanion.insert(
+            id: 'legacy-template',
+            name: '旧模板',
+            content: '您好',
+            createdAtUtc: 1784419200000000,
+            updatedAtUtc: 1784419200000000,
+          ),
+        );
+    final service = BackupService(
+      database: source,
+      sourceDevice: 'Android',
+      snapshotsDirectory: temp,
+    );
+    final path = (await service.exportBackup(
+      outputPath: '${temp.path}${Platform.pathSeparator}legacy-v3.drbackup',
+    )).path;
+    await _rewriteBackup(
+      path,
+      mutateManifest: (manifest) => manifest['schemaVersion'] = 3,
+      mutateDecodedData: (data) {
+        for (final row in data['message_templates'] as List) {
+          (row as Map<String, dynamic>).remove('is_default');
+        }
+      },
+      repairHash: true,
+    );
+
+    final importer = BackupService(
+      database: target,
+      sourceDevice: 'Windows',
+      snapshotsDirectory: temp,
+    );
+    await importer.restore(await importer.inspectBackup(path));
+
+    final restored = await target.select(target.messageTemplates).getSingle();
+    expect(restored.id, 'legacy-template');
+    expect(restored.isDefault, isFalse);
+  });
+
   test(
     'restore impact counts current records absent from backup by id',
     () async {
@@ -104,6 +147,43 @@ void main() {
       expect(impact.totalLost, 2);
     },
   );
+
+  test('restore rejects writes committed after impact preview', () async {
+    final exporter = BackupService(
+      database: source,
+      sourceDevice: 'Android',
+      snapshotsDirectory: temp,
+    );
+    final path = (await exporter.exportBackup(
+      outputPath: '${temp.path}${Platform.pathSeparator}guarded.drbackup',
+    )).path;
+    final importer = BackupService(
+      database: target,
+      sourceDevice: 'Windows',
+      snapshotsDirectory: temp,
+    );
+    final inspected = await importer.inspectBackup(path);
+    final impact = await importer.inspectRestoreImpact(inspected);
+    await CustomerDao(
+      target,
+      sourceDeviceId: 'windows',
+      nowUtc: () => DateTime.utc(2026, 7, 20),
+    ).create(const CustomerDraft(id: 'late-write', name: '稍后写入'));
+
+    await expectLater(
+      importer.restore(
+        inspected,
+        expectedBusinessRevision: impact.businessRevision,
+      ),
+      throwsA(isA<BackupIntegrityException>()),
+    );
+    expect(
+      await (target.select(
+        target.customers,
+      )..where((row) => row.id.equals('late-write'))).getSingleOrNull(),
+      isNotNull,
+    );
+  });
 
   test('rejects corrupt zip and payload hash mismatch', () async {
     final service = BackupService(

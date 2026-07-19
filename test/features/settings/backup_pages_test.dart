@@ -16,8 +16,8 @@ void main() {
             pickBackup: () async => null,
             inspectBackup: (_) => throw UnimplementedError(),
             inspectRestoreImpact: (_) async =>
-                RestoreImpact(lostRecords: const {}),
-            restoreBackup: (_) async {},
+                RestoreImpact(lostRecords: const {}, businessRevision: 0),
+            restoreBackup: (_, _) async {},
           ),
         ),
       ),

@@ -2,6 +2,7 @@ import 'package:deposit_renewal_manager/core/database/app_database.dart';
 import 'package:deposit_renewal_manager/features/templates/application/template_repository.dart';
 import 'package:deposit_renewal_manager/features/templates/domain/message_template.dart'
     as domain;
+import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uuid/uuid.dart';
@@ -59,7 +60,15 @@ void main() {
         true,
       );
       expect(await database.businessRevision(), 3);
-      expect(await database.auditEntryCount(), 3);
+      expect(await database.auditEntryCount(), 4);
+      final demotion =
+          await (database.select(database.auditHistory)..where(
+                (entry) =>
+                    entry.entityId.equals(first.id) &
+                    entry.operation.equals('unset_default'),
+              ))
+              .getSingle();
+      expect(demotion.businessRevision, 3);
     },
   );
 

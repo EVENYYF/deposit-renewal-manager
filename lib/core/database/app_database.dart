@@ -246,6 +246,23 @@ WHERE duplicate_rank > 1
     await transaction(() => _replaceBusinessDataWithoutTransaction(data));
   }
 
+  Future<bool> replaceBusinessDataIfRevision({
+    required Map<String, List<Map<String, Object?>>> data,
+    required int expectedBusinessRevision,
+  }) => transaction(() async {
+    final locked = await customUpdate(
+      'UPDATE business_settings SET business_revision = business_revision '
+      'WHERE singleton_id = 1',
+      updates: {businessSettings},
+    );
+    if (locked != 1) {
+      throw StateError('Business revision singleton is missing');
+    }
+    if (await businessRevision() != expectedBusinessRevision) return false;
+    await _replaceBusinessDataWithoutTransaction(data);
+    return true;
+  });
+
   /// Restores [data] only while the expected import is still the latest write.
   ///
   /// The no-op update acquires SQLite's write lock before either guard is read,
