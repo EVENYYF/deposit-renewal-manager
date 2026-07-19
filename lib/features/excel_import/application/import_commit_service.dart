@@ -42,7 +42,15 @@ class ImportCommitService {
     required ImportPreview preview,
     Map<int, DuplicateDecision> decisions = const {},
     Map<int, Map<String, bool>> fieldChoices = const {},
+    int skippedInvalidRows = 0,
   }) async {
+    if (skippedInvalidRows < 0) {
+      throw ArgumentError.value(
+        skippedInvalidRows,
+        'skippedInvalidRows',
+        'Must not be negative',
+      );
+    }
     _validateDecisionInputs(preview, decisions, fieldChoices);
     final hash = sha256.convert(fileBytes).toString().toLowerCase();
     if (!RegExp(r'^[0-9a-f]{64}$').hasMatch(hash)) {
@@ -56,7 +64,7 @@ class ImportCommitService {
     final snapshot = await createSnapshot();
     final batchId = _uuid.v4();
     final affected = <String>[];
-    var imported = 0, skipped = 0, failed = 0;
+    var imported = 0, skipped = skippedInvalidRows, failed = 0;
     final warnings = <String>[];
     late final ImportResult result;
     try {
@@ -232,6 +240,9 @@ class ImportCommitService {
                     'preSnapshotId': snapshot.path,
                     'completedRevision': revision,
                     'affectedCustomerIds': affected,
+                    'skippedRows': skipped,
+                    'failedRows': failed,
+                    'skippedInvalidRows': skippedInvalidRows,
                   }),
                 ),
                 occurredAtUtc: DateTime.now().toUtc().millisecondsSinceEpoch,

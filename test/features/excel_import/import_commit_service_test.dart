@@ -244,6 +244,25 @@ void main() {
     );
   });
 
+  test('persists user-skipped invalid rows in batch statistics', () async {
+    final result = await service.commit(
+      fileName: 'skipped-invalid.xlsx',
+      fileBytes: [88],
+      preview: const ImportPreview(
+        rows: [],
+        mapping: {},
+        duplicatesResolved: true,
+      ),
+      skippedInvalidRows: 2,
+    );
+
+    expect(result.importedRows, 0);
+    expect(result.skippedRows, 2);
+    expect(result.failedRows, 0);
+    final batch = await database.select(database.importBatches).getSingle();
+    expect(batch.rejectedRows, 2);
+  });
+
   test('concurrent commits with one content hash have one winner', () async {
     final bothSnapshotsStarted = Completer<void>();
     var snapshotCalls = 0;

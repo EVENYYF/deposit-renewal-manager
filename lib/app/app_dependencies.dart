@@ -127,12 +127,13 @@ class ApplicationProviderScope extends StatelessWidget {
           preview: (bytes, {mapping}) =>
               preview.previewBytes(bytes, mapping: mapping),
           resolve: resolver.resolvePreview,
-          commit: (file, result, decisions) async {
+          commit: (file, result, decisions, skippedInvalidRows) async {
             final imported = await commit.commit(
               fileName: file.name,
               fileBytes: file.bytes,
               preview: result,
               decisions: decisions,
+              skippedInvalidRows: skippedInvalidRows,
             );
             ref.invalidate(customerControllerProvider);
             ref.invalidate(dashboardControllerProvider);

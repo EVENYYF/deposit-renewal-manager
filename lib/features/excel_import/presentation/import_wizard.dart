@@ -29,6 +29,7 @@ class ExcelImportBindings {
     PickedSpreadsheet file,
     ImportPreview preview,
     Map<int, DuplicateDecision> decisions,
+    int skippedInvalidRows,
   )
   commit;
 }
@@ -195,7 +196,12 @@ class _ExcelImportWizardState extends State<ExcelImportWizard> {
       _error = null;
     });
     try {
-      final result = await widget.bindings.commit(file, preview, _decisions);
+      final result = await widget.bindings.commit(
+        file,
+        preview,
+        _decisions,
+        _skippedRows.length,
+      );
       if (mounted) setState(() => _result = result);
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
@@ -409,7 +415,7 @@ class _ExcelImportWizardState extends State<ExcelImportWizard> {
                 if (_result != null)
                   Text(
                     '已导入 ${_result!.importedRows} 行，跳过 '
-                    '${_result!.skippedRows + _skippedRows.length} 行',
+                    '${_result!.skippedRows} 行',
                   ),
               ],
             ),

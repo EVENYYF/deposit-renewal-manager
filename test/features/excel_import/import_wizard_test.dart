@@ -38,7 +38,7 @@ void main() {
         return preview;
       },
       resolve: (value) async => value.copyWith(duplicatesResolved: true),
-      commit: (_, _, _) async => _result,
+      commit: (_, _, _, _) async => _result,
     );
     await _pumpWizard(tester, bindings);
 
@@ -79,7 +79,7 @@ void main() {
         resolvedInput = value;
         return value.copyWith(duplicatesResolved: true);
       },
-      commit: (_, _, _) async => _result,
+      commit: (_, _, _, _) async => _result,
     );
     await _pumpWizard(tester, bindings);
     await _reachValidation(tester);
@@ -104,6 +104,7 @@ void main() {
     'invalid rows may be skipped and duplicate decisions batch applied',
     (tester) async {
       Map<int, DuplicateDecision>? committed;
+      var skippedInvalidRows = -1;
       final invalidRow = ImportRow(
         rowNumber: 4,
         raw: const {},
@@ -125,8 +126,9 @@ void main() {
           ],
           duplicatesResolved: true,
         ),
-        commit: (_, _, decisions) async {
+        commit: (_, _, decisions, skipped) async {
           committed = Map.of(decisions);
+          skippedInvalidRows = skipped;
           return _result;
         },
       );
@@ -154,6 +156,7 @@ void main() {
         2: DuplicateDecision.createSeparate,
         3: DuplicateDecision.createSeparate,
       });
+      expect(skippedInvalidRows, 1);
     },
   );
 }
@@ -189,7 +192,7 @@ ExcelImportBindings _bindings({required ImportPreview preview}) =>
     ExcelImportBindings(
       preview: (_, {mapping}) async => preview,
       resolve: (value) async => value.copyWith(duplicatesResolved: true),
-      commit: (_, _, _) async => _result,
+      commit: (_, _, _, _) async => _result,
     );
 
 const _emptyPreview = ImportPreview(rows: [], mapping: {});
