@@ -112,62 +112,88 @@ class _CustomerDirectoryPageState extends ConsumerState<CustomerDirectoryPage> {
     BuildContext context, [
     CustomerRecord? customer,
   ]) async {
-    final name = TextEditingController(text: customer?.name);
-    final phone = TextEditingController(text: customer?.phone);
-    final key = GlobalKey<FormState>();
-    final saved = await showDialog<bool>(
+    final draft = await showDialog<CustomerDraft>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(customer == null ? '新增客户' : '编辑客户'),
-        content: Form(
-          key: key,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: name,
-                autofocus: true,
-                decoration: const InputDecoration(labelText: '姓名'),
-                validator: (value) =>
-                    value == null || value.trim().isEmpty ? '请输入姓名' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: phone,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: '手机号（选填）'),
-              ),
-            ],
+      builder: (_) => _CustomerEditDialog(customer: customer),
+    );
+    if (draft != null) {
+      await ref.read(customerControllerProvider.notifier).saveAndRefresh(draft);
+    }
+  }
+}
+
+class _CustomerEditDialog extends StatefulWidget {
+  const _CustomerEditDialog({this.customer});
+  final CustomerRecord? customer;
+
+  @override
+  State<_CustomerEditDialog> createState() => _CustomerEditDialogState();
+}
+
+class _CustomerEditDialogState extends State<_CustomerEditDialog> {
+  late final TextEditingController _name;
+  late final TextEditingController _phone;
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _name = TextEditingController(text: widget.customer?.name);
+    _phone = TextEditingController(text: widget.customer?.phone);
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _phone.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text(widget.customer == null ? '新增客户' : '编辑客户'),
+    content: Form(
+      key: _formKey,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextFormField(
+            controller: _name,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: '姓名'),
+            validator: (value) =>
+                value == null || value.trim().isEmpty ? '请输入姓名' : null,
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (key.currentState!.validate()) Navigator.pop(context, true);
-            },
-            child: const Text('保存'),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _phone,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(labelText: '手机号（选填）'),
           ),
         ],
       ),
-    );
-    if (saved == true) {
-      await ref
-          .read(customerControllerProvider.notifier)
-          .saveAndRefresh(
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('取消'),
+      ),
+      FilledButton(
+        onPressed: () {
+          if (!_formKey.currentState!.validate()) return;
+          Navigator.pop(
+            context,
             CustomerDraft(
-              id: customer?.id ?? const Uuid().v4(),
-              name: name.text,
-              phone: phone.text,
+              id: widget.customer?.id ?? const Uuid().v4(),
+              name: _name.text,
+              phone: _phone.text,
             ),
           );
-    }
-    name.dispose();
-    phone.dispose();
-  }
+        },
+        child: const Text('保存'),
+      ),
+    ],
+  );
 }
 
 class _CustomerCard extends ConsumerWidget {

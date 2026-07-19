@@ -49,7 +49,7 @@ class _DepositFormPageState extends ConsumerState<DepositFormPage> {
   void initState() {
     super.initState();
     final initial = widget.initial;
-    _automatic = initial?.calculatedExpiryDate != null;
+    _automatic = initial == null || initial.calculatedExpiryDate != null;
     _ratePrecision = initial?.ratePrecision ?? 2;
     _customer = TextEditingController(
       text: initial?.customerId ?? widget.initialCustomerId ?? '',
@@ -252,9 +252,11 @@ class _DepositFormPageState extends ConsumerState<DepositFormPage> {
         case DepositFormMode.renew:
           await workflow.renew(widget.sourceDepositId!, draft);
       }
+      await Future.wait([
+        ref.read(customerControllerProvider.notifier).retry(),
+        ref.read(dashboardControllerProvider.notifier).retry(),
+      ]);
       if (mounted) {
-        ref.invalidate(customerControllerProvider);
-        ref.invalidate(dashboardControllerProvider);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('已保存')));
