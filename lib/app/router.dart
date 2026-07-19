@@ -1,9 +1,11 @@
-import 'package:deposit_renewal_manager/features/dashboard/application/dashboard_controller.dart';
-import 'package:deposit_renewal_manager/core/notifications/notification_scheduler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/notifications/notification_scheduler.dart';
+import '../features/customers/presentation/customer_pages.dart';
+import '../features/dashboard/presentation/dashboard_page.dart';
+import '../features/deposits/presentation/deposit_form_page.dart';
 import 'shell.dart';
 
 abstract final class AppRouteNames {
@@ -36,9 +38,8 @@ GoRouter createAppRouter({String initialLocation = '/'}) => GoRouter(
             GoRoute(
               name: AppRouteNames.notification,
               path: 'notifications/:notificationId',
-              builder: (context, state) => _PlaceholderPage(
-                title: '通知',
-                subtitle: state.pathParameters['notificationId'],
+              builder: (context, state) => _NotificationDepositPage(
+                depositId: state.pathParameters['notificationId']!,
               ),
             ),
           ],
@@ -46,12 +47,12 @@ GoRouter createAppRouter({String initialLocation = '/'}) => GoRouter(
         _branch(
           AppRouteNames.customers,
           '/customers',
-          const _PlaceholderPage(title: '客户'),
+          const CustomerDirectoryPage(),
         ),
         _branch(
           AppRouteNames.addDeposit,
           '/deposits/new',
-          const _PlaceholderPage(title: '新增存款'),
+          const DepositFormPage(),
         ),
         _branch(
           AppRouteNames.templates,
@@ -84,76 +85,15 @@ StatefulShellBranch _branch(
   ],
 );
 
-class DashboardPage extends ConsumerWidget {
-  const DashboardPage({super.key});
+class _NotificationDepositPage extends StatelessWidget {
+  const _NotificationDepositPage({required this.depositId});
+  final String depositId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final value = ref.watch(dashboardControllerProvider);
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('存款续期', style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 16),
-          const NotificationStatusBanner(),
-          const SizedBox(height: 24),
-          Expanded(
-            child: value.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, stack) => _StateMessage(
-                title: '暂时无法加载首页',
-                actionLabel: '重试',
-                onAction: () =>
-                    ref.read(dashboardControllerProvider.notifier).retry(),
-              ),
-              data: (snapshot) => snapshot.isEmpty
-                  ? const _StateMessage(title: '暂无续期数据')
-                  : _DashboardSummary(snapshot: snapshot),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class NotificationStatusBanner extends ConsumerWidget {
-  const NotificationStatusBanner({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(notificationCapabilityControllerProvider);
-    final capability = state.capability;
-    final message = state.message;
-    if (capability == null && message == null && !state.busy) {
-      return const SizedBox.shrink();
-    }
-    final controller = ref.read(
-      notificationCapabilityControllerProvider.notifier,
-    );
-    final needsPermission = state.needsNotificationPermission;
-    final needsExact =
-        capability?.notificationsAllowed == true &&
-        capability?.canScheduleExact == false;
-    final label = needsPermission
-        ? '开启通知'
-        : needsExact
-        ? '开启精确提醒'
-        : '重试';
-    final action = needsPermission
-        ? controller.requestNotificationPermission
-        : needsExact
-        ? controller.requestExactAlarmPermission
-        : controller.reconcileAll;
-    return MaterialBanner(
-      content: Text(message ?? (state.busy ? '正在更新通知状态…' : '通知提醒需要处理')),
-      actions: [
-        TextButton(onPressed: state.busy ? null : action, child: Text(label)),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('存款提醒')),
+    body: Center(child: Text('通知\n$depositId', textAlign: TextAlign.center)),
+  );
 }
 
 class NotificationSettingsPage extends ConsumerWidget {
@@ -170,7 +110,7 @@ class NotificationSettingsPage extends ConsumerWidget {
       ListTile(
         leading: const Icon(Icons.settings_outlined),
         title: const Text('系统通知设置'),
-        subtitle: const Text('可检查通知与闹钟权限'),
+        subtitle: const Text('检查通知与闹钟权限'),
         trailing: const Icon(Icons.open_in_new),
         onTap: () => ref
             .read(notificationCapabilityControllerProvider.notifier)
@@ -179,60 +119,16 @@ class NotificationSettingsPage extends ConsumerWidget {
       const ListTile(
         leading: Icon(Icons.info_outline),
         title: Text('系统限制'),
-        subtitle: Text('应用被强行停止后，Android 不会恢复提醒；请重新打开应用。'),
+        subtitle: Text('应用被强行停止后 Android 不会恢复提醒；厂商省电策略也可能造成延迟。'),
       ),
-    ],
-  );
-}
-
-class _DashboardSummary extends StatelessWidget {
-  const _DashboardSummary({required this.snapshot});
-  final DashboardSnapshot snapshot;
-
-  @override
-  Widget build(BuildContext context) => ListView(
-    children: [
-      Text('即将到期：${snapshot.dueSoonCount}'),
-      Text('已逾期：${snapshot.overdueCount}'),
-      Text('客户数：${snapshot.customerCount}'),
     ],
   );
 }
 
 class _PlaceholderPage extends StatelessWidget {
-  const _PlaceholderPage({required this.title, this.subtitle});
+  const _PlaceholderPage({required this.title});
   final String title;
-  final String? subtitle;
 
   @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Text(
-        subtitle == null ? title : '$title\n$subtitle',
-        textAlign: TextAlign.center,
-      ),
-    ),
-  );
-}
-
-class _StateMessage extends StatelessWidget {
-  const _StateMessage({required this.title, this.actionLabel, this.onAction});
-  final String title;
-  final String? actionLabel;
-  final VoidCallback? onAction;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(title, textAlign: TextAlign.center),
-        if (actionLabel != null) ...[
-          const SizedBox(height: 16),
-          FilledButton(onPressed: onAction, child: Text(actionLabel!)),
-        ],
-      ],
-    ),
-  );
+  Widget build(BuildContext context) => Center(child: Text(title));
 }

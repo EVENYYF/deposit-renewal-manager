@@ -6,14 +6,40 @@ final class DashboardSnapshot {
     this.dueSoonCount = 0,
     this.overdueCount = 0,
     this.customerCount = 0,
+    this.today = const [],
+    this.nextThreeDays = const [],
+    this.thisWeek = const [],
+    this.overdue = const [],
   });
 
   final int dueSoonCount;
   final int overdueCount;
   final int customerCount;
+  final List<DashboardReminder> today;
+  final List<DashboardReminder> nextThreeDays;
+  final List<DashboardReminder> thisWeek;
+  final List<DashboardReminder> overdue;
 
   bool get isEmpty =>
       dueSoonCount == 0 && overdueCount == 0 && customerCount == 0;
+}
+
+final class DashboardReminder {
+  const DashboardReminder({
+    required this.depositId,
+    required this.customerId,
+    required this.customerName,
+    required this.bankName,
+    required this.amountCents,
+    required this.expiryDate,
+  });
+
+  final String depositId;
+  final String customerId;
+  final String customerName;
+  final String bankName;
+  final int amountCents;
+  final String expiryDate;
 }
 
 final class DashboardCommand {
