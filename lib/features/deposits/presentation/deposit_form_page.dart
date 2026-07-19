@@ -43,12 +43,14 @@ class _DepositFormPageState extends ConsumerState<DepositFormPage> {
   bool _automatic = true;
   bool _expiryAdjusted = false;
   bool _saving = false;
+  late int _ratePrecision;
 
   @override
   void initState() {
     super.initState();
     final initial = widget.initial;
     _automatic = initial?.calculatedExpiryDate != null;
+    _ratePrecision = initial?.ratePrecision ?? 2;
     _customer = TextEditingController(
       text: initial?.customerId ?? widget.initialCustomerId ?? '',
     );
@@ -61,7 +63,10 @@ class _DepositFormPageState extends ConsumerState<DepositFormPage> {
     _rate = TextEditingController(
       text: initial == null
           ? ''
-          : (initial.interestRateScaled / 10000).toString(),
+          : (initial.interestRateScaled / _scaleFor(_ratePrecision))
+                .toStringAsFixed(_ratePrecision)
+                .replaceFirst(RegExp(r'0+$'), '')
+                .replaceFirst(RegExp(r'\.$'), ''),
     );
     _start = TextEditingController(text: initial?.startDate.toString() ?? '');
     _expiry = TextEditingController(
@@ -213,7 +218,9 @@ class _DepositFormPageState extends ConsumerState<DepositFormPage> {
     if (!_formKey.currentState!.validate()) return;
     try {
       final amountCents = (double.parse(_amount.text) * 100).round();
-      final rateScaled = ((double.tryParse(_rate.text) ?? 0) * 10000).round();
+      final rateScaled =
+          ((double.tryParse(_rate.text) ?? 0) * _scaleFor(_ratePrecision))
+              .round();
       final start = _parseDate(_start.text);
       final expiry = _parseDate(_expiry.text);
       final calculated = _automatic
@@ -230,7 +237,7 @@ class _DepositFormPageState extends ConsumerState<DepositFormPage> {
         amountCents: amountCents,
         bankName: _bank.text,
         interestRateScaled: rateScaled,
-        ratePrecision: 4,
+        ratePrecision: _ratePrecision,
         startDate: start,
         calculatedExpiryDate: calculated,
         finalExpiryDate: expiry,
@@ -272,5 +279,13 @@ class _DepositFormPageState extends ConsumerState<DepositFormPage> {
       int.parse(parts[1]),
       int.parse(parts[2]),
     );
+  }
+
+  int _scaleFor(int precision) {
+    var scale = 1;
+    for (var i = 0; i < precision; i++) {
+      scale *= 10;
+    }
+    return scale;
   }
 }
