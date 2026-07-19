@@ -375,7 +375,8 @@ class _DepositFormPageState extends ConsumerState<DepositFormPage> {
     child: TextFormField(
       key: Key(label == '存入日期' ? 'start-date' : 'expiry-date'),
       controller: controller,
-      readOnly: true,
+      // 点击时优先使用日期选择器；保留文本输入以兼容键盘和桌面端录入。
+      readOnly: false,
       decoration: InputDecoration(
         labelText: label,
         hintText: 'YYYY-MM-DD',

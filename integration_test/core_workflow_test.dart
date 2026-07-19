@@ -3,6 +3,7 @@ import 'package:deposit_renewal_manager/app/app.dart';
 import 'package:deposit_renewal_manager/app/app_dependencies.dart';
 import 'package:deposit_renewal_manager/core/database/app_database.dart';
 import 'package:deposit_renewal_manager/core/notifications/notification_scheduler.dart';
+import 'package:deposit_renewal_manager/features/deposits/presentation/deposit_form_page.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -47,11 +48,6 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('新增存款'));
       await tester.pumpAndSettle();
-      await tester.enterText(find.widgetWithText(TextFormField, '客户编号'), '');
-      await tester.enterText(
-        find.widgetWithText(TextFormField, '客户编号'),
-        (await database.select(database.customers).getSingle()).id,
-      );
       await tester.enterText(
         find.widgetWithText(TextFormField, '金额（元）'),
         '10000',
@@ -61,7 +57,7 @@ void main() {
         find.widgetWithText(TextFormField, '存入日期'),
         '2025-07-19',
       );
-      final termField = find.widgetWithText(TextFormField, '存期（月）');
+      final termField = find.widgetWithText(TextFormField, '存期');
       await tester.scrollUntilVisible(
         termField,
         160,
@@ -95,7 +91,19 @@ void main() {
       await tester.tap(find.text('续期'));
       await tester.pumpAndSettle();
       expect(find.text('续期'), findsWidgets);
-      await tester.tap(find.widgetWithText(FilledButton, '确认续期'));
+      final confirmRenewal = find.widgetWithText(FilledButton, '确认续期');
+      final renewalFormScroll = find
+          .descendant(
+            of: find.byType(DepositFormPage),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(
+        confirmRenewal,
+        240,
+        scrollable: renewalFormScroll,
+      );
+      await tester.tap(confirmRenewal);
       await tester.pumpAndSettle();
       expect((await database.select(database.deposits).get()).length, 2);
 
