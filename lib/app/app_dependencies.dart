@@ -124,7 +124,8 @@ class ApplicationProviderScope extends StatelessWidget {
               ref.read(notificationMutationCoordinatorProvider).reconcileAll(),
         );
         return ExcelImportBindings(
-          preview: preview.previewBytes,
+          preview: (bytes, {mapping}) =>
+              preview.previewBytes(bytes, mapping: mapping),
           resolve: resolver.resolvePreview,
           commit: (file, result, decisions) async {
             final imported = await commit.commit(

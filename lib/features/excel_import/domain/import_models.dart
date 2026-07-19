@@ -81,11 +81,13 @@ class ImportPreview {
   Iterable<ImportRow> get invalidRows => rows.where((r) => !r.isValid);
 
   ImportPreview copyWith({
+    List<ImportRow>? rows,
+    Map<String, ImportField>? mapping,
     List<DuplicateCandidate>? candidates,
     bool? duplicatesResolved,
   }) => ImportPreview(
-    rows: rows,
-    mapping: mapping,
+    rows: rows ?? this.rows,
+    mapping: mapping ?? this.mapping,
     headers: headers,
     candidates: candidates ?? this.candidates,
     duplicatesResolved: duplicatesResolved ?? this.duplicatesResolved,
