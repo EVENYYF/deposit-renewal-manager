@@ -10,6 +10,7 @@ import '../features/dashboard/presentation/dashboard_page.dart';
 import '../features/deposits/presentation/deposit_form_page.dart';
 import '../features/excel_import/presentation/import_wizard.dart';
 import '../features/settings/presentation/backup_settings_page.dart';
+import '../features/statistics/presentation/deposit_statistics_page.dart';
 import '../features/templates/presentation/templates_page.dart';
 import '../features/text_import/presentation/text_import_page.dart';
 import 'app_dependencies.dart';
@@ -188,6 +189,17 @@ class _SettingsPage extends ConsumerWidget {
       Text('设置', style: Theme.of(context).textTheme.headlineSmall),
       const SizedBox(height: 16),
       const NotificationStatusBanner(),
+      ListTile(
+        leading: const Icon(Icons.query_stats),
+        title: const Text('存款统计'),
+        subtitle: const Text('查看当前本金、状态及银行产品汇总'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => const DepositStatisticsPage(),
+          ),
+        ),
+      ),
       ListTile(
         leading: const Icon(Icons.backup_outlined),
         title: const Text('备份、恢复与快照'),

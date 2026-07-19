@@ -190,6 +190,42 @@ void main() {
     );
   });
 
+  test('restores schema v5 backups by adding empty term fields', () async {
+    await _insertDeposit(source, id: 'v5-deposit');
+    final service = BackupService(
+      database: source,
+      sourceDevice: 'Android',
+      snapshotsDirectory: temp,
+    );
+    final path = (await service.exportBackup(
+      outputPath: '${temp.path}${Platform.pathSeparator}legacy-v5.drbackup',
+    )).path;
+    await _rewriteBackup(
+      path,
+      mutateManifest: (manifest) => manifest['schemaVersion'] = 5,
+      mutateDecodedData: (data) {
+        for (final row in data['deposits'] as List) {
+          final deposit = row as Map<String, dynamic>;
+          deposit.remove('term_value');
+          deposit.remove('term_unit');
+        }
+      },
+      repairHash: true,
+    );
+
+    final importer = BackupService(
+      database: target,
+      sourceDevice: 'Windows',
+      snapshotsDirectory: temp,
+    );
+    await importer.restore(await importer.inspectBackup(path));
+
+    final restored = await target.select(target.deposits).getSingle();
+    expect(restored.productName, isEmpty);
+    expect(restored.termValue, isNull);
+    expect(restored.termUnit, isNull);
+  });
+
   test(
     'restore impact counts current records absent from backup by id',
     () async {

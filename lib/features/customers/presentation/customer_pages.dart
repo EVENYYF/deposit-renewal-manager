@@ -6,6 +6,9 @@ import 'package:intl/intl.dart';
 import '../application/customer_controller.dart';
 import '../application/customer_history_service.dart';
 import '../domain/customer_repository.dart';
+import '../domain/name_search_index.dart';
+import '../../deposits/domain/deposit.dart';
+import '../../deposits/domain/local_date.dart';
 import '../../deposits/presentation/deposit_form_page.dart';
 
 class CustomerDirectoryPage extends ConsumerStatefulWidget {
@@ -18,6 +21,8 @@ class CustomerDirectoryPage extends ConsumerStatefulWidget {
 
 class _CustomerDirectoryPageState extends ConsumerState<CustomerDirectoryPage> {
   final _search = TextEditingController();
+  String? _selectedBank;
+  String? _selectedProduct;
 
   @override
   void dispose() {
@@ -32,46 +37,47 @@ class _CustomerDirectoryPageState extends ConsumerState<CustomerDirectoryPage> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
-          child: Row(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
                       '客户管理',
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
-                    const SizedBox(height: 12),
-                    SearchBar(
-                      controller: _search,
-                      hintText: '姓名、手机号或拼音',
-                      leading: const Icon(Icons.search),
-                      trailing: _search.text.isEmpty
-                          ? null
-                          : [
-                              IconButton(
-                                tooltip: '清除',
-                                onPressed: _clear,
-                                icon: const Icon(Icons.close),
-                              ),
-                            ],
-                      onChanged: (value) {
-                        setState(() {});
-                        ref
-                            .read(customerControllerProvider.notifier)
-                            .search(value);
-                      },
-                    ),
-                  ],
-                ),
+                  ),
+                  IconButton.filled(
+                    tooltip: '新增客户',
+                    onPressed: () => _editCustomer(context),
+                    icon: const Icon(Icons.person_add_alt_1),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              IconButton.filled(
-                tooltip: '新增客户',
-                onPressed: () => _editCustomer(context),
-                icon: const Icon(Icons.person_add_alt_1),
+              const SizedBox(height: 12),
+              SearchBar(
+                controller: _search,
+                hintText: '姓名、手机号或拼音',
+                leading: const Icon(Icons.search),
+                trailing: _search.text.isEmpty
+                    ? null
+                    : [
+                        IconButton(
+                          tooltip: '清除',
+                          onPressed: _clear,
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                onChanged: (value) {
+                  setState(() {});
+                  ref.read(customerControllerProvider.notifier).search(value);
+                },
+              ),
+              const SizedBox(height: 12),
+              directory.maybeWhen(
+                data: (state) => _buildFilters(state.results),
+                orElse: () => const SizedBox.shrink(),
               ),
             ],
           ),
@@ -87,20 +93,95 @@ class _CustomerDirectoryPageState extends ConsumerState<CustomerDirectoryPage> {
                 label: const Text('重新加载'),
               ),
             ),
-            data: (state) => state.results.isEmpty
-                ? Center(child: Text(state.query.isEmpty ? '暂无客户' : '没有匹配的客户'))
-                : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                    itemCount: state.results.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) =>
-                        _CustomerCard(result: state.results[index]),
-                  ),
+            data: (state) {
+              final results = _filter(state.results);
+              return results.isEmpty
+                  ? Center(
+                      child: Text(state.query.isEmpty ? '暂无客户' : '没有匹配的客户'),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                      itemCount: results.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) =>
+                          _CustomerCard(result: results[index]),
+                    );
+            },
           ),
         ),
       ],
     );
   }
+
+  Widget _buildFilters(List<CustomerSearchResult> results) {
+    final banks = {
+      for (final result in results)
+        for (final deposit in result.deposits)
+          if (deposit.bankName.trim().isNotEmpty) deposit.bankName.trim(),
+    }.toList()..sort();
+    final products = {
+      for (final result in results)
+        for (final deposit in result.deposits)
+          if (deposit.productName.trim().isNotEmpty) deposit.productName.trim(),
+    }.toList()..sort();
+    final selectedBank = banks.contains(_selectedBank) ? _selectedBank : null;
+    final selectedProduct = products.contains(_selectedProduct)
+        ? _selectedProduct
+        : null;
+    return Row(
+      children: [
+        Expanded(
+          child: DropdownButtonFormField<String>(
+            key: const Key('customer-bank-filter'),
+            initialValue: selectedBank,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: '银行',
+              prefixIcon: Icon(Icons.account_balance_outlined),
+            ),
+            items: [
+              const DropdownMenuItem(value: null, child: Text('全部银行')),
+              for (final bank in banks)
+                DropdownMenuItem(value: bank, child: Text(bank)),
+            ],
+            onChanged: (value) => setState(() => _selectedBank = value),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: DropdownButtonFormField<String>(
+            key: const Key('customer-product-filter'),
+            initialValue: selectedProduct,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: '产品',
+              prefixIcon: Icon(Icons.savings_outlined),
+            ),
+            items: [
+              const DropdownMenuItem(value: null, child: Text('全部产品')),
+              for (final product in products)
+                DropdownMenuItem(value: product, child: Text(product)),
+            ],
+            onChanged: (value) => setState(() => _selectedProduct = value),
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<CustomerSearchResult> _filter(List<CustomerSearchResult> results) =>
+      results
+          .where((result) {
+            return result.deposits.any(
+                  (deposit) =>
+                      (_selectedBank == null ||
+                          deposit.bankName.trim() == _selectedBank) &&
+                      (_selectedProduct == null ||
+                          deposit.productName.trim() == _selectedProduct),
+                ) ||
+                (_selectedBank == null && _selectedProduct == null);
+          })
+          .toList(growable: false);
 
   void _clear() {
     _search.clear();
@@ -117,6 +198,43 @@ class _CustomerDirectoryPageState extends ConsumerState<CustomerDirectoryPage> {
       builder: (_) => _CustomerEditDialog(customer: customer),
     );
     if (draft != null) {
+      if (customer == null && (draft.phone?.trim().isNotEmpty ?? false)) {
+        final matches = await ref
+            .read(customerUseCasesProvider)
+            .load(draft.phone!.trim());
+        final duplicate = matches
+            .map((result) => result.customer)
+            .where(
+              (candidate) =>
+                  normalizeSearchText(candidate.name) ==
+                      normalizeSearchText(draft.name) &&
+                  normalizePhone(candidate.phone ?? '') ==
+                      normalizePhone(draft.phone!),
+            )
+            .firstOrNull;
+        if (duplicate != null && context.mounted) {
+          final merge = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('发现相同客户'),
+              content: Text('${duplicate.name}（${duplicate.phone}）已存在。'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('仍新增'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('归入已有客户'),
+                ),
+              ],
+            ),
+          );
+          if (merge == true) {
+            return;
+          }
+        }
+      }
       await ref.read(customerControllerProvider.notifier).saveAndRefresh(draft);
     }
   }
@@ -196,13 +314,31 @@ class _CustomerEditDialogState extends State<_CustomerEditDialog> {
   );
 }
 
-class _CustomerCard extends ConsumerWidget {
+class _CustomerCard extends ConsumerStatefulWidget {
   const _CustomerCard({required this.result});
   final CustomerSearchResult result;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Card(
+  ConsumerState<_CustomerCard> createState() => _CustomerCardState();
+}
+
+class _CustomerCardState extends ConsumerState<_CustomerCard> {
+  Future<List<CustomerDepositChain>>? _chains;
+
+  CustomerSearchResult get result => widget.result;
+
+  void _loadDeposits() {
+    _chains ??= ref
+        .read(customerDepositHistoryUseCasesProvider)
+        .load(widget.result);
+  }
+
+  @override
+  Widget build(BuildContext context) => Card(
     child: ExpansionTile(
+      onExpansionChanged: (expanded) {
+        if (expanded) setState(_loadDeposits);
+      },
       leading: CircleAvatar(child: Text(result.customer.name.characters.first)),
       title: Text(
         result.customer.name,
@@ -215,16 +351,37 @@ class _CustomerCard extends ConsumerWidget {
       children: [
         if (result.deposits.isEmpty)
           const ListTile(title: Text('暂无存款'))
-        else
-          ...result.deposits.map(
-            (deposit) => ListTile(
-              leading: const Icon(Icons.account_balance_outlined),
-              title: Text(
-                deposit.bankName.isEmpty ? '未填写银行' : deposit.bankName,
-              ),
-              subtitle: Text('到期日 ${deposit.finalExpiryDate}'),
-              trailing: Text(_lifecycleLabel(deposit.lifecycle.name)),
-            ),
+        else if (_chains != null)
+          FutureBuilder<List<CustomerDepositChain>>(
+            future: _chains,
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return ListTile(
+                  leading: const Icon(Icons.error_outline),
+                  title: const Text('存款详情加载失败'),
+                  trailing: IconButton(
+                    tooltip: '重试',
+                    icon: const Icon(Icons.refresh),
+                    onPressed: () => setState(() {
+                      _chains = ref
+                          .read(customerDepositHistoryUseCasesProvider)
+                          .load(widget.result);
+                    }),
+                  ),
+                );
+              }
+              if (!snapshot.hasData) {
+                return const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(),
+                );
+              }
+              return Column(
+                children: [
+                  for (final chain in snapshot.data!) _buildChain(chain),
+                ],
+              );
+            },
           ),
         OverflowBar(
           children: [
@@ -244,11 +401,63 @@ class _CustomerCard extends ConsumerWidget {
     ),
   );
 
-  static String _lifecycleLabel(String value) => switch (value) {
-    'active' => '有效',
-    'renewed' => '已续期',
-    _ => '已停止',
-  };
+  Widget _buildChain(CustomerDepositChain chain) => Column(
+    children: [
+      for (var index = 0; index < chain.versions.length; index++)
+        Padding(
+          padding: EdgeInsets.only(left: index == 0 ? 0 : 28),
+          child: _buildDepositTile(chain.versions[index], isRenewal: index > 0),
+        ),
+    ],
+  );
+
+  Widget _buildDepositTile(
+    CustomerDepositVersion deposit, {
+    required bool isRenewal,
+  }) {
+    final appearance = _appearance(deposit);
+    final bank = deposit.bankName.isEmpty ? '未填写银行' : deposit.bankName;
+    final product = deposit.productName.trim();
+    final title = product.isEmpty ? bank : '$bank · $product';
+    return ListTile(
+      key: Key('customer-deposit-${deposit.id}'),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+      leading: Icon(
+        isRenewal ? Icons.subdirectory_arrow_right : Icons.account_balance,
+        color: appearance.color,
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: appearance.color,
+          decoration: deposit.lifecycle == DepositLifecycle.renewed
+              ? TextDecoration.lineThrough
+              : null,
+        ),
+      ),
+      subtitle: Text('到期日 ${deposit.finalExpiryDate}'),
+      trailing: Text(
+        appearance.label,
+        style: TextStyle(color: appearance.color, fontWeight: FontWeight.w600),
+      ),
+      onTap: () => _showDepositDetails(context, deposit),
+    );
+  }
+
+  _DepositAppearance _appearance(CustomerDepositVersion deposit) {
+    if (deposit.lifecycle == DepositLifecycle.renewed) {
+      return const _DepositAppearance('已续期', Colors.grey);
+    }
+    if (deposit.lifecycle == DepositLifecycle.stopped) {
+      return const _DepositAppearance('已停止', Color(0xFF4B5563));
+    }
+    final now = DateTime.now();
+    final today = LocalDate(now.year, now.month, now.day);
+    if (deposit.finalExpiryDate.isBefore(today)) {
+      return const _DepositAppearance('已到期', Color(0xFFC62828));
+    }
+    return const _DepositAppearance('生效中', Color(0xFF2E7D32));
+  }
 
   Future<void> _addDeposit(BuildContext context, WidgetRef ref) async {
     await showDialog<void>(
@@ -259,6 +468,8 @@ class _CustomerCard extends ConsumerWidget {
           height: 700,
           child: DepositFormPage(
             initialCustomerId: result.customer.id,
+            initialCustomerName: result.customer.name,
+            initialCustomerPhone: result.customer.phone,
             onSaved: () => Navigator.of(dialogContext).pop(),
           ),
         ),
@@ -266,7 +477,132 @@ class _CustomerCard extends ConsumerWidget {
     );
     if (context.mounted) {
       await ref.read(customerControllerProvider.notifier).retry();
+      if (mounted) {
+        setState(() {
+          _chains = ref
+              .read(customerDepositHistoryUseCasesProvider)
+              .load(widget.result);
+        });
+      }
     }
+  }
+
+  Future<void> _showDepositDetails(
+    BuildContext context,
+    CustomerDepositVersion deposit,
+  ) async {
+    final appearance = _appearance(deposit);
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('存款详情'),
+        content: SizedBox(
+          width: 480,
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              _detailRow('客户', result.customer.name),
+              _detailRow('手机号', result.customer.phone ?? '未填写'),
+              _detailRow(
+                '银行',
+                deposit.bankName.isEmpty ? '未填写' : deposit.bankName,
+              ),
+              _detailRow(
+                '产品',
+                deposit.productName.isEmpty ? '未填写' : deposit.productName,
+              ),
+              if (deposit.amountCents != null)
+                _detailRow(
+                  '金额',
+                  '¥${(deposit.amountCents! / 100).toStringAsFixed(2)}',
+                ),
+              if (deposit.interestRateScaled != null)
+                _detailRow('年利率', '${_formatRate(deposit)}%'),
+              if (deposit.startDate != null)
+                _detailRow('存入日期', deposit.startDate.toString()),
+              _detailRow('到期日期', deposit.finalExpiryDate.toString()),
+              _detailRow('状态', appearance.label, valueColor: appearance.color),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('关闭'),
+          ),
+          if (deposit.lifecycle == DepositLifecycle.active &&
+              deposit.editableDraft != null)
+            FilledButton.icon(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _editDeposit(context, deposit);
+              },
+              icon: const Icon(Icons.edit_outlined),
+              label: const Text('编辑'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detailRow(String label, String value, {Color? valueColor}) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(width: 88, child: Text(label)),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(color: valueColor, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  String _formatRate(CustomerDepositVersion deposit) {
+    final divisor = _pow10(deposit.ratePrecision);
+    return (deposit.interestRateScaled! / divisor)
+        .toStringAsFixed(deposit.ratePrecision)
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
+  }
+
+  int _pow10(int exponent) {
+    var result = 1;
+    for (var index = 0; index < exponent; index++) {
+      result *= 10;
+    }
+    return result;
+  }
+
+  Future<void> _editDeposit(
+    BuildContext context,
+    CustomerDepositVersion deposit,
+  ) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        child: SizedBox(
+          width: 560,
+          height: 700,
+          child: DepositFormPage(
+            mode: DepositFormMode.update,
+            sourceDepositId: deposit.id,
+            initial: deposit.editableDraft,
+            onSaved: () => Navigator.pop(dialogContext),
+          ),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    await ref.read(customerControllerProvider.notifier).retry();
+    setState(() {
+      _chains = ref
+          .read(customerDepositHistoryUseCasesProvider)
+          .load(widget.result);
+    });
   }
 
   Future<void> _showHistory(BuildContext context, WidgetRef ref) async {
@@ -290,9 +626,27 @@ class _CustomerCard extends ConsumerWidget {
                     final entry = history[index];
                     return ListTile(
                       leading: const Icon(Icons.history),
-                      title: Text(_operationLabel(entry.operation)),
-                      subtitle: Text(
-                        DateFormat('yyyy-MM-dd HH:mm').format(entry.occurredAt),
+                      title: Text(
+                        entry.entityType == null
+                            ? _operationLabel(entry.operation)
+                            : '${_entityLabel(entry.entityType)} · '
+                                  '${_operationLabel(entry.operation)}',
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            DateFormat(
+                              'yyyy-MM-dd HH:mm',
+                            ).format(entry.occurredAt),
+                          ),
+                          for (final change in entry.changes)
+                            Text(
+                              '${_fieldLabel(change.field)}：'
+                              '${_valueLabel(change.before)} → '
+                              '${_valueLabel(change.after)}',
+                            ),
+                        ],
                       ),
                     );
                   },
@@ -317,4 +671,35 @@ class _CustomerCard extends ConsumerWidget {
     'deactivate' => '停用客户',
     _ => value,
   };
+
+  static String _entityLabel(String? value) => switch (value) {
+    'customer' => '客户',
+    'deposit' => '存款',
+    _ => '记录',
+  };
+
+  static String _fieldLabel(String value) => switch (value) {
+    'name' => '姓名',
+    'phone' => '手机号',
+    'bank_name' => '银行',
+    'product_name' => '产品',
+    'amount_cents' => '金额（分）',
+    'interest_rate_scaled' => '年利率',
+    'start_date' => '存入日期',
+    'final_expiry_date' => '到期日',
+    'lifecycle' => '状态',
+    _ => value,
+  };
+
+  static String _valueLabel(Object? value) {
+    if (value == null || value == '') return '未填写';
+    if (value is bool) return value ? '是' : '否';
+    return value.toString();
+  }
+}
+
+final class _DepositAppearance {
+  const _DepositAppearance(this.label, this.color);
+  final String label;
+  final Color color;
 }

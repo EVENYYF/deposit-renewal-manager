@@ -129,12 +129,22 @@ final class _NotificationLifecycleState
   Widget build(BuildContext context) => widget.child;
 
   Future<void> _reconcile() async {
+    try {
+      await ref.read(snapshotPolicyServiceProvider).reconcile();
+    } catch (_) {
+      // 快照失败不应阻断通知和页面恢复。
+    }
     await ref
         .read(notificationCapabilityControllerProvider.notifier)
         .reconcileAll();
   }
 
   Future<void> _initializeNotifications() async {
+    try {
+      await ref.read(snapshotPolicyServiceProvider).reconcile();
+    } catch (_) {
+      // 快照失败不应阻断通知初始化。
+    }
     final controller = ref.read(
       notificationCapabilityControllerProvider.notifier,
     );

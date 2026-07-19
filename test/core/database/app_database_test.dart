@@ -33,7 +33,7 @@ void main() {
   tearDown(() => database.close());
 
   test('schema version, primary keys and foreign keys are enabled', () async {
-    expect(database.schemaVersion, 5);
+    expect(database.schemaVersion, 6);
     final pragma = await database
         .customSelect('PRAGMA foreign_keys')
         .getSingle();
@@ -56,6 +56,7 @@ void main() {
         'import_batches',
         'business_settings',
         'device_settings',
+        'deposit_presets',
         'notification_id_mappings',
       }),
     );
@@ -109,6 +110,8 @@ INSERT INTO deposits VALUES (
     try {
       final row = await migrated.select(migrated.deposits).getSingle();
       expect(row.productName, isEmpty);
+      expect(row.termValue, isNull);
+      expect(row.termUnit, isNull);
       expect(
         await migrated.select(migrated.deviceSettings).getSingle(),
         isA<DeviceSetting>(),
@@ -120,6 +123,15 @@ INSERT INTO deposits VALUES (
           )
           .getSingle();
       expect(index.read<String>('name'), 'deposits_product_name_idx');
+      expect(
+        await migrated
+            .customSelect(
+              "SELECT name FROM sqlite_master WHERE type = 'table' "
+              "AND name = 'deposit_presets'",
+            )
+            .getSingle(),
+        isNotNull,
+      );
     } finally {
       await migrated.close();
       await temp.delete(recursive: true);

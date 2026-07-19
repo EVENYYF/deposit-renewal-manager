@@ -50,7 +50,7 @@ void main() {
     await tester.tap(find.text('续期'));
     await tester.pumpAndSettle();
     expect(find.byType(DepositFormPage), findsOneWidget);
-    expect(find.widgetWithText(TextFormField, 'c1'), findsOneWidget);
+    expect(find.byKey(const Key('customer-name')), findsOneWidget);
 
     Navigator.of(tester.element(find.byType(DepositFormPage))).pop();
     await tester.pumpAndSettle();

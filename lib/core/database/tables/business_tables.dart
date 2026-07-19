@@ -59,6 +59,18 @@ class Deposits extends Table {
       integer().check(const CustomExpression<bool>('amount_cents > 0'))();
   TextColumn get bankName => text().withDefault(const Constant(''))();
   TextColumn get productName => text().withDefault(const Constant(''))();
+  IntColumn get termValue => integer().nullable().check(
+    const CustomExpression<bool>(
+      'term_value IS NULL OR '
+      '(typeof(term_value) = \'integer\' AND term_value > 0)',
+    ),
+  )();
+  TextColumn get termUnit => text().nullable().check(
+    const CustomExpression<bool>(
+      '(term_unit IS NULL AND term_value IS NULL) OR '
+      "(term_value > 0 AND term_unit IN ('day', 'month', 'year'))",
+    ),
+  )();
   IntColumn get interestRateScaled => integer().check(
     const CustomExpression<bool>('interest_rate_scaled >= 0'),
   )();
@@ -197,6 +209,26 @@ class DeviceSettings extends Table {
 
   @override
   Set<Column<Object>> get primaryKey => {singletonId};
+}
+
+@TableIndex(
+  name: 'deposit_presets_field_type_value_idx',
+  columns: {#fieldType, #value},
+  unique: true,
+)
+class DepositPresets extends Table {
+  TextColumn get id => text()();
+  TextColumn get fieldType => text().check(
+    const CustomExpression<bool>(
+      "field_type IN ('amount', 'bank', 'rate', 'term', 'product')",
+    ),
+  )();
+  TextColumn get value => text().check(value.length.isBiggerThanValue(0))();
+  IntColumn get createdAtUtc =>
+      integer().check(utcEpochCheck('created_at_utc'))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
 }
 
 class NotificationIdMappings extends Table {

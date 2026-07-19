@@ -198,6 +198,8 @@ class ImportCommitService {
                   customerId: customerId,
                   amountCents: amount,
                   bankName: Value(n['bankName']?.toString() ?? ''),
+                  termValue: Value(term),
+                  termUnit: const Value('month'),
                   interestRateScaled: _requiredInt(n, 'interestRateScaled'),
                   ratePrecision: _requiredInt(n, 'ratePrecision'),
                   startDate: start,

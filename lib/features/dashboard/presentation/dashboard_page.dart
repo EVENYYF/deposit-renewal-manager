@@ -277,6 +277,8 @@ class _ReminderTile extends ConsumerWidget {
             mode: mode,
             sourceDepositId: record.depositId,
             initial: draft,
+            initialCustomerName: record.customerName,
+            initialCustomerPhone: record.customerPhone,
             onSaved: () => Navigator.of(dialogContext).pop(),
           ),
         ),
@@ -292,6 +294,11 @@ class _ReminderTile extends ConsumerWidget {
     customerId: record.customerId,
     amountCents: record.amountCents,
     bankName: record.bankName,
+    productName: record.productName,
+    termValue: record.termValue,
+    termUnit: record.termUnit == null
+        ? null
+        : DepositTermUnit.values.byName(record.termUnit!),
     interestRateScaled: record.interestRateScaled,
     ratePrecision: record.ratePrecision,
     startDate: _parseDate(record.startDate),

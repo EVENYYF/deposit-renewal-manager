@@ -29,7 +29,11 @@ final class DashboardReminder {
     required this.depositId,
     required this.customerId,
     required this.customerName,
+    this.customerPhone,
     required this.bankName,
+    this.productName = '',
+    this.termValue,
+    this.termUnit,
     required this.amountCents,
     required this.expiryDate,
     required this.startDate,
@@ -41,7 +45,11 @@ final class DashboardReminder {
   final String depositId;
   final String customerId;
   final String customerName;
+  final String? customerPhone;
   final String bankName;
+  final String productName;
+  final int? termValue;
+  final String? termUnit;
   final int amountCents;
   final String expiryDate;
   final String startDate;

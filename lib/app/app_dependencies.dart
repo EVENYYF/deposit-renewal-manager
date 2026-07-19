@@ -5,9 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/backup/backup_service.dart';
+import '../core/backup/snapshot_policy_service.dart';
 import '../core/database/app_database.dart';
 import '../core/database/daos/customer_dao.dart';
 import '../core/database/daos/deposit_dao.dart';
+import '../core/database/daos/deposit_preset_dao.dart';
 import '../core/notifications/notification_scheduler.dart';
 import '../features/customers/application/customer_controller.dart';
 import '../features/customers/application/customer_history_service.dart';
@@ -16,6 +18,7 @@ import '../features/customers/domain/customer_repository.dart';
 import '../features/customers/domain/name_search_index.dart';
 import '../features/dashboard/application/dashboard_controller.dart';
 import '../features/deposits/application/deposit_workflow_controller.dart';
+import '../features/deposits/application/deposit_preset_service.dart';
 import '../features/deposits/domain/deposit.dart' as domain;
 import '../features/deposits/domain/deposit_repository.dart';
 import '../features/deposits/domain/expiry_calculator.dart';
@@ -25,6 +28,7 @@ import '../features/excel_import/application/duplicate_resolver.dart';
 import '../features/excel_import/application/import_commit_service.dart';
 import '../features/excel_import/application/xlsx_preview_service.dart';
 import '../features/excel_import/presentation/import_wizard.dart';
+import '../features/statistics/application/deposit_statistics.dart';
 import '../features/text_import/domain/text_deposit_parser.dart';
 import '../features/templates/application/template_repository.dart';
 import '../features/templates/domain/message_template.dart' as template_domain;
@@ -38,6 +42,17 @@ final appDatabaseProvider = Provider<AppDatabase>(
 
 final backupServiceProvider = Provider<BackupService>(
   (ref) => throw StateError('Backup service is not configured'),
+);
+
+final snapshotPolicyServiceProvider = Provider<SnapshotPolicyService>(
+  (ref) => SnapshotPolicyService(
+    database: ref.read(appDatabaseProvider),
+    backupService: ref.read(backupServiceProvider),
+  ),
+);
+
+final depositPresetServiceProvider = Provider<DepositPresetService>(
+  (ref) => throw StateError('Deposit presets are not configured'),
 );
 
 final excelImportBindingsProvider = Provider<ExcelImportBindings>(
@@ -80,6 +95,9 @@ class ApplicationProviderScope extends StatelessWidget {
     overrides: [
       appDatabaseProvider.overrideWithValue(database),
       backupServiceProvider.overrideWithValue(backupService),
+      depositPresetServiceProvider.overrideWithValue(
+        DepositPresetService(DepositPresetDao(database)),
+      ),
       notificationSchedulerProvider.overrideWithValue(notificationScheduler),
       customerUseCasesProvider.overrideWith(
         (ref) => SqliteCustomerUseCases(
@@ -89,8 +107,15 @@ class ApplicationProviderScope extends StatelessWidget {
       customerHistoryUseCasesProvider.overrideWith(
         (ref) => SqliteCustomerHistoryUseCases(database),
       ),
-      depositWorkflowProvider.overrideWith(
-        (ref) => DaoDepositWorkflow(
+      customerDepositHistoryUseCasesProvider.overrideWith(
+        (ref) => SqliteCustomerDepositHistoryUseCases(database),
+      ),
+      depositWorkflowProvider.overrideWith((ref) {
+        final customers = CustomerDao(
+          database,
+          sourceDeviceId: localSourceDeviceId,
+        );
+        return DaoDepositWorkflow.configured(
           DepositDao(
             database,
             sourceDeviceId: localSourceDeviceId,
@@ -98,10 +123,15 @@ class ApplicationProviderScope extends StatelessWidget {
               notificationMutationCoordinatorProvider,
             ),
           ),
-        ),
-      ),
+          database,
+          customers,
+        );
+      }),
       dashboardUseCasesProvider.overrideWith(
         (ref) => SqliteDashboardUseCases(database),
+      ),
+      depositStatisticsUseCasesProvider.overrideWith(
+        (ref) => SqliteDepositStatisticsUseCases(database),
       ),
       templateBindingsProvider.overrideWith((ref) {
         final repository = TemplateRepository(
@@ -116,10 +146,8 @@ class ApplicationProviderScope extends StatelessWidget {
         final commit = ImportCommitService(
           database: database,
           sourceDeviceId: localSourceDeviceId,
-          createSnapshot: () => backupService.exportBackup(
-            automatic: true,
-            automaticOperation: 'excel_import',
-          ),
+          createSnapshot: () =>
+              backupService.createAutomaticSnapshot('excel_import'),
           notificationReconcile: (_) =>
               ref.read(notificationMutationCoordinatorProvider).reconcileAll(),
         );
@@ -180,10 +208,15 @@ class ApplicationProviderScope extends StatelessWidget {
                 id: depositId,
                 customerId: customerId,
                 amountCents: amount,
-                bankName: [result.bank, result.product]
-                    .whereType<String>()
-                    .where((value) => value.trim().isNotEmpty)
-                    .join(' '),
+                bankName: result.bank ?? '',
+                productName: result.product ?? '',
+                termValue: result.term?.value,
+                termUnit: switch (result.term) {
+                  DayTerm() => DepositTermUnit.day,
+                  MonthTerm() => DepositTermUnit.month,
+                  YearTerm() => DepositTermUnit.year,
+                  null => null,
+                },
                 interestRateScaled: (rate * 100).round(),
                 ratePrecision: 2,
                 startDate: start,
@@ -222,13 +255,39 @@ final class SqliteCustomerUseCases implements CustomerUseCases {
 }
 
 final class DaoDepositWorkflow implements DepositWorkflow {
-  const DaoDepositWorkflow(this._repository);
+  const DaoDepositWorkflow(this._repository)
+    : _database = null,
+      _customers = null;
 
+  const DaoDepositWorkflow.configured(
+    this._repository,
+    this._database,
+    this._customers,
+  );
+
+  final AppDatabase? _database;
   final DepositRepository _repository;
+  final CustomerRepository? _customers;
 
   @override
   Future<void> create(DepositDraft draft) async {
     await _repository.create(draft);
+  }
+
+  @override
+  Future<void> createWithCustomer(
+    DepositDraft draft,
+    CustomerDraft customer,
+  ) async {
+    final database = _database;
+    final customers = _customers;
+    if (database == null || customers == null) {
+      throw StateError('Customer creation is not configured');
+    }
+    await database.transaction(() async {
+      await customers.create(customer);
+      await _repository.create(draft);
+    });
   }
 
   @override
@@ -257,10 +316,11 @@ final class SqliteDashboardUseCases implements DashboardUseCases {
     final rows = await _database
         .customSelect(
           '''
-SELECT d.id, d.customer_id, d.amount_cents, d.bank_name, d.start_date,
+SELECT d.id, d.customer_id, d.amount_cents, d.bank_name, d.product_name,
+       d.term_value, d.term_unit, d.start_date,
        d.interest_rate_scaled, d.rate_precision,
        d.calculated_expiry_date, d.final_expiry_date, d.lifecycle,
-       c.name AS customer_name
+       c.name AS customer_name, c.phone AS customer_phone
 FROM deposits d
 JOIN customers c ON c.id = d.customer_id
 WHERE d.lifecycle = 'active' AND c.is_active = 1
@@ -288,7 +348,11 @@ ORDER BY d.final_expiry_date, c.name
         depositId: id,
         customerId: row.read<String>('customer_id'),
         customerName: row.read<String>('customer_name'),
+        customerPhone: row.readNullable<String>('customer_phone'),
         bankName: row.read<String>('bank_name'),
+        productName: row.read<String>('product_name'),
+        termValue: row.readNullable<int>('term_value'),
+        termUnit: row.readNullable<String>('term_unit'),
         amountCents: row.read<int>('amount_cents'),
         expiryDate: finalExpiry.toString(),
         startDate: row.read<String>('start_date'),
@@ -344,7 +408,8 @@ final class SqliteCustomerHistoryUseCases implements CustomerHistoryUseCases {
     final rows = await _database
         .customSelect(
           '''
-SELECT a.operation, a.occurred_at_utc
+SELECT a.entity_type, a.entity_id, a.operation, a.before_json,
+       a.after_json, a.occurred_at_utc
 FROM audit_history a
 WHERE (a.entity_type = 'customer' AND a.entity_id = ?)
    OR (a.entity_type = 'deposit' AND a.entity_id IN (
@@ -367,8 +432,110 @@ ORDER BY a.occurred_at_utc DESC
               row.read<int>('occurred_at_utc'),
               isUtc: true,
             ).toLocal(),
+            entityType: row.read<String>('entity_type'),
+            entityId: row.read<String>('entity_id'),
+            beforeJson: row.readNullable<String>('before_json'),
+            afterJson: row.readNullable<String>('after_json'),
           ),
         )
         .toList(growable: false);
+  }
+}
+
+final class SqliteCustomerDepositHistoryUseCases
+    implements CustomerDepositHistoryUseCases {
+  const SqliteCustomerDepositHistoryUseCases(this._database);
+
+  final AppDatabase _database;
+
+  @override
+  Future<List<CustomerDepositChain>> load(CustomerSearchResult result) async {
+    final rows =
+        await (_database.select(_database.deposits)
+              ..where(
+                (deposit) => deposit.customerId.equals(result.customer.id),
+              )
+              ..orderBy([(deposit) => OrderingTerm.asc(deposit.startDate)]))
+            .get();
+    final links =
+        await (_database.select(_database.renewals)..where(
+              (renewal) => renewal.sourceDepositId.isIn(
+                rows.map((row) => row.id).toList(growable: false),
+              ),
+            ))
+            .get();
+    final targetBySource = {
+      for (final link in links) link.sourceDepositId: link.targetDepositId,
+    };
+    final rowsById = {for (final row in rows) row.id: row};
+    final targeted = links.map((link) => link.targetDepositId).toSet();
+    final roots = rows.where((row) => !targeted.contains(row.id));
+    return [
+      for (final root in roots)
+        CustomerDepositChain(
+          versions: _chain(root.id, rowsById, targetBySource),
+        ),
+    ];
+  }
+
+  List<CustomerDepositVersion> _chain(
+    String rootId,
+    Map<String, Deposit> rows,
+    Map<String, String> targetBySource,
+  ) {
+    final versions = <CustomerDepositVersion>[];
+    final seen = <String>{};
+    String? current = rootId;
+    while (current != null && seen.add(current)) {
+      final row = rows[current];
+      if (row == null) break;
+      final calculated = row.calculatedExpiryDate;
+      final start = _date(row.startDate);
+      versions.add(
+        CustomerDepositVersion(
+          id: row.id,
+          bankName: row.bankName,
+          productName: row.productName,
+          amountCents: row.amountCents,
+          interestRateScaled: row.interestRateScaled,
+          ratePrecision: row.ratePrecision,
+          finalExpiryDate: _date(row.finalExpiryDate),
+          startDate: start,
+          lifecycle: domain.DepositLifecycle.values.byName(row.lifecycle),
+          renewalSourceId: versions.isEmpty ? null : versions.last.id,
+          editableDraft: row.lifecycle == 'active'
+              ? DepositDraft(
+                  id: row.id,
+                  customerId: row.customerId,
+                  amountCents: row.amountCents,
+                  bankName: row.bankName,
+                  productName: row.productName,
+                  termValue: row.termValue,
+                  termUnit: row.termUnit == null
+                      ? null
+                      : DepositTermUnit.values.byName(row.termUnit!),
+                  interestRateScaled: row.interestRateScaled,
+                  ratePrecision: row.ratePrecision,
+                  startDate: start,
+                  calculatedExpiryDate: calculated == null
+                      ? null
+                      : _date(calculated),
+                  finalExpiryDate: _date(row.finalExpiryDate),
+                )
+              : null,
+        ),
+      );
+      current = targetBySource[current];
+    }
+    return versions;
+  }
+
+  LocalDate _date(String value) {
+    final parts = value.split('-');
+    return LocalDate(
+      int.parse(parts[0]),
+      int.parse(parts[1]),
+      int.parse(parts[2]),
+    );
   }
 }

@@ -72,12 +72,13 @@ class SnapshotStore {
     List<int> bytes,
     DateTime nowUtc,
     String operation,
-    Future<void> Function(File file) validate,
-  ) => _serialized(
+    Future<void> Function(File file) validate, {
+    int? retentionCount,
+  }) => _serialized(
     () => _withFileLock(() async {
       final file = await _allocateAutomatic(nowUtc, operation);
       await _writeAtomically(file, bytes, validate);
-      await _pruneAutomatic();
+      await _pruneAutomatic(retentionCount: retentionCount);
       return file;
     }),
   );
@@ -119,12 +120,14 @@ class SnapshotStore {
     return result;
   }
 
-  Future<void> pruneAutomatic() =>
-      _serialized(() => _withFileLock(_pruneAutomatic));
+  Future<void> pruneAutomatic({int? retentionCount}) => _serialized(
+    () => _withFileLock(() => _pruneAutomatic(retentionCount: retentionCount)),
+  );
 
-  Future<void> _pruneAutomatic() async {
+  Future<void> _pruneAutomatic({int? retentionCount}) async {
     final snapshots = await _listAutomatic();
-    for (final snapshot in snapshots.skip(maxAutomaticSnapshots)) {
+    final keep = retentionCount ?? maxAutomaticSnapshots;
+    for (final snapshot in snapshots.skip(keep)) {
       final root = p.canonicalize(_automaticDirectory.absolute.path);
       final target = p.canonicalize(snapshot.file.absolute.path);
       if (p.isWithin(root, target) && p.basename(target).startsWith('auto_')) {

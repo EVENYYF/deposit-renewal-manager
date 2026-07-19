@@ -183,6 +183,7 @@ final class CustomerDao implements CustomerRepository {
             CustomerSearchDeposit(
               id: depositId,
               bankName: row.read<String>('deposit_bank_name'),
+              productName: row.read<String>('deposit_product_name'),
               finalExpiryDate: _parseDate(
                 row.read<String>('deposit_final_expiry_date'),
               ),
@@ -285,6 +286,7 @@ SELECT
   c.is_active AS customer_is_active,
   d.id AS deposit_id,
   d.bank_name AS deposit_bank_name,
+  d.product_name AS deposit_product_name,
   d.final_expiry_date AS deposit_final_expiry_date,
   d.lifecycle AS deposit_lifecycle,
   $rankSql AS search_rank

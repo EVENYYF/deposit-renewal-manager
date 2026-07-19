@@ -43,6 +43,7 @@ final class DepositDao implements DepositRepository {
 
   @override
   Future<StoredDeposit> create(DepositDraft draft) async {
+    _validateTerm(draft);
     final result = await _db.transaction(() async {
       await _requireActiveCustomer(draft.customerId);
       final timestamp = _timestamp();
@@ -68,6 +69,7 @@ final class DepositDao implements DepositRepository {
 
   @override
   Future<StoredDeposit> update(String id, DepositDraft draft) async {
+    _validateTerm(draft);
     final result = await _db.transaction(() async {
       final before = await _requireRow(id);
       if (before.lifecycle != 'active') throw DepositNotActiveException(id);
@@ -80,6 +82,8 @@ final class DepositDao implements DepositRepository {
           amountCents: Value(draft.amountCents),
           bankName: Value(draft.bankName.trim()),
           productName: Value(draft.productName.trim()),
+          termValue: Value(draft.termValue),
+          termUnit: Value(draft.termUnit?.name),
           interestRateScaled: Value(draft.interestRateScaled),
           ratePrecision: Value(draft.ratePrecision),
           startDate: Value(draft.startDate.toString()),
@@ -90,6 +94,7 @@ final class DepositDao implements DepositRepository {
         ),
       );
       final after = await _requireRow(id);
+      await _learnProduct(draft.productName, after.updatedAtUtc);
       final revision = await _db.incrementBusinessRevision();
       await _appendAudit(
         'update',
@@ -106,6 +111,7 @@ final class DepositDao implements DepositRepository {
 
   @override
   Future<RenewalResult> renew(String sourceId, DepositDraft next) async {
+    _validateTerm(next);
     final result = await _db.transaction(() async {
       final before = await _requireRow(sourceId);
       if (before.lifecycle != 'active') {
@@ -215,11 +221,11 @@ final class DepositDao implements DepositRepository {
     return row?.sourceDepositId;
   }
 
-  Future<void> _insertDraft(DepositDraft draft, int timestamp) {
+  Future<void> _insertDraft(DepositDraft draft, int timestamp) async {
     if (draft.id.trim().isEmpty) {
       throw ArgumentError.value(draft.id, 'id', 'Must not be empty');
     }
-    return _db
+    await _db
         .into(_db.deposits)
         .insert(
           db.DepositsCompanion.insert(
@@ -228,6 +234,8 @@ final class DepositDao implements DepositRepository {
             amountCents: draft.amountCents,
             bankName: Value(draft.bankName.trim()),
             productName: Value(draft.productName.trim()),
+            termValue: Value(draft.termValue),
+            termUnit: Value(draft.termUnit?.name),
             interestRateScaled: draft.interestRateScaled,
             ratePrecision: draft.ratePrecision,
             startDate: draft.startDate.toString(),
@@ -239,6 +247,7 @@ final class DepositDao implements DepositRepository {
             sourceDeviceId: sourceDeviceId,
           ),
         );
+    await _learnProduct(draft.productName, timestamp);
   }
 
   Future<db.Deposit> _requireRow(String id) async {
@@ -279,6 +288,10 @@ final class DepositDao implements DepositRepository {
       amountCents: row.amountCents,
       bankName: row.bankName,
       productName: row.productName,
+      termValue: row.termValue,
+      termUnit: row.termUnit == null
+          ? null
+          : DepositTermUnit.values.byName(row.termUnit!),
       interestRateScaled: row.interestRateScaled,
       ratePrecision: row.ratePrecision,
       startDate: _parseDate(row.startDate),
@@ -291,6 +304,8 @@ final class DepositDao implements DepositRepository {
     'amountCents': row.amountCents,
     'bankName': row.bankName,
     'productName': row.productName,
+    'termValue': row.termValue,
+    'termUnit': row.termUnit,
     'interestRateScaled': row.interestRateScaled,
     'ratePrecision': row.ratePrecision,
     'startDate': row.startDate,
@@ -349,4 +364,27 @@ final class DepositDao implements DepositRepository {
       value == null ? null : _parseDate(value);
 
   int _timestamp() => _nowUtc().toUtc().microsecondsSinceEpoch;
+
+  void _validateTerm(DepositDraft draft) {
+    if ((draft.termValue == null) != (draft.termUnit == null)) {
+      throw ArgumentError('termValue and termUnit must both be set or null');
+    }
+    if (draft.termValue != null && draft.termValue! <= 0) {
+      throw ArgumentError.value(
+        draft.termValue,
+        'termValue',
+        'Must be positive',
+      );
+    }
+  }
+
+  Future<void> _learnProduct(String productName, int timestamp) async {
+    final value = productName.trim();
+    if (value.isEmpty) return;
+    await _db.customStatement(
+      'INSERT OR IGNORE INTO deposit_presets '
+      '(id, field_type, value, created_at_utc) VALUES (?, ?, ?, ?)',
+      [_uuid.v4(), 'product', value, timestamp],
+    );
+  }
 }

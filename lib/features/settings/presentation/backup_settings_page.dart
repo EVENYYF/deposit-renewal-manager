@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/backup/backup_service.dart';
 import '../../../core/backup/snapshot_store.dart';
+import '../../../core/database/app_database.dart';
+import '../../../core/backup/snapshot_policy_service.dart';
 
 final class BackupSettingsBindings {
   const BackupSettingsBindings({
@@ -12,6 +14,9 @@ final class BackupSettingsBindings {
     required this.inspectBackup,
     required this.inspectRestoreImpact,
     required this.restoreBackup,
+    this.loadPolicy,
+    this.updatePolicy,
+    this.createSnapshot,
   });
 
   final Future<List<SnapshotInfo>> Function() listSnapshots;
@@ -25,41 +30,58 @@ final class BackupSettingsBindings {
     int expectedBusinessRevision,
   )
   restoreBackup;
+  final Future<DeviceSetting> Function()? loadPolicy;
+  final Future<void> Function({
+    bool? enabled,
+    int? intervalDays,
+    int? retentionCount,
+  })?
+  updatePolicy;
+  final Future<void> Function()? createSnapshot;
 
   static BackupSettingsBindings fromService(
     BackupService backup, {
     Future<void> Function()? afterRestore,
-  }) => BackupSettingsBindings(
-    listSnapshots: backup.listSnapshots,
-    exportBackup: () async {
-      final archive = await backup.buildBackupArchive();
-      final path = await FilePicker.platform.saveFile(
-        dialogTitle: '导出备份',
-        fileName: archive.suggestedFileName,
-        type: FileType.custom,
-        allowedExtensions: const ['drbackup'],
-        bytes: archive.bytes,
-      );
-      if (path == null) return null;
-      return path;
-    },
-    pickBackup: () async {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: const ['drbackup'],
-      );
-      return result?.files.single.path;
-    },
-    inspectBackup: backup.inspectBackup,
-    inspectRestoreImpact: backup.inspectRestoreImpact,
-    restoreBackup: (inspected, expectedBusinessRevision) async {
-      await backup.restore(
-        inspected,
-        expectedBusinessRevision: expectedBusinessRevision,
-      );
-      await afterRestore?.call();
-    },
-  );
+  }) {
+    final policy = SnapshotPolicyService(
+      database: backup.database,
+      backupService: backup,
+    );
+    return BackupSettingsBindings(
+      listSnapshots: backup.listSnapshots,
+      exportBackup: () async {
+        final archive = await backup.buildBackupArchive();
+        final path = await FilePicker.platform.saveFile(
+          dialogTitle: '导出备份',
+          fileName: archive.suggestedFileName,
+          type: FileType.custom,
+          allowedExtensions: const ['drbackup'],
+          bytes: archive.bytes,
+        );
+        if (path == null) return null;
+        return path;
+      },
+      pickBackup: () async {
+        final result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: const ['drbackup'],
+        );
+        return result?.files.single.path;
+      },
+      inspectBackup: backup.inspectBackup,
+      inspectRestoreImpact: backup.inspectRestoreImpact,
+      restoreBackup: (inspected, expectedBusinessRevision) async {
+        await backup.restore(
+          inspected,
+          expectedBusinessRevision: expectedBusinessRevision,
+        );
+        await afterRestore?.call();
+      },
+      loadPolicy: policy.settings,
+      updatePolicy: policy.update,
+      createSnapshot: policy.createManualSnapshot,
+    );
+  }
 }
 
 class BackupSettingsPage extends StatefulWidget {
@@ -84,11 +106,37 @@ class _BackupSettingsPageState extends State<BackupSettingsPage> {
   List<SnapshotInfo> _snapshots = const [];
   bool _busy = false;
   String? _message;
+  DeviceSetting? _policy;
 
   @override
   void initState() {
     super.initState();
     _loadSnapshots();
+    _loadPolicy();
+  }
+
+  Future<void> _loadPolicy() async {
+    final loader = widget.bindings.loadPolicy;
+    if (loader == null) return;
+    try {
+      final policy = await loader();
+      if (mounted) setState(() => _policy = policy);
+    } catch (_) {}
+  }
+
+  Future<void> _updatePolicy({
+    bool? enabled,
+    int? intervalDays,
+    int? retentionCount,
+  }) async {
+    final update = widget.bindings.updatePolicy;
+    if (update == null) return;
+    await update(
+      enabled: enabled,
+      intervalDays: intervalDays,
+      retentionCount: retentionCount,
+    );
+    await _loadPolicy();
   }
 
   Future<void> _loadSnapshots() async {
@@ -152,6 +200,20 @@ class _BackupSettingsPageState extends State<BackupSettingsPage> {
     }
   }
 
+  Future<void> _createSnapshot() async {
+    setState(() => _busy = true);
+    try {
+      await widget.bindings.createSnapshot!();
+      await _loadSnapshots();
+      await _loadPolicy();
+      if (mounted) setState(() => _message = '快照已创建');
+    } catch (error) {
+      if (mounted) setState(() => _message = '创建快照失败：$error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('备份与设置')),
@@ -183,7 +245,63 @@ class _BackupSettingsPageState extends State<BackupSettingsPage> {
             child: Text(_message!),
           ),
         const Divider(height: 32),
-        Text('自动快照（最多保留 10 份）', style: Theme.of(context).textTheme.titleMedium),
+        if (_policy != null) ...[
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('自动快照'),
+            value: _policy!.autoSnapshotEnabled,
+            onChanged: _busy ? null : (value) => _updatePolicy(enabled: value),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('快照周期'),
+            trailing: DropdownButton<int>(
+              value: _policy!.snapshotIntervalDays,
+              items: const [1, 3, 7]
+                  .map(
+                    (value) =>
+                        DropdownMenuItem(value: value, child: Text('$value 天')),
+                  )
+                  .toList(),
+              onChanged: _busy
+                  ? null
+                  : (value) {
+                      if (value != null) {
+                        _updatePolicy(intervalDays: value);
+                      }
+                    },
+            ),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('保留快照数量'),
+            trailing: DropdownButton<int>(
+              value: _policy!.snapshotRetentionCount,
+              items: const [5, 10, 20, 30]
+                  .map(
+                    (value) =>
+                        DropdownMenuItem(value: value, child: Text('$value 份')),
+                  )
+                  .toList(),
+              onChanged: _busy
+                  ? null
+                  : (value) {
+                      if (value != null) {
+                        _updatePolicy(retentionCount: value);
+                      }
+                    },
+            ),
+          ),
+          OutlinedButton.icon(
+            onPressed: _busy || widget.bindings.createSnapshot == null
+                ? null
+                : _createSnapshot,
+            icon: const Icon(Icons.camera_alt_outlined),
+            label: const Text('立即创建快照'),
+          ),
+          const Divider(height: 32),
+        ],
+        Text('自动快照记录', style: Theme.of(context).textTheme.titleMedium),
         if (_snapshots.isEmpty)
           const ListTile(contentPadding: EdgeInsets.zero, title: Text('暂无快照')),
         for (final snapshot in _snapshots)

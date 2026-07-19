@@ -690,6 +690,36 @@ class $DepositsTable extends Deposits with TableInfo<$DepositsTable, Deposit> {
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _termValueMeta = const VerificationMeta(
+    'termValue',
+  );
+  @override
+  late final GeneratedColumn<int> termValue = GeneratedColumn<int>(
+    'term_value',
+    aliasedName,
+    true,
+    check: () => const CustomExpression<bool>(
+      'term_value IS NULL OR '
+      '(typeof(term_value) = \'integer\' AND term_value > 0)',
+    ),
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _termUnitMeta = const VerificationMeta(
+    'termUnit',
+  );
+  @override
+  late final GeneratedColumn<String> termUnit = GeneratedColumn<String>(
+    'term_unit',
+    aliasedName,
+    true,
+    check: () => const CustomExpression<bool>(
+      '(term_unit IS NULL AND term_value IS NULL) OR '
+      "(term_value > 0 AND term_unit IN ('day', 'month', 'year'))",
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _interestRateScaledMeta =
       const VerificationMeta('interestRateScaled');
   @override
@@ -805,6 +835,8 @@ class $DepositsTable extends Deposits with TableInfo<$DepositsTable, Deposit> {
     amountCents,
     bankName,
     productName,
+    termValue,
+    termUnit,
     interestRateScaled,
     ratePrecision,
     startDate,
@@ -864,6 +896,18 @@ class $DepositsTable extends Deposits with TableInfo<$DepositsTable, Deposit> {
           data['product_name']!,
           _productNameMeta,
         ),
+      );
+    }
+    if (data.containsKey('term_value')) {
+      context.handle(
+        _termValueMeta,
+        termValue.isAcceptableOrUnknown(data['term_value']!, _termValueMeta),
+      );
+    }
+    if (data.containsKey('term_unit')) {
+      context.handle(
+        _termUnitMeta,
+        termUnit.isAcceptableOrUnknown(data['term_unit']!, _termUnitMeta),
       );
     }
     if (data.containsKey('interest_rate_scaled')) {
@@ -986,6 +1030,14 @@ class $DepositsTable extends Deposits with TableInfo<$DepositsTable, Deposit> {
         DriftSqlType.string,
         data['${effectivePrefix}product_name'],
       )!,
+      termValue: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}term_value'],
+      ),
+      termUnit: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}term_unit'],
+      ),
       interestRateScaled: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}interest_rate_scaled'],
@@ -1037,6 +1089,8 @@ class Deposit extends DataClass implements Insertable<Deposit> {
   final int amountCents;
   final String bankName;
   final String productName;
+  final int? termValue;
+  final String? termUnit;
   final int interestRateScaled;
   final int ratePrecision;
   final String startDate;
@@ -1052,6 +1106,8 @@ class Deposit extends DataClass implements Insertable<Deposit> {
     required this.amountCents,
     required this.bankName,
     required this.productName,
+    this.termValue,
+    this.termUnit,
     required this.interestRateScaled,
     required this.ratePrecision,
     required this.startDate,
@@ -1070,6 +1126,12 @@ class Deposit extends DataClass implements Insertable<Deposit> {
     map['amount_cents'] = Variable<int>(amountCents);
     map['bank_name'] = Variable<String>(bankName);
     map['product_name'] = Variable<String>(productName);
+    if (!nullToAbsent || termValue != null) {
+      map['term_value'] = Variable<int>(termValue);
+    }
+    if (!nullToAbsent || termUnit != null) {
+      map['term_unit'] = Variable<String>(termUnit);
+    }
     map['interest_rate_scaled'] = Variable<int>(interestRateScaled);
     map['rate_precision'] = Variable<int>(ratePrecision);
     map['start_date'] = Variable<String>(startDate);
@@ -1091,6 +1153,12 @@ class Deposit extends DataClass implements Insertable<Deposit> {
       amountCents: Value(amountCents),
       bankName: Value(bankName),
       productName: Value(productName),
+      termValue: termValue == null && nullToAbsent
+          ? const Value.absent()
+          : Value(termValue),
+      termUnit: termUnit == null && nullToAbsent
+          ? const Value.absent()
+          : Value(termUnit),
       interestRateScaled: Value(interestRateScaled),
       ratePrecision: Value(ratePrecision),
       startDate: Value(startDate),
@@ -1116,6 +1184,8 @@ class Deposit extends DataClass implements Insertable<Deposit> {
       amountCents: serializer.fromJson<int>(json['amountCents']),
       bankName: serializer.fromJson<String>(json['bankName']),
       productName: serializer.fromJson<String>(json['productName']),
+      termValue: serializer.fromJson<int?>(json['termValue']),
+      termUnit: serializer.fromJson<String?>(json['termUnit']),
       interestRateScaled: serializer.fromJson<int>(json['interestRateScaled']),
       ratePrecision: serializer.fromJson<int>(json['ratePrecision']),
       startDate: serializer.fromJson<String>(json['startDate']),
@@ -1138,6 +1208,8 @@ class Deposit extends DataClass implements Insertable<Deposit> {
       'amountCents': serializer.toJson<int>(amountCents),
       'bankName': serializer.toJson<String>(bankName),
       'productName': serializer.toJson<String>(productName),
+      'termValue': serializer.toJson<int?>(termValue),
+      'termUnit': serializer.toJson<String?>(termUnit),
       'interestRateScaled': serializer.toJson<int>(interestRateScaled),
       'ratePrecision': serializer.toJson<int>(ratePrecision),
       'startDate': serializer.toJson<String>(startDate),
@@ -1156,6 +1228,8 @@ class Deposit extends DataClass implements Insertable<Deposit> {
     int? amountCents,
     String? bankName,
     String? productName,
+    Value<int?> termValue = const Value.absent(),
+    Value<String?> termUnit = const Value.absent(),
     int? interestRateScaled,
     int? ratePrecision,
     String? startDate,
@@ -1171,6 +1245,8 @@ class Deposit extends DataClass implements Insertable<Deposit> {
     amountCents: amountCents ?? this.amountCents,
     bankName: bankName ?? this.bankName,
     productName: productName ?? this.productName,
+    termValue: termValue.present ? termValue.value : this.termValue,
+    termUnit: termUnit.present ? termUnit.value : this.termUnit,
     interestRateScaled: interestRateScaled ?? this.interestRateScaled,
     ratePrecision: ratePrecision ?? this.ratePrecision,
     startDate: startDate ?? this.startDate,
@@ -1196,6 +1272,8 @@ class Deposit extends DataClass implements Insertable<Deposit> {
       productName: data.productName.present
           ? data.productName.value
           : this.productName,
+      termValue: data.termValue.present ? data.termValue.value : this.termValue,
+      termUnit: data.termUnit.present ? data.termUnit.value : this.termUnit,
       interestRateScaled: data.interestRateScaled.present
           ? data.interestRateScaled.value
           : this.interestRateScaled,
@@ -1230,6 +1308,8 @@ class Deposit extends DataClass implements Insertable<Deposit> {
           ..write('amountCents: $amountCents, ')
           ..write('bankName: $bankName, ')
           ..write('productName: $productName, ')
+          ..write('termValue: $termValue, ')
+          ..write('termUnit: $termUnit, ')
           ..write('interestRateScaled: $interestRateScaled, ')
           ..write('ratePrecision: $ratePrecision, ')
           ..write('startDate: $startDate, ')
@@ -1250,6 +1330,8 @@ class Deposit extends DataClass implements Insertable<Deposit> {
     amountCents,
     bankName,
     productName,
+    termValue,
+    termUnit,
     interestRateScaled,
     ratePrecision,
     startDate,
@@ -1269,6 +1351,8 @@ class Deposit extends DataClass implements Insertable<Deposit> {
           other.amountCents == this.amountCents &&
           other.bankName == this.bankName &&
           other.productName == this.productName &&
+          other.termValue == this.termValue &&
+          other.termUnit == this.termUnit &&
           other.interestRateScaled == this.interestRateScaled &&
           other.ratePrecision == this.ratePrecision &&
           other.startDate == this.startDate &&
@@ -1286,6 +1370,8 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
   final Value<int> amountCents;
   final Value<String> bankName;
   final Value<String> productName;
+  final Value<int?> termValue;
+  final Value<String?> termUnit;
   final Value<int> interestRateScaled;
   final Value<int> ratePrecision;
   final Value<String> startDate;
@@ -1302,6 +1388,8 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
     this.amountCents = const Value.absent(),
     this.bankName = const Value.absent(),
     this.productName = const Value.absent(),
+    this.termValue = const Value.absent(),
+    this.termUnit = const Value.absent(),
     this.interestRateScaled = const Value.absent(),
     this.ratePrecision = const Value.absent(),
     this.startDate = const Value.absent(),
@@ -1319,6 +1407,8 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
     required int amountCents,
     this.bankName = const Value.absent(),
     this.productName = const Value.absent(),
+    this.termValue = const Value.absent(),
+    this.termUnit = const Value.absent(),
     required int interestRateScaled,
     required int ratePrecision,
     required String startDate,
@@ -1346,6 +1436,8 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
     Expression<int>? amountCents,
     Expression<String>? bankName,
     Expression<String>? productName,
+    Expression<int>? termValue,
+    Expression<String>? termUnit,
     Expression<int>? interestRateScaled,
     Expression<int>? ratePrecision,
     Expression<String>? startDate,
@@ -1363,6 +1455,8 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
       if (amountCents != null) 'amount_cents': amountCents,
       if (bankName != null) 'bank_name': bankName,
       if (productName != null) 'product_name': productName,
+      if (termValue != null) 'term_value': termValue,
+      if (termUnit != null) 'term_unit': termUnit,
       if (interestRateScaled != null)
         'interest_rate_scaled': interestRateScaled,
       if (ratePrecision != null) 'rate_precision': ratePrecision,
@@ -1384,6 +1478,8 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
     Value<int>? amountCents,
     Value<String>? bankName,
     Value<String>? productName,
+    Value<int?>? termValue,
+    Value<String?>? termUnit,
     Value<int>? interestRateScaled,
     Value<int>? ratePrecision,
     Value<String>? startDate,
@@ -1401,6 +1497,8 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
       amountCents: amountCents ?? this.amountCents,
       bankName: bankName ?? this.bankName,
       productName: productName ?? this.productName,
+      termValue: termValue ?? this.termValue,
+      termUnit: termUnit ?? this.termUnit,
       interestRateScaled: interestRateScaled ?? this.interestRateScaled,
       ratePrecision: ratePrecision ?? this.ratePrecision,
       startDate: startDate ?? this.startDate,
@@ -1431,6 +1529,12 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
     }
     if (productName.present) {
       map['product_name'] = Variable<String>(productName.value);
+    }
+    if (termValue.present) {
+      map['term_value'] = Variable<int>(termValue.value);
+    }
+    if (termUnit.present) {
+      map['term_unit'] = Variable<String>(termUnit.value);
     }
     if (interestRateScaled.present) {
       map['interest_rate_scaled'] = Variable<int>(interestRateScaled.value);
@@ -1475,6 +1579,8 @@ class DepositsCompanion extends UpdateCompanion<Deposit> {
           ..write('amountCents: $amountCents, ')
           ..write('bankName: $bankName, ')
           ..write('productName: $productName, ')
+          ..write('termValue: $termValue, ')
+          ..write('termUnit: $termUnit, ')
           ..write('interestRateScaled: $interestRateScaled, ')
           ..write('ratePrecision: $ratePrecision, ')
           ..write('startDate: $startDate, ')
@@ -4119,6 +4225,324 @@ class DeviceSettingsCompanion extends UpdateCompanion<DeviceSetting> {
   }
 }
 
+class $DepositPresetsTable extends DepositPresets
+    with TableInfo<$DepositPresetsTable, DepositPreset> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DepositPresetsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _fieldTypeMeta = const VerificationMeta(
+    'fieldType',
+  );
+  @override
+  late final GeneratedColumn<String> fieldType = GeneratedColumn<String>(
+    'field_type',
+    aliasedName,
+    false,
+    check: () => const CustomExpression<bool>(
+      "field_type IN ('amount', 'bank', 'rate', 'term', 'product')",
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _valueMeta = const VerificationMeta('value');
+  @override
+  late final GeneratedColumn<String> value = GeneratedColumn<String>(
+    'value',
+    aliasedName,
+    false,
+    check: () => ComparableExpr(value.length).isBiggerThanValue(0),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtUtcMeta = const VerificationMeta(
+    'createdAtUtc',
+  );
+  @override
+  late final GeneratedColumn<int> createdAtUtc = GeneratedColumn<int>(
+    'created_at_utc',
+    aliasedName,
+    false,
+    check: () => utcEpochCheck('created_at_utc'),
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, fieldType, value, createdAtUtc];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'deposit_presets';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DepositPreset> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('field_type')) {
+      context.handle(
+        _fieldTypeMeta,
+        fieldType.isAcceptableOrUnknown(data['field_type']!, _fieldTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_fieldTypeMeta);
+    }
+    if (data.containsKey('value')) {
+      context.handle(
+        _valueMeta,
+        value.isAcceptableOrUnknown(data['value']!, _valueMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_valueMeta);
+    }
+    if (data.containsKey('created_at_utc')) {
+      context.handle(
+        _createdAtUtcMeta,
+        createdAtUtc.isAcceptableOrUnknown(
+          data['created_at_utc']!,
+          _createdAtUtcMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtUtcMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  DepositPreset map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DepositPreset(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      fieldType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}field_type'],
+      )!,
+      value: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}value'],
+      )!,
+      createdAtUtc: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at_utc'],
+      )!,
+    );
+  }
+
+  @override
+  $DepositPresetsTable createAlias(String alias) {
+    return $DepositPresetsTable(attachedDatabase, alias);
+  }
+}
+
+class DepositPreset extends DataClass implements Insertable<DepositPreset> {
+  final String id;
+  final String fieldType;
+  final String value;
+  final int createdAtUtc;
+  const DepositPreset({
+    required this.id,
+    required this.fieldType,
+    required this.value,
+    required this.createdAtUtc,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['field_type'] = Variable<String>(fieldType);
+    map['value'] = Variable<String>(value);
+    map['created_at_utc'] = Variable<int>(createdAtUtc);
+    return map;
+  }
+
+  DepositPresetsCompanion toCompanion(bool nullToAbsent) {
+    return DepositPresetsCompanion(
+      id: Value(id),
+      fieldType: Value(fieldType),
+      value: Value(value),
+      createdAtUtc: Value(createdAtUtc),
+    );
+  }
+
+  factory DepositPreset.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DepositPreset(
+      id: serializer.fromJson<String>(json['id']),
+      fieldType: serializer.fromJson<String>(json['fieldType']),
+      value: serializer.fromJson<String>(json['value']),
+      createdAtUtc: serializer.fromJson<int>(json['createdAtUtc']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'fieldType': serializer.toJson<String>(fieldType),
+      'value': serializer.toJson<String>(value),
+      'createdAtUtc': serializer.toJson<int>(createdAtUtc),
+    };
+  }
+
+  DepositPreset copyWith({
+    String? id,
+    String? fieldType,
+    String? value,
+    int? createdAtUtc,
+  }) => DepositPreset(
+    id: id ?? this.id,
+    fieldType: fieldType ?? this.fieldType,
+    value: value ?? this.value,
+    createdAtUtc: createdAtUtc ?? this.createdAtUtc,
+  );
+  DepositPreset copyWithCompanion(DepositPresetsCompanion data) {
+    return DepositPreset(
+      id: data.id.present ? data.id.value : this.id,
+      fieldType: data.fieldType.present ? data.fieldType.value : this.fieldType,
+      value: data.value.present ? data.value.value : this.value,
+      createdAtUtc: data.createdAtUtc.present
+          ? data.createdAtUtc.value
+          : this.createdAtUtc,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DepositPreset(')
+          ..write('id: $id, ')
+          ..write('fieldType: $fieldType, ')
+          ..write('value: $value, ')
+          ..write('createdAtUtc: $createdAtUtc')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, fieldType, value, createdAtUtc);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DepositPreset &&
+          other.id == this.id &&
+          other.fieldType == this.fieldType &&
+          other.value == this.value &&
+          other.createdAtUtc == this.createdAtUtc);
+}
+
+class DepositPresetsCompanion extends UpdateCompanion<DepositPreset> {
+  final Value<String> id;
+  final Value<String> fieldType;
+  final Value<String> value;
+  final Value<int> createdAtUtc;
+  final Value<int> rowid;
+  const DepositPresetsCompanion({
+    this.id = const Value.absent(),
+    this.fieldType = const Value.absent(),
+    this.value = const Value.absent(),
+    this.createdAtUtc = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DepositPresetsCompanion.insert({
+    required String id,
+    required String fieldType,
+    required String value,
+    required int createdAtUtc,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       fieldType = Value(fieldType),
+       value = Value(value),
+       createdAtUtc = Value(createdAtUtc);
+  static Insertable<DepositPreset> custom({
+    Expression<String>? id,
+    Expression<String>? fieldType,
+    Expression<String>? value,
+    Expression<int>? createdAtUtc,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (fieldType != null) 'field_type': fieldType,
+      if (value != null) 'value': value,
+      if (createdAtUtc != null) 'created_at_utc': createdAtUtc,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DepositPresetsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? fieldType,
+    Value<String>? value,
+    Value<int>? createdAtUtc,
+    Value<int>? rowid,
+  }) {
+    return DepositPresetsCompanion(
+      id: id ?? this.id,
+      fieldType: fieldType ?? this.fieldType,
+      value: value ?? this.value,
+      createdAtUtc: createdAtUtc ?? this.createdAtUtc,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (fieldType.present) {
+      map['field_type'] = Variable<String>(fieldType.value);
+    }
+    if (value.present) {
+      map['value'] = Variable<String>(value.value);
+    }
+    if (createdAtUtc.present) {
+      map['created_at_utc'] = Variable<int>(createdAtUtc.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DepositPresetsCompanion(')
+          ..write('id: $id, ')
+          ..write('fieldType: $fieldType, ')
+          ..write('value: $value, ')
+          ..write('createdAtUtc: $createdAtUtc, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $NotificationIdMappingsTable extends NotificationIdMappings
     with TableInfo<$NotificationIdMappingsTable, NotificationIdMapping> {
   @override
@@ -4423,6 +4847,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this,
   );
   late final $DeviceSettingsTable deviceSettings = $DeviceSettingsTable(this);
+  late final $DepositPresetsTable depositPresets = $DepositPresetsTable(this);
   late final $NotificationIdMappingsTable notificationIdMappings =
       $NotificationIdMappingsTable(this);
   late final Index customersNormalizedNameIdx = Index(
@@ -4461,6 +4886,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'import_batches_content_hash_idx',
     'CREATE UNIQUE INDEX import_batches_content_hash_idx ON import_batches (content_hash COLLATE NOCASE)',
   );
+  late final Index depositPresetsFieldTypeValueIdx = Index(
+    'deposit_presets_field_type_value_idx',
+    'CREATE UNIQUE INDEX deposit_presets_field_type_value_idx ON deposit_presets (field_type, value)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4474,6 +4903,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     importBatches,
     businessSettings,
     deviceSettings,
+    depositPresets,
     notificationIdMappings,
     customersNormalizedNameIdx,
     customersFullPinyinIdx,
@@ -4484,6 +4914,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     depositsExpiryLifecycleCustomerIdx,
     messageTemplatesSingleDefaultIdx,
     importBatchesContentHashIdx,
+    depositPresetsFieldTypeValueIdx,
   ];
 }
 
@@ -4901,6 +5332,8 @@ typedef $$DepositsTableCreateCompanionBuilder =
       required int amountCents,
       Value<String> bankName,
       Value<String> productName,
+      Value<int?> termValue,
+      Value<String?> termUnit,
       required int interestRateScaled,
       required int ratePrecision,
       required String startDate,
@@ -4919,6 +5352,8 @@ typedef $$DepositsTableUpdateCompanionBuilder =
       Value<int> amountCents,
       Value<String> bankName,
       Value<String> productName,
+      Value<int?> termValue,
+      Value<String?> termUnit,
       Value<int> interestRateScaled,
       Value<int> ratePrecision,
       Value<String> startDate,
@@ -5022,6 +5457,16 @@ class $$DepositsTableFilterComposer
 
   ColumnFilters<String> get productName => $composableBuilder(
     column: $table.productName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get termValue => $composableBuilder(
+    column: $table.termValue,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get termUnit => $composableBuilder(
+    column: $table.termUnit,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5173,6 +5618,16 @@ class $$DepositsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get termValue => $composableBuilder(
+    column: $table.termValue,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get termUnit => $composableBuilder(
+    column: $table.termUnit,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get interestRateScaled => $composableBuilder(
     column: $table.interestRateScaled,
     builder: (column) => ColumnOrderings(column),
@@ -5266,6 +5721,12 @@ class $$DepositsTableAnnotationComposer
     column: $table.productName,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get termValue =>
+      $composableBuilder(column: $table.termValue, builder: (column) => column);
+
+  GeneratedColumn<String> get termUnit =>
+      $composableBuilder(column: $table.termUnit, builder: (column) => column);
 
   GeneratedColumn<int> get interestRateScaled => $composableBuilder(
     column: $table.interestRateScaled,
@@ -5419,6 +5880,8 @@ class $$DepositsTableTableManager
                 Value<int> amountCents = const Value.absent(),
                 Value<String> bankName = const Value.absent(),
                 Value<String> productName = const Value.absent(),
+                Value<int?> termValue = const Value.absent(),
+                Value<String?> termUnit = const Value.absent(),
                 Value<int> interestRateScaled = const Value.absent(),
                 Value<int> ratePrecision = const Value.absent(),
                 Value<String> startDate = const Value.absent(),
@@ -5435,6 +5898,8 @@ class $$DepositsTableTableManager
                 amountCents: amountCents,
                 bankName: bankName,
                 productName: productName,
+                termValue: termValue,
+                termUnit: termUnit,
                 interestRateScaled: interestRateScaled,
                 ratePrecision: ratePrecision,
                 startDate: startDate,
@@ -5453,6 +5918,8 @@ class $$DepositsTableTableManager
                 required int amountCents,
                 Value<String> bankName = const Value.absent(),
                 Value<String> productName = const Value.absent(),
+                Value<int?> termValue = const Value.absent(),
+                Value<String?> termUnit = const Value.absent(),
                 required int interestRateScaled,
                 required int ratePrecision,
                 required String startDate,
@@ -5469,6 +5936,8 @@ class $$DepositsTableTableManager
                 amountCents: amountCents,
                 bankName: bankName,
                 productName: productName,
+                termValue: termValue,
+                termUnit: termUnit,
                 interestRateScaled: interestRateScaled,
                 ratePrecision: ratePrecision,
                 startDate: startDate,
@@ -7170,6 +7639,191 @@ typedef $$DeviceSettingsTableProcessedTableManager =
       DeviceSetting,
       PrefetchHooks Function()
     >;
+typedef $$DepositPresetsTableCreateCompanionBuilder =
+    DepositPresetsCompanion Function({
+      required String id,
+      required String fieldType,
+      required String value,
+      required int createdAtUtc,
+      Value<int> rowid,
+    });
+typedef $$DepositPresetsTableUpdateCompanionBuilder =
+    DepositPresetsCompanion Function({
+      Value<String> id,
+      Value<String> fieldType,
+      Value<String> value,
+      Value<int> createdAtUtc,
+      Value<int> rowid,
+    });
+
+class $$DepositPresetsTableFilterComposer
+    extends Composer<_$AppDatabase, $DepositPresetsTable> {
+  $$DepositPresetsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get fieldType => $composableBuilder(
+    column: $table.fieldType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAtUtc => $composableBuilder(
+    column: $table.createdAtUtc,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$DepositPresetsTableOrderingComposer
+    extends Composer<_$AppDatabase, $DepositPresetsTable> {
+  $$DepositPresetsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get fieldType => $composableBuilder(
+    column: $table.fieldType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAtUtc => $composableBuilder(
+    column: $table.createdAtUtc,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DepositPresetsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DepositPresetsTable> {
+  $$DepositPresetsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get fieldType =>
+      $composableBuilder(column: $table.fieldType, builder: (column) => column);
+
+  GeneratedColumn<String> get value =>
+      $composableBuilder(column: $table.value, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAtUtc => $composableBuilder(
+    column: $table.createdAtUtc,
+    builder: (column) => column,
+  );
+}
+
+class $$DepositPresetsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DepositPresetsTable,
+          DepositPreset,
+          $$DepositPresetsTableFilterComposer,
+          $$DepositPresetsTableOrderingComposer,
+          $$DepositPresetsTableAnnotationComposer,
+          $$DepositPresetsTableCreateCompanionBuilder,
+          $$DepositPresetsTableUpdateCompanionBuilder,
+          (
+            DepositPreset,
+            BaseReferences<_$AppDatabase, $DepositPresetsTable, DepositPreset>,
+          ),
+          DepositPreset,
+          PrefetchHooks Function()
+        > {
+  $$DepositPresetsTableTableManager(
+    _$AppDatabase db,
+    $DepositPresetsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DepositPresetsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DepositPresetsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DepositPresetsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> fieldType = const Value.absent(),
+                Value<String> value = const Value.absent(),
+                Value<int> createdAtUtc = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DepositPresetsCompanion(
+                id: id,
+                fieldType: fieldType,
+                value: value,
+                createdAtUtc: createdAtUtc,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String fieldType,
+                required String value,
+                required int createdAtUtc,
+                Value<int> rowid = const Value.absent(),
+              }) => DepositPresetsCompanion.insert(
+                id: id,
+                fieldType: fieldType,
+                value: value,
+                createdAtUtc: createdAtUtc,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$DepositPresetsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DepositPresetsTable,
+      DepositPreset,
+      $$DepositPresetsTableFilterComposer,
+      $$DepositPresetsTableOrderingComposer,
+      $$DepositPresetsTableAnnotationComposer,
+      $$DepositPresetsTableCreateCompanionBuilder,
+      $$DepositPresetsTableUpdateCompanionBuilder,
+      (
+        DepositPreset,
+        BaseReferences<_$AppDatabase, $DepositPresetsTable, DepositPreset>,
+      ),
+      DepositPreset,
+      PrefetchHooks Function()
+    >;
 typedef $$NotificationIdMappingsTableCreateCompanionBuilder =
     NotificationIdMappingsCompanion Function({
       required String entityId,
@@ -7375,6 +8029,8 @@ class $AppDatabaseManager {
       $$BusinessSettingsTableTableManager(_db, _db.businessSettings);
   $$DeviceSettingsTableTableManager get deviceSettings =>
       $$DeviceSettingsTableTableManager(_db, _db.deviceSettings);
+  $$DepositPresetsTableTableManager get depositPresets =>
+      $$DepositPresetsTableTableManager(_db, _db.depositPresets);
   $$NotificationIdMappingsTableTableManager get notificationIdMappings =>
       $$NotificationIdMappingsTableTableManager(
         _db,

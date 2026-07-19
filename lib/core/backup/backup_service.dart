@@ -140,6 +140,7 @@ class BackupService {
     String? outputPath,
     bool automatic = false,
     String automaticOperation = 'export',
+    int? automaticRetentionCount,
   }) async {
     final now = _nowUtc().toUtc();
     final file = outputPath == null
@@ -160,11 +161,13 @@ class BackupService {
     }
     final encoded = (await buildBackupArchive()).bytes;
     if (automatic) {
-      return snapshots.writeAutomatic(encoded, now, automaticOperation, (
-        temporary,
-      ) async {
-        await inspectBackup(temporary.path);
-      });
+      return snapshots.writeAutomatic(
+        encoded,
+        now,
+        automaticOperation,
+        (temporary) async => inspectBackup(temporary.path),
+        retentionCount: automaticRetentionCount,
+      );
     }
     await _writeAtomically(file, encoded);
     return file;
@@ -194,7 +197,7 @@ class BackupService {
       if (manifest.formatVersion != 1) {
         throw const BackupIntegrityException('Unsupported format version');
       }
-      if (!{3, 4, database.schemaVersion}.contains(manifest.schemaVersion)) {
+      if (!{3, 4, 5, database.schemaVersion}.contains(manifest.schemaVersion)) {
         throw const BackupIntegrityException('Unsupported schema version');
       }
       final payload = entries['data.json']!;
@@ -253,6 +256,17 @@ class BackupService {
             );
           }
           row['product_name'] = '';
+        }
+      }
+      if (manifest.schemaVersion < 6) {
+        for (final row in data['deposits']!) {
+          if (row['term_value'] != null || row['term_unit'] != null) {
+            throw BackupIntegrityException(
+              'Invalid v${manifest.schemaVersion} deposit row structure',
+            );
+          }
+          row['term_value'] = null;
+          row['term_unit'] = null;
         }
       }
       _validateRows(data);
@@ -314,8 +328,23 @@ class BackupService {
     return RestoreImpact(lostRecords: lost, businessRevision: businessRevision);
   }
 
-  Future<File> createAutomaticSnapshot(String operation) =>
-      exportBackup(automatic: true, automaticOperation: operation);
+  Future<File> createAutomaticSnapshot(String operation) async {
+    final settings = await database.getDeviceSettings();
+    return exportBackup(
+      automatic: true,
+      automaticOperation: operation,
+      automaticRetentionCount: settings.snapshotRetentionCount,
+    );
+  }
+
+  Future<File> createAutomaticSnapshotWithRetention(
+    String operation, {
+    required int retentionCount,
+  }) => exportBackup(
+    automatic: true,
+    automaticOperation: operation,
+    automaticRetentionCount: retentionCount,
+  );
 
   Future<List<SnapshotInfo>> listSnapshots() => snapshots.listAutomatic();
 
@@ -388,6 +417,8 @@ class BackupService {
         'amount_cents',
         'bank_name',
         'product_name',
+        'term_value',
+        'term_unit',
         'interest_rate_scaled',
         'rate_precision',
         'start_date',
@@ -470,6 +501,7 @@ class BackupService {
       'business_revision',
       'imported_rows',
       'rejected_rows',
+      'term_value',
       'singleton_id',
       'is_active',
       'is_default',
@@ -477,12 +509,14 @@ class BackupService {
     const nullable = {
       'phone',
       'calculated_expiry_date',
+      'term_value',
+      'term_unit',
       'before_json',
       'after_json',
     };
     for (final e in row.entries) {
       final v = e.value;
-      if (ints.contains(e.key) && v is! int) return false;
+      if (ints.contains(e.key) && v != null && v is! int) return false;
       if ((e.key == 'is_active' || e.key == 'is_default') && v != 0 && v != 1) {
         return false;
       }
@@ -496,6 +530,13 @@ class BackupService {
       }
     }
     if (table == 'deposits') {
+      final termValue = row['term_value'];
+      final termUnit = row['term_unit'];
+      if ((termValue == null) != (termUnit == null) ||
+          (termValue is int && termValue <= 0) ||
+          (termUnit != null && !{'day', 'month', 'year'}.contains(termUnit))) {
+        return false;
+      }
       final p = row['rate_precision'];
       if (p is! int || p < 0 || p > 9) return false;
       if (row['amount_cents'] is! int || (row['amount_cents'] as int) <= 0) {

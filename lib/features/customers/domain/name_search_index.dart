@@ -62,12 +62,14 @@ final class CustomerSearchDeposit {
   const CustomerSearchDeposit({
     required this.id,
     required this.bankName,
+    this.productName = '',
     required this.finalExpiryDate,
     required this.lifecycle,
   });
 
   final String id;
   final String bankName;
+  final String productName;
   final LocalDate finalExpiryDate;
   final DepositLifecycle lifecycle;
 }

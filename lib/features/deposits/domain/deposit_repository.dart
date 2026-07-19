@@ -1,6 +1,8 @@
 import 'deposit.dart';
 import 'local_date.dart';
 
+enum DepositTermUnit { day, month, year }
+
 final class DepositDraft {
   const DepositDraft({
     required this.id,
@@ -8,6 +10,8 @@ final class DepositDraft {
     required this.amountCents,
     this.bankName = '',
     this.productName = '',
+    this.termValue,
+    this.termUnit,
     required this.interestRateScaled,
     required this.ratePrecision,
     required this.startDate,
@@ -20,6 +24,8 @@ final class DepositDraft {
   final int amountCents;
   final String bankName;
   final String productName;
+  final int? termValue;
+  final DepositTermUnit? termUnit;
   final int interestRateScaled;
   final int ratePrecision;
   final LocalDate startDate;
@@ -34,6 +40,8 @@ final class StoredDeposit {
     required this.amountCents,
     required this.bankName,
     this.productName = '',
+    this.termValue,
+    this.termUnit,
     required this.interestRateScaled,
     required this.ratePrecision,
     required this.startDate,
@@ -44,6 +52,8 @@ final class StoredDeposit {
   final int amountCents;
   final String bankName;
   final String productName;
+  final int? termValue;
+  final DepositTermUnit? termUnit;
   final int interestRateScaled;
   final int ratePrecision;
   final LocalDate startDate;

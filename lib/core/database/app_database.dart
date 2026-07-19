@@ -16,6 +16,7 @@ part 'app_database.g.dart';
     ImportBatches,
     BusinessSettings,
     DeviceSettings,
+    DepositPresets,
     NotificationIdMappings,
   ],
 )
@@ -26,7 +27,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : this(executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -142,6 +143,30 @@ WHERE duplicate_rank > 1
           ).insert(DeviceSettingsCompanion.insert(singletonId: const Value(1)));
         });
       }
+      if (from < 6) {
+        await transaction(() async {
+          final depositsTable = await customSelect(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' "
+            "AND name = 'deposits'",
+          ).get();
+          final columns = await customSelect(
+            'PRAGMA table_info(deposits)',
+          ).get();
+          final names = columns.map((row) => row.read<String>('name')).toSet();
+          if (depositsTable.isNotEmpty) {
+            if (!names.contains('term_value')) {
+              await migrator.addColumn(deposits, deposits.termValue);
+            }
+            if (!names.contains('term_unit')) {
+              await migrator.addColumn(deposits, deposits.termUnit);
+            }
+          }
+          final presetsTable = await customSelect(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'deposit_presets'",
+          ).get();
+          if (presetsTable.isEmpty) await migrator.createTable(depositPresets);
+        });
+      }
     },
     beforeOpen: (_) async {
       await customStatement('PRAGMA foreign_keys = ON');
@@ -201,6 +226,46 @@ WHERE duplicate_rank > 1
       businessSettings,
     )..where((settings) => settings.singletonId.equals(1))).getSingle();
     return row.businessRevision;
+  }
+
+  Future<DeviceSetting> getDeviceSettings() => (select(
+    deviceSettings,
+  )..where((row) => row.singletonId.equals(1))).getSingle();
+
+  Future<void> updateDeviceSettings({
+    bool? autoSnapshotEnabled,
+    int? snapshotIntervalDays,
+    int? snapshotRetentionCount,
+  }) async {
+    await (update(
+      deviceSettings,
+    )..where((row) => row.singletonId.equals(1))).write(
+      DeviceSettingsCompanion(
+        autoSnapshotEnabled: autoSnapshotEnabled == null
+            ? const Value.absent()
+            : Value(autoSnapshotEnabled),
+        snapshotIntervalDays: snapshotIntervalDays == null
+            ? const Value.absent()
+            : Value(snapshotIntervalDays),
+        snapshotRetentionCount: snapshotRetentionCount == null
+            ? const Value.absent()
+            : Value(snapshotRetentionCount),
+      ),
+    );
+  }
+
+  Future<void> markSnapshotCreated({
+    required DateTime createdAtUtc,
+    required int businessRevision,
+  }) async {
+    await (update(
+      deviceSettings,
+    )..where((row) => row.singletonId.equals(1))).write(
+      DeviceSettingsCompanion(
+        lastSnapshotAtUtc: Value(createdAtUtc.toUtc().millisecondsSinceEpoch),
+        lastSnapshotBusinessRevision: Value(businessRevision),
+      ),
+    );
   }
 
   Future<int> incrementBusinessRevision() async {
