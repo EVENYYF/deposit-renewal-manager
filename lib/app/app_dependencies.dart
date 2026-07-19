@@ -2,7 +2,9 @@ import 'package:clock/clock.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
+import '../core/backup/backup_service.dart';
 import '../core/database/app_database.dart';
 import '../core/database/daos/customer_dao.dart';
 import '../core/database/daos/deposit_dao.dart';
@@ -16,24 +18,52 @@ import '../features/dashboard/application/dashboard_controller.dart';
 import '../features/deposits/application/deposit_workflow_controller.dart';
 import '../features/deposits/domain/deposit.dart' as domain;
 import '../features/deposits/domain/deposit_repository.dart';
+import '../features/deposits/domain/expiry_calculator.dart';
 import '../features/deposits/domain/local_date.dart';
 import '../features/deposits/domain/reminder_buckets.dart';
+import '../features/excel_import/application/duplicate_resolver.dart';
+import '../features/excel_import/application/import_commit_service.dart';
+import '../features/excel_import/application/xlsx_preview_service.dart';
+import '../features/excel_import/presentation/import_wizard.dart';
+import '../features/text_import/domain/text_deposit_parser.dart';
 
 const String localSourceDeviceId = 'local-device';
+
+final appDatabaseProvider = Provider<AppDatabase>(
+  (ref) => throw StateError('Application database is not configured'),
+);
+
+final backupServiceProvider = Provider<BackupService>(
+  (ref) => throw StateError('Backup service is not configured'),
+);
+
+final excelImportBindingsProvider = Provider<ExcelImportBindings>(
+  (ref) => throw StateError('Excel import is not configured'),
+);
+
+typedef ConfirmedTextImport = Future<void> Function(ParseResult result);
+
+final confirmedTextImportProvider = Provider<ConfirmedTextImport>(
+  (ref) => throw StateError('Text import is not configured'),
+);
 
 class ApplicationProviderScope extends StatelessWidget {
   const ApplicationProviderScope({
     required this.database,
     required this.notificationScheduler,
+    required this.backupService,
     required this.child,
     super.key,
   });
   final AppDatabase database;
   final NotificationScheduler notificationScheduler;
+  final BackupService backupService;
   final Widget child;
   @override
   Widget build(BuildContext context) => ProviderScope(
     overrides: [
+      appDatabaseProvider.overrideWithValue(database),
+      backupServiceProvider.overrideWithValue(backupService),
       notificationSchedulerProvider.overrideWithValue(notificationScheduler),
       customerUseCasesProvider.overrideWith(
         (ref) => SqliteCustomerUseCases(
@@ -57,6 +87,85 @@ class ApplicationProviderScope extends StatelessWidget {
       dashboardUseCasesProvider.overrideWith(
         (ref) => SqliteDashboardUseCases(database),
       ),
+      excelImportBindingsProvider.overrideWith((ref) {
+        final preview = const XlsxPreviewService();
+        final resolver = DuplicateResolver(database);
+        final commit = ImportCommitService(
+          database: database,
+          sourceDeviceId: localSourceDeviceId,
+          createSnapshot: () => backupService.exportBackup(
+            automatic: true,
+            automaticOperation: 'excel_import',
+          ),
+          notificationReconcile: (_) =>
+              ref.read(notificationMutationCoordinatorProvider).reconcileAll(),
+        );
+        return ExcelImportBindings(
+          preview: preview.previewBytes,
+          resolve: resolver.resolvePreview,
+          commit: (file, result, decisions) => commit.commit(
+            fileName: file.name,
+            fileBytes: file.bytes,
+            preview: result,
+            decisions: decisions,
+          ),
+        );
+      }),
+      confirmedTextImportProvider.overrideWith((ref) {
+        final customers = CustomerDao(
+          database,
+          sourceDeviceId: localSourceDeviceId,
+        );
+        final deposits = DepositDao(
+          database,
+          sourceDeviceId: localSourceDeviceId,
+          notificationCoordinator: ref.read(
+            notificationMutationCoordinatorProvider,
+          ),
+        );
+        return (result) async {
+          final name = result.name?.trim();
+          final amount = result.amountCents;
+          final start = result.depositDate;
+          final calculated = result.term == null || start == null
+              ? null
+              : ExpiryCalculator().calculate(start, result.term!);
+          final expiry = result.expiryDate ?? calculated;
+          if (name == null ||
+              name.isEmpty ||
+              amount == null ||
+              start == null ||
+              expiry == null) {
+            throw const FormatException('姓名、金额、存入日期和到期信息必须完整');
+          }
+          final customerId = const Uuid().v4();
+          final depositId = const Uuid().v4();
+          final rate = result.interestRatePercent ?? 0;
+          await database.transaction(() async {
+            await customers.create(
+              CustomerDraft(id: customerId, name: name, phone: result.phone),
+            );
+            await deposits.create(
+              DepositDraft(
+                id: depositId,
+                customerId: customerId,
+                amountCents: amount,
+                bankName: [result.bank, result.product]
+                    .whereType<String>()
+                    .where((value) => value.trim().isNotEmpty)
+                    .join(' '),
+                interestRateScaled: (rate * 100).round(),
+                ratePrecision: 2,
+                startDate: start,
+                calculatedExpiryDate: calculated,
+                finalExpiryDate: expiry,
+              ),
+            );
+          });
+          ref.invalidate(customerControllerProvider);
+          ref.invalidate(dashboardControllerProvider);
+        };
+      }),
     ],
     child: child,
   );

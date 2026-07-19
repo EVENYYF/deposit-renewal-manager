@@ -78,6 +78,8 @@ final class ParseResult {
 }
 
 final class TextDepositParser {
+  const TextDepositParser();
+
   ParseResult parse(String source) {
     final normalized = _normalize(source);
     final located = <_LocatedCandidate>[];

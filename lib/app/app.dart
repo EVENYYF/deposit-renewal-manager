@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/database/app_database.dart';
+import '../core/backup/backup_service.dart';
 import '../core/notifications/notification_scheduler.dart';
 import 'app_dependencies.dart';
 import 'router.dart';
@@ -13,6 +14,7 @@ class DepositRenewalApp extends StatefulWidget {
   const DepositRenewalApp({
     this.themeMode = ThemeMode.light,
     this.database,
+    this.backupService,
     this.notificationScheduler,
     this.notificationTapDispatcher,
     this.notificationInitializationError,
@@ -21,6 +23,7 @@ class DepositRenewalApp extends StatefulWidget {
 
   final ThemeMode themeMode;
   final AppDatabase? database;
+  final BackupService? backupService;
   final NotificationScheduler? notificationScheduler;
   final NotificationTapDispatcher? notificationTapDispatcher;
   final String? notificationInitializationError;
@@ -44,8 +47,15 @@ final class _DepositRenewalAppState extends State<DepositRenewalApp> {
       child: _DepositRenewalMaterialApp(themeMode: widget.themeMode),
     );
     if (widget.database != null) {
+      final backupService =
+          widget.backupService ??
+          BackupService(
+            database: widget.database!,
+            sourceDevice: localSourceDeviceId,
+          );
       return ApplicationProviderScope(
         database: widget.database!,
+        backupService: backupService,
         notificationScheduler:
             widget.notificationScheduler ??
             const UnsupportedNotificationScheduler(),
