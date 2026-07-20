@@ -410,6 +410,7 @@ class _DepositFormPageState extends ConsumerState<DepositFormPage> {
       onTap: () async {
         final selected = await showDatePicker(
           context: context,
+          locale: const Locale('zh', 'CN'),
           initialDate: _tryDateTime(controller.text) ?? DateTime.now(),
           firstDate: DateTime(1900),
           lastDate: DateTime(2200),

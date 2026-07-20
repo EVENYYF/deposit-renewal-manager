@@ -8,10 +8,34 @@ import 'package:deposit_renewal_manager/features/deposits/domain/local_date.dart
 import 'package:deposit_renewal_manager/features/deposits/domain/product_catalog_repository.dart';
 import 'package:deposit_renewal_manager/features/deposits/presentation/deposit_form_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('日期选择器使用中文', (tester) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          supportedLocales: [Locale('zh', 'CN')],
+          home: Scaffold(body: DepositFormPage()),
+        ),
+      ),
+    );
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('start-date')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const Key('start-date')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('取消'), findsOneWidget);
+    expect(find.text('确定'), findsOneWidget);
+  });
+
   testWidgets('matches catalog rate by bank, product and start date', (
     tester,
   ) async {
