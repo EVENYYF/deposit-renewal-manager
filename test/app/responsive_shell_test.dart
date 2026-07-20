@@ -1,12 +1,13 @@
 import 'package:deposit_renewal_manager/app/app.dart';
 import 'package:deposit_renewal_manager/app/router.dart';
+import 'package:deposit_renewal_manager/features/templates/presentation/templates_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
 void main() {
-  const destinations = ['首页', '客户', '新增', '模板', '设置'];
+  const destinations = ['首页', '客户', '新增', '设置'];
 
   void setSize(WidgetTester tester, Size size) {
     tester.view.devicePixelRatio = 1;
@@ -15,7 +16,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
   }
 
-  testWidgets('uses bottom navigation with five destinations on a phone', (
+  testWidgets('uses bottom navigation with four destinations on a phone', (
     tester,
   ) async {
     setSize(tester, const Size(390, 844));
@@ -28,6 +29,20 @@ void main() {
     for (final destination in destinations) {
       expect(find.text(destination), findsWidgets);
     }
+  });
+
+  testWidgets('opens templates from settings', (tester) async {
+    setSize(tester, const Size(390, 844));
+
+    await tester.pumpWidget(const DepositRenewalApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('设置').last);
+    await tester.pumpAndSettle();
+    expect(find.text('消息模板'), findsOneWidget);
+
+    await tester.tap(find.text('消息模板'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TemplatesPage), findsOneWidget);
   });
 
   testWidgets('uses a navigation rail on a wide window', (tester) async {

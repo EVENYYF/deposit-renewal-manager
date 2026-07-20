@@ -18,11 +18,6 @@ const _destinations = <NavigationDestination>[
     label: '新增',
   ),
   NavigationDestination(
-    icon: Icon(Icons.description_outlined),
-    selectedIcon: Icon(Icons.description),
-    label: '模板',
-  ),
-  NavigationDestination(
     icon: Icon(Icons.settings_outlined),
     selectedIcon: Icon(Icons.settings),
     label: '设置',
@@ -44,11 +39,6 @@ const _railDestinations = <NavigationRailDestination>[
     icon: Icon(Icons.add_circle_outline),
     selectedIcon: Icon(Icons.add_circle),
     label: Text('新增'),
-  ),
-  NavigationRailDestination(
-    icon: Icon(Icons.description_outlined),
-    selectedIcon: Icon(Icons.description),
-    label: Text('模板'),
   ),
   NavigationRailDestination(
     icon: Icon(Icons.settings_outlined),

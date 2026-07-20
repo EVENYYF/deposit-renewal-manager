@@ -20,7 +20,6 @@ abstract final class AppRouteNames {
   static const dashboard = 'dashboard';
   static const customers = 'customers';
   static const addDeposit = 'addDeposit';
-  static const templates = 'templates';
   static const settings = 'settings';
   static const notification = 'notification';
 }
@@ -62,7 +61,6 @@ GoRouter createAppRouter({String initialLocation = '/'}) => GoRouter(
           '/deposits/new',
           const _NewEntryPage(),
         ),
-        _branch(AppRouteNames.templates, '/templates', const _TemplatesRoute()),
         _branch(AppRouteNames.settings, '/settings', const _SettingsPage()),
       ],
     ),
@@ -171,14 +169,6 @@ class _NewEntryPage extends ConsumerWidget {
   }
 }
 
-class _TemplatesRoute extends ConsumerWidget {
-  const _TemplatesRoute();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) =>
-      TemplatesPage(bindings: ref.watch(templateBindingsProvider));
-}
-
 class _SettingsPage extends ConsumerWidget {
   const _SettingsPage();
 
@@ -189,6 +179,19 @@ class _SettingsPage extends ConsumerWidget {
       Text('设置', style: Theme.of(context).textTheme.headlineSmall),
       const SizedBox(height: 16),
       const NotificationStatusBanner(),
+      ListTile(
+        leading: const Icon(Icons.description_outlined),
+        title: const Text('消息模板'),
+        subtitle: const Text('管理续期提示语模板'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => TemplatesPage(
+              bindings: ref.read(templateBindingsProvider),
+            ),
+          ),
+        ),
+      ),
       ListTile(
         leading: const Icon(Icons.query_stats),
         title: const Text('存款统计'),
