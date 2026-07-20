@@ -8,7 +8,9 @@ import '../application/customer_history_service.dart';
 import '../domain/customer_repository.dart';
 import '../domain/name_search_index.dart';
 import '../../deposits/domain/deposit.dart';
+import '../../deposits/domain/deposit_repository.dart';
 import '../../deposits/domain/local_date.dart';
+import '../../deposits/application/deposit_workflow_controller.dart';
 import '../../deposits/presentation/deposit_form_page.dart';
 
 class CustomerDirectoryPage extends ConsumerStatefulWidget {
@@ -363,8 +365,11 @@ class _CustomerCard extends ConsumerStatefulWidget {
   ConsumerState<_CustomerCard> createState() => _CustomerCardState();
 }
 
+enum _DepositDetailAction { renew, stop, edit }
+
 class _CustomerCardState extends ConsumerState<_CustomerCard> {
   Future<List<CustomerDepositChain>>? _chains;
+  final _mutatingDeposits = <String>{};
 
   CustomerSearchResult get result => widget.result;
 
@@ -376,9 +381,8 @@ class _CustomerCardState extends ConsumerState<_CustomerCard> {
     }
   }
 
-  Future<List<CustomerDepositChain>> _loadDepositChains() => ref
-      .read(customerDepositHistoryUseCasesProvider)
-      .load(widget.result);
+  Future<List<CustomerDepositChain>> _loadDepositChains() =>
+      ref.read(customerDepositHistoryUseCasesProvider).load(widget.result);
 
   void _loadDeposits() {
     _chains ??= _loadDepositChains();
@@ -541,7 +545,7 @@ class _CustomerCardState extends ConsumerState<_CustomerCard> {
     CustomerDepositVersion deposit,
   ) async {
     final appearance = _appearance(deposit);
-    await showDialog<void>(
+    final action = await showDialog<_DepositDetailAction>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('存款详情'),
@@ -580,18 +584,41 @@ class _CustomerCardState extends ConsumerState<_CustomerCard> {
             child: const Text('关闭'),
           ),
           if (deposit.lifecycle == DepositLifecycle.active &&
-              deposit.editableDraft != null)
+              deposit.editableDraft != null &&
+              !_mutatingDeposits.contains(deposit.id)) ...[
+            TextButton(
+              onPressed: () =>
+                  Navigator.pop(dialogContext, _DepositDetailAction.stop),
+              child: const Text('停止续期'),
+            ),
             FilledButton.icon(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                _editDeposit(context, deposit);
-              },
+              onPressed: () =>
+                  Navigator.pop(dialogContext, _DepositDetailAction.renew),
+              icon: const Icon(Icons.autorenew),
+              label: const Text('续期'),
+            ),
+            FilledButton.icon(
+              onPressed: () =>
+                  Navigator.pop(dialogContext, _DepositDetailAction.edit),
               icon: const Icon(Icons.edit_outlined),
               label: const Text('编辑'),
             ),
+          ],
         ],
       ),
     );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case _DepositDetailAction.renew:
+        await _showDepositForm(this.context, deposit, DepositFormMode.renew);
+        return;
+      case _DepositDetailAction.stop:
+        await _stopDeposit(this.context, deposit);
+        return;
+      case _DepositDetailAction.edit:
+        await _showDepositForm(this.context, deposit, DepositFormMode.update);
+        return;
+    }
   }
 
   Widget _detailRow(String label, String value, {Color? valueColor}) => Padding(
@@ -626,32 +653,77 @@ class _CustomerCardState extends ConsumerState<_CustomerCard> {
     return result;
   }
 
-  Future<void> _editDeposit(
+  Future<void> _showDepositForm(
     BuildContext context,
     CustomerDepositVersion deposit,
+    DepositFormMode mode,
   ) async {
-    await showDialog<void>(
+    final saved = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => Dialog(
         child: SizedBox(
           width: 560,
           height: 700,
           child: DepositFormPage(
-            mode: DepositFormMode.update,
+            mode: mode,
             sourceDepositId: deposit.id,
             initial: deposit.editableDraft,
-            onSaved: () => Navigator.pop(dialogContext),
+            initialCustomerName: result.customer.name,
+            initialCustomerPhone: result.customer.phone,
+            onSaved: () => Navigator.pop(dialogContext, true),
           ),
         ),
       ),
     );
-    if (!mounted) return;
+    if (saved == true) await _refreshAfterMutation();
+  }
+
+  Future<void> _stopDeposit(
+    BuildContext context,
+    CustomerDepositVersion deposit,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('停止续期？'),
+        content: const Text('停止后该笔存款不再进入提醒。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('确认停止'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _mutatingDeposits.add(deposit.id));
+    try {
+      await ref.read(depositWorkflowProvider).stop(deposit.id);
+    } on DepositNotActiveException {
+      _showDepositError('该存款已被处理，请刷新后重试');
+    } on Object {
+      _showDepositError('停止续期失败，请稍后重试');
+    }
+    try {
+      await _refreshAfterMutation();
+    } finally {
+      if (mounted) setState(() => _mutatingDeposits.remove(deposit.id));
+    }
+  }
+
+  Future<void> _refreshAfterMutation() async {
     await ref.read(customerControllerProvider.notifier).retry();
-    setState(() {
-      _chains = ref
-          .read(customerDepositHistoryUseCasesProvider)
-          .load(widget.result);
-    });
+  }
+
+  void _showDepositError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _showHistory(BuildContext context, WidgetRef ref) async {
