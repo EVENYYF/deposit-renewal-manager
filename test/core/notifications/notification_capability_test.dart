@@ -68,6 +68,29 @@ void main() {
     );
   });
 
+  test('successful reconcile clears a previous degraded message', () async {
+    final scheduler = _RecoveringScheduler();
+    final container = ProviderContainer(
+      overrides: [notificationSchedulerProvider.overrideWithValue(scheduler)],
+    );
+    addTearDown(container.dispose);
+    final controller = container.read(
+      notificationCapabilityControllerProvider.notifier,
+    );
+
+    await controller.reconcileAll();
+    expect(
+      container.read(notificationCapabilityControllerProvider).message,
+      '精确提醒未开启',
+    );
+
+    await controller.reconcileAll();
+    expect(
+      container.read(notificationCapabilityControllerProvider).message,
+      isNull,
+    );
+  });
+
   test(
     'denied permission requires user action then grant reconciles all',
     () async {
@@ -228,6 +251,53 @@ final class _PermissionScheduler implements NotificationScheduler {
   Future<NotificationReconcileResult> reconcileSummary() => reconcileAll();
   @override
   Future<bool> requestExactAlarmPermission() async => false;
+}
+
+final class _RecoveringScheduler implements NotificationScheduler {
+  int reconcileCalls = 0;
+
+  static const healthy = NotificationCapability(
+    support: NotificationSupport.supported,
+    notificationsAllowed: true,
+    canScheduleExact: true,
+  );
+
+  @override
+  Future<NotificationCapability> get capability async => healthy;
+
+  @override
+  Future<NotificationReconcileResult> reconcileAll() async {
+    reconcileCalls++;
+    return NotificationReconcileResult(
+      capability: healthy,
+      scheduledCount: 0,
+      cancelledCount: 0,
+      status: reconcileCalls == 1
+          ? NotificationReconcileStatus.degraded
+          : NotificationReconcileStatus.success,
+      degradedReason: reconcileCalls == 1 ? '精确提醒未开启' : null,
+    );
+  }
+
+  @override
+  Future<NotificationReconcileResult> cancelDeposit(String depositId) =>
+      reconcileAll();
+
+  @override
+  Future<bool> openSettings() async => true;
+
+  @override
+  Future<NotificationReconcileResult> reconcileDeposit(String depositId) =>
+      reconcileAll();
+
+  @override
+  Future<NotificationReconcileResult> reconcileSummary() => reconcileAll();
+
+  @override
+  Future<bool> requestExactAlarmPermission() async => true;
+
+  @override
+  Future<bool> requestNotificationPermission() async => true;
 }
 
 final class _Clock implements NotificationLocalClock {

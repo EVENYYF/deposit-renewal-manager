@@ -12,6 +12,60 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('hides notification banner when capability is healthy', (
+    tester,
+  ) async {
+    await _pumpNotificationBanner(
+      tester,
+      const _CapabilityScheduler(
+        NotificationCapability(
+          support: NotificationSupport.supported,
+          notificationsAllowed: true,
+          canScheduleExact: true,
+        ),
+      ),
+    );
+
+    expect(find.byType(MaterialBanner), findsNothing);
+    expect(find.text('通知提醒需要处理'), findsNothing);
+  });
+
+  testWidgets('notification banner explains missing notification permission', (
+    tester,
+  ) async {
+    await _pumpNotificationBanner(
+      tester,
+      const _CapabilityScheduler(
+        NotificationCapability(
+          support: NotificationSupport.supported,
+          notificationsAllowed: false,
+          canScheduleExact: true,
+        ),
+      ),
+    );
+
+    expect(find.text('通知权限未开启，无法发送到期提醒'), findsOneWidget);
+    expect(find.text('开启通知'), findsOneWidget);
+  });
+
+  testWidgets('notification banner explains missing exact alarm permission', (
+    tester,
+  ) async {
+    await _pumpNotificationBanner(
+      tester,
+      const _CapabilityScheduler(
+        NotificationCapability(
+          support: NotificationSupport.supported,
+          notificationsAllowed: true,
+          canScheduleExact: false,
+        ),
+      ),
+    );
+
+    expect(find.text('精确提醒未开启，提醒时间可能延后'), findsOneWidget);
+    expect(find.text('开启精确提醒'), findsOneWidget);
+  });
+
   testWidgets('shows reminder sections and quick actions', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -128,6 +182,26 @@ void main() {
   });
 }
 
+Future<void> _pumpNotificationBanner(
+  WidgetTester tester,
+  NotificationScheduler scheduler,
+) async {
+  final container = ProviderContainer(
+    overrides: [notificationSchedulerProvider.overrideWithValue(scheduler)],
+  );
+  addTearDown(container.dispose);
+  await container
+      .read(notificationCapabilityControllerProvider.notifier)
+      .refresh();
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(home: Scaffold(body: NotificationStatusBanner())),
+    ),
+  );
+  await tester.pump();
+}
+
 final class _Cases implements DashboardUseCases {
   const _Cases();
   @override
@@ -190,4 +264,42 @@ final class _PendingStopWorkflow implements DepositWorkflow {
 
   @override
   Future<void> update(String depositId, DepositDraft draft) async {}
+}
+
+final class _CapabilityScheduler implements NotificationScheduler {
+  const _CapabilityScheduler(this.value);
+
+  final NotificationCapability value;
+
+  @override
+  Future<NotificationCapability> get capability async => value;
+
+  NotificationReconcileResult get _result => NotificationReconcileResult(
+    capability: value,
+    scheduledCount: 0,
+    cancelledCount: 0,
+  );
+
+  @override
+  Future<NotificationReconcileResult> cancelDeposit(String depositId) async =>
+      _result;
+
+  @override
+  Future<bool> openSettings() async => true;
+
+  @override
+  Future<NotificationReconcileResult> reconcileAll() async => _result;
+
+  @override
+  Future<NotificationReconcileResult> reconcileDeposit(String depositId) async =>
+      _result;
+
+  @override
+  Future<NotificationReconcileResult> reconcileSummary() async => _result;
+
+  @override
+  Future<bool> requestExactAlarmPermission() async => true;
+
+  @override
+  Future<bool> requestNotificationPermission() async => true;
 }

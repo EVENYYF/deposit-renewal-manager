@@ -89,7 +89,12 @@ class NotificationStatusBanner extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(notificationCapabilityControllerProvider);
-    if (state.capability == null && state.message == null && !state.busy) {
+    final capability = state.capability;
+    final healthy =
+        capability?.isSupported == true &&
+        capability?.notificationsAllowed == true &&
+        capability?.canScheduleExact == true;
+    if (!state.busy && state.message == null && (capability == null || healthy)) {
       return const SizedBox.shrink();
     }
     final controller = ref.read(
@@ -97,10 +102,15 @@ class NotificationStatusBanner extends ConsumerWidget {
     );
     final permission = state.needsNotificationPermission;
     final exact =
-        state.capability?.notificationsAllowed == true &&
-        state.capability?.canScheduleExact == false;
+        capability?.notificationsAllowed == true &&
+        capability?.canScheduleExact == false;
+    final content = permission
+        ? '通知权限未开启，无法发送到期提醒'
+        : exact
+        ? '精确提醒未开启，提醒时间可能延后'
+        : state.message ?? '正在更新通知提醒';
     return MaterialBanner(
-      content: Text(state.message ?? '通知提醒需要处理'),
+      content: Text(content),
       actions: [
         TextButton(
           onPressed: state.busy
