@@ -19,7 +19,7 @@
 
 ---
 
-### 任务 1：Android 通知图标、权限与设置跳转
+### Task 1：Android 通知图标、权限与设置跳转
 
 **文件：**
 - 修改：`lib/core/notifications/android_notification_scheduler.dart`
@@ -71,7 +71,7 @@ git -c safe.directory=F:/MY_CHERRY_WORKSPACE/deposit-renewal-manager add lib/cor
 git -c safe.directory=F:/MY_CHERRY_WORKSPACE/deposit-renewal-manager commit -m "fix: repair Android notification permission settings"
 ```
 
-### 任务 2：续期表单与停止续期状态时序
+### Task 2：续期表单与停止续期状态时序
 
 **文件：**
 - 修改：`lib/features/deposits/presentation/deposit_form_page.dart`
@@ -115,7 +115,7 @@ git -c safe.directory=F:/MY_CHERRY_WORKSPACE/deposit-renewal-manager add lib/fea
 git -c safe.directory=F:/MY_CHERRY_WORKSPACE/deposit-renewal-manager commit -m "fix: clarify renewal and stop lifecycle"
 ```
 
-### 任务 3：首页与客户管理下拉刷新
+### Task 3：首页与客户管理下拉刷新
 
 **文件：**
 - 修改：`lib/features/dashboard/application/dashboard_controller.dart`
@@ -161,7 +161,7 @@ git -c safe.directory=F:/MY_CHERRY_WORKSPACE/deposit-renewal-manager add lib/fea
 git -c safe.directory=F:/MY_CHERRY_WORKSPACE/deposit-renewal-manager commit -m "feat: add pull to refresh"
 ```
 
-### 任务 4：银行/产品统计独立详情页
+### Task 4：银行/产品统计独立详情页
 
 **文件：**
 - 修改：`lib/features/statistics/application/deposit_statistics.dart`
@@ -214,7 +214,7 @@ git -c safe.directory=F:/MY_CHERRY_WORKSPACE/deposit-renewal-manager add lib/fea
 git -c safe.directory=F:/MY_CHERRY_WORKSPACE/deposit-renewal-manager commit -m "feat: add statistics breakdown details"
 ```
 
-### 任务 5：统一验证、APK 与真机交付
+### Task 5：统一验证、APK 与真机交付
 
 **文件：**
 - 可能修改：仅在前述测试暴露问题时修改对应测试或实现文件
