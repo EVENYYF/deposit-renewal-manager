@@ -1,21 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../deposits/application/deposit_details_service.dart';
+import '../../deposits/presentation/deposit_details_view.dart';
 import '../application/deposit_statistics.dart';
 
 class DepositStatisticsDetailPage extends ConsumerWidget {
   const DepositStatisticsDetailPage({
     required this.dimension,
     required this.value,
+    this.kind,
     super.key,
   });
 
   final DepositStatisticsDimension dimension;
   final String value;
+  final DepositStatisticsDetailKind? kind;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final query = DepositStatisticsDetailQuery(dimension, value);
+    final query = DepositStatisticsDetailQuery(dimension, value, kind: kind);
     final state = ref.watch(depositStatisticsDetailProvider(query));
     return Scaffold(
       appBar: AppBar(
@@ -54,46 +58,60 @@ class DepositStatisticsDetailPage extends ConsumerWidget {
   }
 }
 
-class _DetailTile extends StatelessWidget {
+class _DetailTile extends ConsumerWidget {
   const _DetailTile({required this.detail});
 
   final DepositStatisticsDetail detail;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final phone = detail.customerPhone?.trim();
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    detail.customerName,
-                    style: Theme.of(context).textTheme.titleMedium,
+      child: InkWell(
+        onTap: () async {
+          final record = await ref
+              .read(depositDetailsUseCasesProvider)
+              .load(detail.depositId);
+          if (record != null && context.mounted) {
+            await showDepositDetailsDialog(
+              context,
+              data: record.data,
+              allowActions: record.editableDraft != null,
+            );
+          }
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      detail.customerName,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                   ),
-                ),
-                Text(_money(detail.amountCents)),
+                  Text(_money(detail.amountCents)),
+                ],
+              ),
+              if (phone != null && phone.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(phone),
               ],
-            ),
-            if (phone != null && phone.isNotEmpty) ...[
-              const SizedBox(height: 2),
-              Text(phone),
+              const SizedBox(height: 8),
+              Text('${_name(detail.bankName)} · ${_name(detail.productName)}'),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Expanded(child: Text(_rate(detail))),
+                  Text(detail.expiryDate),
+                ],
+              ),
             ],
-            const SizedBox(height: 8),
-            Text('${_name(detail.bankName)} · ${_name(detail.productName)}'),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Expanded(child: Text(_rate(detail))),
-                Text(detail.expiryDate),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );

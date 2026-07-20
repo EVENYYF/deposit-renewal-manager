@@ -97,6 +97,36 @@ void main() {
       expect(snapshot.byProduct.map((row) => row.name), ['稳健一年', '通知存款', '']);
       expect(snapshot.byBank.first.depositCount, 2);
       expect(snapshot.byBank.first.customerCount, 1);
+
+      final useCases = SqliteDepositStatisticsUseCases(database);
+      expect(
+        (await useCases.loadDetails(
+          DepositStatisticsDimension.bank,
+          '__status:active',
+        )).map((row) => row.depositId),
+        ['active', 'renewed-target'],
+      );
+      expect(
+        (await useCases.loadDetails(
+          DepositStatisticsDimension.bank,
+          '__status:overdue',
+        )).map((row) => row.depositId),
+        ['overdue'],
+      );
+      expect(
+        (await useCases.loadDetails(
+          DepositStatisticsDimension.bank,
+          '__status:renewed',
+        )).map((row) => row.depositId),
+        ['renewed-source'],
+      );
+      expect(
+        (await useCases.loadDetails(
+          DepositStatisticsDimension.bank,
+          '__status:stopped',
+        )).map((row) => row.depositId),
+        ['stopped'],
+      );
     },
   );
 

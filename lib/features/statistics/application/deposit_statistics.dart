@@ -6,6 +6,15 @@ import '../../../core/database/app_database.dart';
 
 enum DepositStatisticsDimension { bank, product }
 
+enum DepositStatisticsDetailKind {
+  active,
+  overdue,
+  renewed,
+  stopped,
+  bank,
+  product,
+}
+
 final class DepositStatisticsDetail {
   const DepositStatisticsDetail({
     required this.depositId,
@@ -17,6 +26,8 @@ final class DepositStatisticsDetail {
     required this.interestRateScaled,
     required this.ratePrecision,
     required this.expiryDate,
+    this.startDate,
+    this.lifecycle = 'active',
   });
 
   final String depositId;
@@ -28,22 +39,26 @@ final class DepositStatisticsDetail {
   final int interestRateScaled;
   final int ratePrecision;
   final String expiryDate;
+  final String? startDate;
+  final String lifecycle;
 }
 
 final class DepositStatisticsDetailQuery {
-  const DepositStatisticsDetailQuery(this.dimension, this.value);
+  const DepositStatisticsDetailQuery(this.dimension, this.value, {this.kind});
 
   final DepositStatisticsDimension dimension;
   final String value;
+  final DepositStatisticsDetailKind? kind;
 
   @override
   bool operator ==(Object other) =>
       other is DepositStatisticsDetailQuery &&
       other.dimension == dimension &&
-      other.value == value;
+      other.value == value &&
+      other.kind == kind;
 
   @override
-  int get hashCode => Object.hash(dimension, value);
+  int get hashCode => Object.hash(dimension, value, kind);
 }
 
 final class DepositStatisticsSnapshot {
@@ -124,9 +139,11 @@ final depositStatisticsDetailProvider = FutureProvider.autoDispose
       ref,
       query,
     ) {
-      return ref
-          .read(depositStatisticsUseCasesProvider)
-          .loadDetails(query.dimension, query.value);
+      final useCases = ref.read(depositStatisticsUseCasesProvider);
+      return useCases.loadDetails(
+        query.dimension,
+        query.kind == null ? query.value : '__status:${query.kind!.name}',
+      );
     });
 
 /// Statistics intentionally use current active records for principal and
@@ -188,6 +205,12 @@ WHERE c.is_active = 1
     DepositStatisticsDimension dimension,
     String value,
   ) async {
+    if (value.startsWith('__status:')) {
+      final kind = DepositStatisticsDetailKind.values.byName(
+        value.substring('__status:'.length),
+      );
+      return _loadStatusDetails(kind);
+    }
     final column = _columns[dimension]!;
     final rows = await _database
         .customSelect(
@@ -226,6 +249,56 @@ ORDER BY d.final_expiry_date,
             interestRateScaled: row.read<int>('interest_rate_scaled'),
             ratePrecision: row.read<int>('rate_precision'),
             expiryDate: row.read<String>('expiry_date'),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Future<List<DepositStatisticsDetail>> _loadStatusDetails(
+    DepositStatisticsDetailKind kind,
+  ) async {
+    final date = _isoDate(clock.now().toLocal());
+    final condition = switch (kind) {
+      DepositStatisticsDetailKind.active =>
+        "d.lifecycle = 'active' AND d.final_expiry_date >= ?",
+      DepositStatisticsDetailKind.overdue =>
+        "d.lifecycle = 'active' AND d.final_expiry_date < ?",
+      DepositStatisticsDetailKind.renewed => "d.lifecycle = 'renewed'",
+      DepositStatisticsDetailKind.stopped => "d.lifecycle = 'stopped'",
+      _ => "d.lifecycle = 'active'",
+    };
+    final rows = await _database
+        .customSelect(
+          '''
+SELECT d.id AS deposit_id, c.name AS customer_name, c.phone AS customer_phone,
+ d.bank_name, d.product_name, d.amount_cents, d.interest_rate_scaled,
+ d.rate_precision, d.start_date, d.final_expiry_date AS expiry_date, d.lifecycle
+FROM deposits d JOIN customers c ON c.id = d.customer_id
+WHERE c.is_active = 1 AND $condition
+ORDER BY d.final_expiry_date, c.name COLLATE NOCASE, d.id
+''',
+          variables:
+              kind == DepositStatisticsDetailKind.active ||
+                  kind == DepositStatisticsDetailKind.overdue
+              ? [Variable.withString(date)]
+              : const [],
+          readsFrom: {_database.deposits, _database.customers},
+        )
+        .get();
+    return rows
+        .map(
+          (row) => DepositStatisticsDetail(
+            depositId: row.read<String>('deposit_id'),
+            customerName: row.read<String>('customer_name'),
+            customerPhone: row.readNullable<String>('customer_phone'),
+            bankName: row.read<String>('bank_name'),
+            productName: row.read<String>('product_name'),
+            amountCents: row.read<int>('amount_cents'),
+            interestRateScaled: row.read<int>('interest_rate_scaled'),
+            ratePrecision: row.read<int>('rate_precision'),
+            startDate: row.read<String>('start_date'),
+            expiryDate: row.read<String>('expiry_date'),
+            lifecycle: row.read<String>('lifecycle'),
           ),
         )
         .toList(growable: false);

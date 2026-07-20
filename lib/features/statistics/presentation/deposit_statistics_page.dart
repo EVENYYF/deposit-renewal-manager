@@ -57,10 +57,26 @@ class _StatisticsBody extends StatelessWidget {
       Card(
         child: Column(
           children: [
-            _StatusRow(label: '生效中', value: snapshot.activeCount),
-            _StatusRow(label: '已逾期', value: snapshot.overdueCount),
-            _StatusRow(label: '已续期历史', value: snapshot.renewedCount),
-            _StatusRow(label: '已停止', value: snapshot.stoppedCount),
+            _StatusRow(
+              label: '生效中',
+              value: snapshot.activeCount,
+              kind: DepositStatisticsDetailKind.active,
+            ),
+            _StatusRow(
+              label: '已逾期',
+              value: snapshot.overdueCount,
+              kind: DepositStatisticsDetailKind.overdue,
+            ),
+            _StatusRow(
+              label: '已续期历史',
+              value: snapshot.renewedCount,
+              kind: DepositStatisticsDetailKind.renewed,
+            ),
+            _StatusRow(
+              label: '已停止',
+              value: snapshot.stoppedCount,
+              kind: DepositStatisticsDetailKind.stopped,
+            ),
           ],
         ),
       ),
@@ -105,13 +121,33 @@ class _Metric extends StatelessWidget {
 }
 
 class _StatusRow extends StatelessWidget {
-  const _StatusRow({required this.label, required this.value});
+  const _StatusRow({
+    required this.label,
+    required this.value,
+    required this.kind,
+  });
   final String label;
   final int value;
+  final DepositStatisticsDetailKind kind;
 
   @override
-  Widget build(BuildContext context) =>
-      ListTile(dense: true, title: Text(label), trailing: Text('$value 笔'));
+  Widget build(BuildContext context) => ListTile(
+    dense: true,
+    title: Text(label),
+    trailing: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [Text('$value 笔'), const Icon(Icons.chevron_right)],
+    ),
+    onTap: () => Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => DepositStatisticsDetailPage(
+          dimension: DepositStatisticsDimension.bank,
+          value: '',
+          kind: kind,
+        ),
+      ),
+    ),
+  );
 }
 
 class _BreakdownSection extends StatelessWidget {
