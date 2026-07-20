@@ -54,6 +54,19 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('张三的修改记录'), findsOneWidget);
     expect(find.text('更新'), findsOneWidget);
+    expect(find.text('手机号：'), findsOneWidget);
+    expect(find.text('13800000000'), findsOneWidget);
+    expect(find.text('13900000000'), findsOneWidget);
+
+    final before = tester.widget<Text>(
+      find.byKey(const Key('history-before-0')),
+    );
+    final after = tester.widget<Text>(find.byKey(const Key('history-after-0')));
+    expect(
+      before.style?.color,
+      Theme.of(tester.element(find.byType(AlertDialog))).colorScheme.error,
+    );
+    expect(after.style?.color, const Color(0xFF2E7D32));
   });
 
   testWidgets('filters customers by bank and product', (tester) async {
@@ -339,6 +352,8 @@ final class _History implements CustomerHistoryUseCases {
     CustomerHistoryEntry(
       operation: 'update',
       occurredAt: DateTime(2026, 7, 19),
+      beforeJson: '{"phone":"13800000000"}',
+      afterJson: '{"phone":"13900000000"}',
     ),
   ];
 }

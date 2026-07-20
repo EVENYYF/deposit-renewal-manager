@@ -7,6 +7,7 @@ import '../application/customer_controller.dart';
 import '../application/customer_history_service.dart';
 import '../domain/customer_repository.dart';
 import '../domain/name_search_index.dart';
+import 'customer_history_formatter.dart';
 import '../../deposits/domain/deposit.dart';
 import '../../deposits/domain/deposit_repository.dart';
 import '../../deposits/domain/local_date.dart';
@@ -745,6 +746,7 @@ class _CustomerCardState extends ConsumerState<_CustomerCard> {
                   separatorBuilder: (_, _) => const Divider(),
                   itemBuilder: (context, index) {
                     final entry = history[index];
+                    final changes = CustomerHistoryFormatter.formatEntry(entry);
                     return ListTile(
                       leading: const Icon(Icons.history),
                       title: Text(
@@ -761,11 +763,15 @@ class _CustomerCardState extends ConsumerState<_CustomerCard> {
                               'yyyy-MM-dd HH:mm',
                             ).format(entry.occurredAt),
                           ),
-                          for (final change in entry.changes)
-                            Text(
-                              '${_fieldLabel(change.field)}：'
-                              '${_valueLabel(change.before)} → '
-                              '${_valueLabel(change.after)}',
+                          for (
+                            var changeIndex = 0;
+                            changeIndex < changes.length;
+                            changeIndex++
+                          )
+                            _historyChange(
+                              context,
+                              changes[changeIndex],
+                              changeIndex,
                             ),
                         ],
                       ),
@@ -799,24 +805,42 @@ class _CustomerCardState extends ConsumerState<_CustomerCard> {
     _ => '记录',
   };
 
-  static String _fieldLabel(String value) => switch (value) {
-    'name' => '姓名',
-    'phone' => '手机号',
-    'bank_name' => '银行',
-    'product_name' => '产品',
-    'amount_cents' => '金额（分）',
-    'interest_rate_scaled' => '年利率',
-    'start_date' => '存入日期',
-    'final_expiry_date' => '到期日',
-    'lifecycle' => '状态',
-    _ => value,
-  };
-
-  static String _valueLabel(Object? value) {
-    if (value == null || value == '') return '未填写';
-    if (value is bool) return value ? '是' : '否';
-    return value.toString();
-  }
+  Widget _historyChange(
+    BuildContext context,
+    FormattedHistoryChange change,
+    int index,
+  ) => Padding(
+    padding: const EdgeInsets.only(top: 4),
+    child: Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 6,
+      runSpacing: 2,
+      children: [
+        Text(
+          '${change.label}：',
+          key: Key('history-field-$index'),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.primary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Text(
+          change.before,
+          key: Key('history-before-$index'),
+          style: TextStyle(color: Theme.of(context).colorScheme.error),
+        ),
+        const Icon(Icons.arrow_forward, size: 14),
+        Text(
+          change.after,
+          key: Key('history-after-$index'),
+          style: const TextStyle(
+            color: Color(0xFF2E7D32),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 final class _DepositAppearance {
