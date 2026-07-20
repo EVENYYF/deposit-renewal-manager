@@ -33,7 +33,7 @@ void main() {
   tearDown(() => database.close());
 
   test('schema version, primary keys and foreign keys are enabled', () async {
-    expect(database.schemaVersion, 6);
+    expect(database.schemaVersion, 7);
     final pragma = await database
         .customSelect('PRAGMA foreign_keys')
         .getSingle();
@@ -57,6 +57,8 @@ void main() {
         'business_settings',
         'device_settings',
         'deposit_presets',
+        'products',
+        'product_rate_versions',
         'notification_id_mappings',
       }),
     );
@@ -205,6 +207,8 @@ INSERT INTO deposits VALUES (
       'message_templates': ['created_at_utc', 'updated_at_utc'],
       'import_batches': ['imported_at_utc'],
       'notification_id_mappings': ['created_at_utc'],
+      'products': ['created_at_utc', 'updated_at_utc'],
+      'product_rate_versions': ['created_at_utc', 'updated_at_utc'],
     };
 
     for (final entry in utcColumns.entries) {

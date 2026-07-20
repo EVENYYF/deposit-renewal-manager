@@ -4543,6 +4543,939 @@ class DepositPresetsCompanion extends UpdateCompanion<DepositPreset> {
   }
 }
 
+class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ProductsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _bankNameMeta = const VerificationMeta(
+    'bankName',
+  );
+  @override
+  late final GeneratedColumn<String> bankName = GeneratedColumn<String>(
+    'bank_name',
+    aliasedName,
+    false,
+    check: () => ComparableExpr(bankName.length).isBiggerThanValue(0),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _productNameMeta = const VerificationMeta(
+    'productName',
+  );
+  @override
+  late final GeneratedColumn<String> productName = GeneratedColumn<String>(
+    'product_name',
+    aliasedName,
+    false,
+    check: () => ComparableExpr(productName.length).isBiggerThanValue(0),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _createdAtUtcMeta = const VerificationMeta(
+    'createdAtUtc',
+  );
+  @override
+  late final GeneratedColumn<int> createdAtUtc = GeneratedColumn<int>(
+    'created_at_utc',
+    aliasedName,
+    false,
+    check: () => utcEpochCheck('created_at_utc'),
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtUtcMeta = const VerificationMeta(
+    'updatedAtUtc',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAtUtc = GeneratedColumn<int>(
+    'updated_at_utc',
+    aliasedName,
+    false,
+    check: () => utcEpochCheck('updated_at_utc'),
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    bankName,
+    productName,
+    isActive,
+    createdAtUtc,
+    updatedAtUtc,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'products';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Product> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('bank_name')) {
+      context.handle(
+        _bankNameMeta,
+        bankName.isAcceptableOrUnknown(data['bank_name']!, _bankNameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_bankNameMeta);
+    }
+    if (data.containsKey('product_name')) {
+      context.handle(
+        _productNameMeta,
+        productName.isAcceptableOrUnknown(
+          data['product_name']!,
+          _productNameMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_productNameMeta);
+    }
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
+    if (data.containsKey('created_at_utc')) {
+      context.handle(
+        _createdAtUtcMeta,
+        createdAtUtc.isAcceptableOrUnknown(
+          data['created_at_utc']!,
+          _createdAtUtcMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtUtcMeta);
+    }
+    if (data.containsKey('updated_at_utc')) {
+      context.handle(
+        _updatedAtUtcMeta,
+        updatedAtUtc.isAcceptableOrUnknown(
+          data['updated_at_utc']!,
+          _updatedAtUtcMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtUtcMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Product map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Product(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      bankName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}bank_name'],
+      )!,
+      productName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}product_name'],
+      )!,
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
+      createdAtUtc: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at_utc'],
+      )!,
+      updatedAtUtc: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at_utc'],
+      )!,
+    );
+  }
+
+  @override
+  $ProductsTable createAlias(String alias) {
+    return $ProductsTable(attachedDatabase, alias);
+  }
+}
+
+class Product extends DataClass implements Insertable<Product> {
+  final String id;
+  final String bankName;
+  final String productName;
+  final bool isActive;
+  final int createdAtUtc;
+  final int updatedAtUtc;
+  const Product({
+    required this.id,
+    required this.bankName,
+    required this.productName,
+    required this.isActive,
+    required this.createdAtUtc,
+    required this.updatedAtUtc,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['bank_name'] = Variable<String>(bankName);
+    map['product_name'] = Variable<String>(productName);
+    map['is_active'] = Variable<bool>(isActive);
+    map['created_at_utc'] = Variable<int>(createdAtUtc);
+    map['updated_at_utc'] = Variable<int>(updatedAtUtc);
+    return map;
+  }
+
+  ProductsCompanion toCompanion(bool nullToAbsent) {
+    return ProductsCompanion(
+      id: Value(id),
+      bankName: Value(bankName),
+      productName: Value(productName),
+      isActive: Value(isActive),
+      createdAtUtc: Value(createdAtUtc),
+      updatedAtUtc: Value(updatedAtUtc),
+    );
+  }
+
+  factory Product.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Product(
+      id: serializer.fromJson<String>(json['id']),
+      bankName: serializer.fromJson<String>(json['bankName']),
+      productName: serializer.fromJson<String>(json['productName']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
+      createdAtUtc: serializer.fromJson<int>(json['createdAtUtc']),
+      updatedAtUtc: serializer.fromJson<int>(json['updatedAtUtc']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'bankName': serializer.toJson<String>(bankName),
+      'productName': serializer.toJson<String>(productName),
+      'isActive': serializer.toJson<bool>(isActive),
+      'createdAtUtc': serializer.toJson<int>(createdAtUtc),
+      'updatedAtUtc': serializer.toJson<int>(updatedAtUtc),
+    };
+  }
+
+  Product copyWith({
+    String? id,
+    String? bankName,
+    String? productName,
+    bool? isActive,
+    int? createdAtUtc,
+    int? updatedAtUtc,
+  }) => Product(
+    id: id ?? this.id,
+    bankName: bankName ?? this.bankName,
+    productName: productName ?? this.productName,
+    isActive: isActive ?? this.isActive,
+    createdAtUtc: createdAtUtc ?? this.createdAtUtc,
+    updatedAtUtc: updatedAtUtc ?? this.updatedAtUtc,
+  );
+  Product copyWithCompanion(ProductsCompanion data) {
+    return Product(
+      id: data.id.present ? data.id.value : this.id,
+      bankName: data.bankName.present ? data.bankName.value : this.bankName,
+      productName: data.productName.present
+          ? data.productName.value
+          : this.productName,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      createdAtUtc: data.createdAtUtc.present
+          ? data.createdAtUtc.value
+          : this.createdAtUtc,
+      updatedAtUtc: data.updatedAtUtc.present
+          ? data.updatedAtUtc.value
+          : this.updatedAtUtc,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Product(')
+          ..write('id: $id, ')
+          ..write('bankName: $bankName, ')
+          ..write('productName: $productName, ')
+          ..write('isActive: $isActive, ')
+          ..write('createdAtUtc: $createdAtUtc, ')
+          ..write('updatedAtUtc: $updatedAtUtc')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    bankName,
+    productName,
+    isActive,
+    createdAtUtc,
+    updatedAtUtc,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Product &&
+          other.id == this.id &&
+          other.bankName == this.bankName &&
+          other.productName == this.productName &&
+          other.isActive == this.isActive &&
+          other.createdAtUtc == this.createdAtUtc &&
+          other.updatedAtUtc == this.updatedAtUtc);
+}
+
+class ProductsCompanion extends UpdateCompanion<Product> {
+  final Value<String> id;
+  final Value<String> bankName;
+  final Value<String> productName;
+  final Value<bool> isActive;
+  final Value<int> createdAtUtc;
+  final Value<int> updatedAtUtc;
+  final Value<int> rowid;
+  const ProductsCompanion({
+    this.id = const Value.absent(),
+    this.bankName = const Value.absent(),
+    this.productName = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.createdAtUtc = const Value.absent(),
+    this.updatedAtUtc = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ProductsCompanion.insert({
+    required String id,
+    required String bankName,
+    required String productName,
+    this.isActive = const Value.absent(),
+    required int createdAtUtc,
+    required int updatedAtUtc,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       bankName = Value(bankName),
+       productName = Value(productName),
+       createdAtUtc = Value(createdAtUtc),
+       updatedAtUtc = Value(updatedAtUtc);
+  static Insertable<Product> custom({
+    Expression<String>? id,
+    Expression<String>? bankName,
+    Expression<String>? productName,
+    Expression<bool>? isActive,
+    Expression<int>? createdAtUtc,
+    Expression<int>? updatedAtUtc,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (bankName != null) 'bank_name': bankName,
+      if (productName != null) 'product_name': productName,
+      if (isActive != null) 'is_active': isActive,
+      if (createdAtUtc != null) 'created_at_utc': createdAtUtc,
+      if (updatedAtUtc != null) 'updated_at_utc': updatedAtUtc,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ProductsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? bankName,
+    Value<String>? productName,
+    Value<bool>? isActive,
+    Value<int>? createdAtUtc,
+    Value<int>? updatedAtUtc,
+    Value<int>? rowid,
+  }) {
+    return ProductsCompanion(
+      id: id ?? this.id,
+      bankName: bankName ?? this.bankName,
+      productName: productName ?? this.productName,
+      isActive: isActive ?? this.isActive,
+      createdAtUtc: createdAtUtc ?? this.createdAtUtc,
+      updatedAtUtc: updatedAtUtc ?? this.updatedAtUtc,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (bankName.present) {
+      map['bank_name'] = Variable<String>(bankName.value);
+    }
+    if (productName.present) {
+      map['product_name'] = Variable<String>(productName.value);
+    }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    if (createdAtUtc.present) {
+      map['created_at_utc'] = Variable<int>(createdAtUtc.value);
+    }
+    if (updatedAtUtc.present) {
+      map['updated_at_utc'] = Variable<int>(updatedAtUtc.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProductsCompanion(')
+          ..write('id: $id, ')
+          ..write('bankName: $bankName, ')
+          ..write('productName: $productName, ')
+          ..write('isActive: $isActive, ')
+          ..write('createdAtUtc: $createdAtUtc, ')
+          ..write('updatedAtUtc: $updatedAtUtc, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ProductRateVersionsTable extends ProductRateVersions
+    with TableInfo<$ProductRateVersionsTable, ProductRateVersion> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ProductRateVersionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _productIdMeta = const VerificationMeta(
+    'productId',
+  );
+  @override
+  late final GeneratedColumn<String> productId = GeneratedColumn<String>(
+    'product_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES products (id) ON DELETE RESTRICT',
+    ),
+  );
+  static const VerificationMeta _interestRateScaledMeta =
+      const VerificationMeta('interestRateScaled');
+  @override
+  late final GeneratedColumn<int> interestRateScaled = GeneratedColumn<int>(
+    'interest_rate_scaled',
+    aliasedName,
+    false,
+    check: () => const CustomExpression<bool>('interest_rate_scaled >= 0'),
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _ratePrecisionMeta = const VerificationMeta(
+    'ratePrecision',
+  );
+  @override
+  late final GeneratedColumn<int> ratePrecision = GeneratedColumn<int>(
+    'rate_precision',
+    aliasedName,
+    false,
+    check: () => const CustomExpression<bool>('rate_precision BETWEEN 0 AND 9'),
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _effectiveDateMeta = const VerificationMeta(
+    'effectiveDate',
+  );
+  @override
+  late final GeneratedColumn<String> effectiveDate = GeneratedColumn<String>(
+    'effective_date',
+    aliasedName,
+    false,
+    check: () => isoDateTextCheck('effective_date'),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtUtcMeta = const VerificationMeta(
+    'createdAtUtc',
+  );
+  @override
+  late final GeneratedColumn<int> createdAtUtc = GeneratedColumn<int>(
+    'created_at_utc',
+    aliasedName,
+    false,
+    check: () => utcEpochCheck('created_at_utc'),
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtUtcMeta = const VerificationMeta(
+    'updatedAtUtc',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAtUtc = GeneratedColumn<int>(
+    'updated_at_utc',
+    aliasedName,
+    false,
+    check: () => utcEpochCheck('updated_at_utc'),
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    productId,
+    interestRateScaled,
+    ratePrecision,
+    effectiveDate,
+    createdAtUtc,
+    updatedAtUtc,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'product_rate_versions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ProductRateVersion> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('product_id')) {
+      context.handle(
+        _productIdMeta,
+        productId.isAcceptableOrUnknown(data['product_id']!, _productIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_productIdMeta);
+    }
+    if (data.containsKey('interest_rate_scaled')) {
+      context.handle(
+        _interestRateScaledMeta,
+        interestRateScaled.isAcceptableOrUnknown(
+          data['interest_rate_scaled']!,
+          _interestRateScaledMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_interestRateScaledMeta);
+    }
+    if (data.containsKey('rate_precision')) {
+      context.handle(
+        _ratePrecisionMeta,
+        ratePrecision.isAcceptableOrUnknown(
+          data['rate_precision']!,
+          _ratePrecisionMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ratePrecisionMeta);
+    }
+    if (data.containsKey('effective_date')) {
+      context.handle(
+        _effectiveDateMeta,
+        effectiveDate.isAcceptableOrUnknown(
+          data['effective_date']!,
+          _effectiveDateMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_effectiveDateMeta);
+    }
+    if (data.containsKey('created_at_utc')) {
+      context.handle(
+        _createdAtUtcMeta,
+        createdAtUtc.isAcceptableOrUnknown(
+          data['created_at_utc']!,
+          _createdAtUtcMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtUtcMeta);
+    }
+    if (data.containsKey('updated_at_utc')) {
+      context.handle(
+        _updatedAtUtcMeta,
+        updatedAtUtc.isAcceptableOrUnknown(
+          data['updated_at_utc']!,
+          _updatedAtUtcMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtUtcMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ProductRateVersion map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ProductRateVersion(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      productId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}product_id'],
+      )!,
+      interestRateScaled: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}interest_rate_scaled'],
+      )!,
+      ratePrecision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}rate_precision'],
+      )!,
+      effectiveDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}effective_date'],
+      )!,
+      createdAtUtc: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at_utc'],
+      )!,
+      updatedAtUtc: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at_utc'],
+      )!,
+    );
+  }
+
+  @override
+  $ProductRateVersionsTable createAlias(String alias) {
+    return $ProductRateVersionsTable(attachedDatabase, alias);
+  }
+}
+
+class ProductRateVersion extends DataClass
+    implements Insertable<ProductRateVersion> {
+  final String id;
+  final String productId;
+  final int interestRateScaled;
+  final int ratePrecision;
+  final String effectiveDate;
+  final int createdAtUtc;
+  final int updatedAtUtc;
+  const ProductRateVersion({
+    required this.id,
+    required this.productId,
+    required this.interestRateScaled,
+    required this.ratePrecision,
+    required this.effectiveDate,
+    required this.createdAtUtc,
+    required this.updatedAtUtc,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['product_id'] = Variable<String>(productId);
+    map['interest_rate_scaled'] = Variable<int>(interestRateScaled);
+    map['rate_precision'] = Variable<int>(ratePrecision);
+    map['effective_date'] = Variable<String>(effectiveDate);
+    map['created_at_utc'] = Variable<int>(createdAtUtc);
+    map['updated_at_utc'] = Variable<int>(updatedAtUtc);
+    return map;
+  }
+
+  ProductRateVersionsCompanion toCompanion(bool nullToAbsent) {
+    return ProductRateVersionsCompanion(
+      id: Value(id),
+      productId: Value(productId),
+      interestRateScaled: Value(interestRateScaled),
+      ratePrecision: Value(ratePrecision),
+      effectiveDate: Value(effectiveDate),
+      createdAtUtc: Value(createdAtUtc),
+      updatedAtUtc: Value(updatedAtUtc),
+    );
+  }
+
+  factory ProductRateVersion.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ProductRateVersion(
+      id: serializer.fromJson<String>(json['id']),
+      productId: serializer.fromJson<String>(json['productId']),
+      interestRateScaled: serializer.fromJson<int>(json['interestRateScaled']),
+      ratePrecision: serializer.fromJson<int>(json['ratePrecision']),
+      effectiveDate: serializer.fromJson<String>(json['effectiveDate']),
+      createdAtUtc: serializer.fromJson<int>(json['createdAtUtc']),
+      updatedAtUtc: serializer.fromJson<int>(json['updatedAtUtc']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'productId': serializer.toJson<String>(productId),
+      'interestRateScaled': serializer.toJson<int>(interestRateScaled),
+      'ratePrecision': serializer.toJson<int>(ratePrecision),
+      'effectiveDate': serializer.toJson<String>(effectiveDate),
+      'createdAtUtc': serializer.toJson<int>(createdAtUtc),
+      'updatedAtUtc': serializer.toJson<int>(updatedAtUtc),
+    };
+  }
+
+  ProductRateVersion copyWith({
+    String? id,
+    String? productId,
+    int? interestRateScaled,
+    int? ratePrecision,
+    String? effectiveDate,
+    int? createdAtUtc,
+    int? updatedAtUtc,
+  }) => ProductRateVersion(
+    id: id ?? this.id,
+    productId: productId ?? this.productId,
+    interestRateScaled: interestRateScaled ?? this.interestRateScaled,
+    ratePrecision: ratePrecision ?? this.ratePrecision,
+    effectiveDate: effectiveDate ?? this.effectiveDate,
+    createdAtUtc: createdAtUtc ?? this.createdAtUtc,
+    updatedAtUtc: updatedAtUtc ?? this.updatedAtUtc,
+  );
+  ProductRateVersion copyWithCompanion(ProductRateVersionsCompanion data) {
+    return ProductRateVersion(
+      id: data.id.present ? data.id.value : this.id,
+      productId: data.productId.present ? data.productId.value : this.productId,
+      interestRateScaled: data.interestRateScaled.present
+          ? data.interestRateScaled.value
+          : this.interestRateScaled,
+      ratePrecision: data.ratePrecision.present
+          ? data.ratePrecision.value
+          : this.ratePrecision,
+      effectiveDate: data.effectiveDate.present
+          ? data.effectiveDate.value
+          : this.effectiveDate,
+      createdAtUtc: data.createdAtUtc.present
+          ? data.createdAtUtc.value
+          : this.createdAtUtc,
+      updatedAtUtc: data.updatedAtUtc.present
+          ? data.updatedAtUtc.value
+          : this.updatedAtUtc,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProductRateVersion(')
+          ..write('id: $id, ')
+          ..write('productId: $productId, ')
+          ..write('interestRateScaled: $interestRateScaled, ')
+          ..write('ratePrecision: $ratePrecision, ')
+          ..write('effectiveDate: $effectiveDate, ')
+          ..write('createdAtUtc: $createdAtUtc, ')
+          ..write('updatedAtUtc: $updatedAtUtc')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    productId,
+    interestRateScaled,
+    ratePrecision,
+    effectiveDate,
+    createdAtUtc,
+    updatedAtUtc,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ProductRateVersion &&
+          other.id == this.id &&
+          other.productId == this.productId &&
+          other.interestRateScaled == this.interestRateScaled &&
+          other.ratePrecision == this.ratePrecision &&
+          other.effectiveDate == this.effectiveDate &&
+          other.createdAtUtc == this.createdAtUtc &&
+          other.updatedAtUtc == this.updatedAtUtc);
+}
+
+class ProductRateVersionsCompanion extends UpdateCompanion<ProductRateVersion> {
+  final Value<String> id;
+  final Value<String> productId;
+  final Value<int> interestRateScaled;
+  final Value<int> ratePrecision;
+  final Value<String> effectiveDate;
+  final Value<int> createdAtUtc;
+  final Value<int> updatedAtUtc;
+  final Value<int> rowid;
+  const ProductRateVersionsCompanion({
+    this.id = const Value.absent(),
+    this.productId = const Value.absent(),
+    this.interestRateScaled = const Value.absent(),
+    this.ratePrecision = const Value.absent(),
+    this.effectiveDate = const Value.absent(),
+    this.createdAtUtc = const Value.absent(),
+    this.updatedAtUtc = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ProductRateVersionsCompanion.insert({
+    required String id,
+    required String productId,
+    required int interestRateScaled,
+    required int ratePrecision,
+    required String effectiveDate,
+    required int createdAtUtc,
+    required int updatedAtUtc,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       productId = Value(productId),
+       interestRateScaled = Value(interestRateScaled),
+       ratePrecision = Value(ratePrecision),
+       effectiveDate = Value(effectiveDate),
+       createdAtUtc = Value(createdAtUtc),
+       updatedAtUtc = Value(updatedAtUtc);
+  static Insertable<ProductRateVersion> custom({
+    Expression<String>? id,
+    Expression<String>? productId,
+    Expression<int>? interestRateScaled,
+    Expression<int>? ratePrecision,
+    Expression<String>? effectiveDate,
+    Expression<int>? createdAtUtc,
+    Expression<int>? updatedAtUtc,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (productId != null) 'product_id': productId,
+      if (interestRateScaled != null)
+        'interest_rate_scaled': interestRateScaled,
+      if (ratePrecision != null) 'rate_precision': ratePrecision,
+      if (effectiveDate != null) 'effective_date': effectiveDate,
+      if (createdAtUtc != null) 'created_at_utc': createdAtUtc,
+      if (updatedAtUtc != null) 'updated_at_utc': updatedAtUtc,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ProductRateVersionsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? productId,
+    Value<int>? interestRateScaled,
+    Value<int>? ratePrecision,
+    Value<String>? effectiveDate,
+    Value<int>? createdAtUtc,
+    Value<int>? updatedAtUtc,
+    Value<int>? rowid,
+  }) {
+    return ProductRateVersionsCompanion(
+      id: id ?? this.id,
+      productId: productId ?? this.productId,
+      interestRateScaled: interestRateScaled ?? this.interestRateScaled,
+      ratePrecision: ratePrecision ?? this.ratePrecision,
+      effectiveDate: effectiveDate ?? this.effectiveDate,
+      createdAtUtc: createdAtUtc ?? this.createdAtUtc,
+      updatedAtUtc: updatedAtUtc ?? this.updatedAtUtc,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (productId.present) {
+      map['product_id'] = Variable<String>(productId.value);
+    }
+    if (interestRateScaled.present) {
+      map['interest_rate_scaled'] = Variable<int>(interestRateScaled.value);
+    }
+    if (ratePrecision.present) {
+      map['rate_precision'] = Variable<int>(ratePrecision.value);
+    }
+    if (effectiveDate.present) {
+      map['effective_date'] = Variable<String>(effectiveDate.value);
+    }
+    if (createdAtUtc.present) {
+      map['created_at_utc'] = Variable<int>(createdAtUtc.value);
+    }
+    if (updatedAtUtc.present) {
+      map['updated_at_utc'] = Variable<int>(updatedAtUtc.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProductRateVersionsCompanion(')
+          ..write('id: $id, ')
+          ..write('productId: $productId, ')
+          ..write('interestRateScaled: $interestRateScaled, ')
+          ..write('ratePrecision: $ratePrecision, ')
+          ..write('effectiveDate: $effectiveDate, ')
+          ..write('createdAtUtc: $createdAtUtc, ')
+          ..write('updatedAtUtc: $updatedAtUtc, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $NotificationIdMappingsTable extends NotificationIdMappings
     with TableInfo<$NotificationIdMappingsTable, NotificationIdMapping> {
   @override
@@ -4848,6 +5781,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $DeviceSettingsTable deviceSettings = $DeviceSettingsTable(this);
   late final $DepositPresetsTable depositPresets = $DepositPresetsTable(this);
+  late final $ProductsTable products = $ProductsTable(this);
+  late final $ProductRateVersionsTable productRateVersions =
+      $ProductRateVersionsTable(this);
   late final $NotificationIdMappingsTable notificationIdMappings =
       $NotificationIdMappingsTable(this);
   late final Index customersNormalizedNameIdx = Index(
@@ -4890,6 +5826,18 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'deposit_presets_field_type_value_idx',
     'CREATE UNIQUE INDEX deposit_presets_field_type_value_idx ON deposit_presets (field_type, value)',
   );
+  late final Index productsBankNameProductNameIdx = Index(
+    'products_bank_name_product_name_idx',
+    'CREATE UNIQUE INDEX products_bank_name_product_name_idx ON products (lower(trim(bank_name)), lower(trim(product_name)))',
+  );
+  late final Index productRateVersionsProductDateIdx = Index(
+    'product_rate_versions_product_date_idx',
+    'CREATE UNIQUE INDEX product_rate_versions_product_date_idx ON product_rate_versions (product_id, effective_date)',
+  );
+  late final Index productRateVersionsProductIdIdx = Index(
+    'product_rate_versions_product_id_idx',
+    'CREATE INDEX product_rate_versions_product_id_idx ON product_rate_versions (product_id)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4904,6 +5852,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     businessSettings,
     deviceSettings,
     depositPresets,
+    products,
+    productRateVersions,
     notificationIdMappings,
     customersNormalizedNameIdx,
     customersFullPinyinIdx,
@@ -4915,6 +5865,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     messageTemplatesSingleDefaultIdx,
     importBatchesContentHashIdx,
     depositPresetsFieldTypeValueIdx,
+    productsBankNameProductNameIdx,
+    productRateVersionsProductDateIdx,
+    productRateVersionsProductIdIdx,
   ];
 }
 
@@ -7824,6 +8777,729 @@ typedef $$DepositPresetsTableProcessedTableManager =
       DepositPreset,
       PrefetchHooks Function()
     >;
+typedef $$ProductsTableCreateCompanionBuilder =
+    ProductsCompanion Function({
+      required String id,
+      required String bankName,
+      required String productName,
+      Value<bool> isActive,
+      required int createdAtUtc,
+      required int updatedAtUtc,
+      Value<int> rowid,
+    });
+typedef $$ProductsTableUpdateCompanionBuilder =
+    ProductsCompanion Function({
+      Value<String> id,
+      Value<String> bankName,
+      Value<String> productName,
+      Value<bool> isActive,
+      Value<int> createdAtUtc,
+      Value<int> updatedAtUtc,
+      Value<int> rowid,
+    });
+
+final class $$ProductsTableReferences
+    extends BaseReferences<_$AppDatabase, $ProductsTable, Product> {
+  $$ProductsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<
+    $ProductRateVersionsTable,
+    List<ProductRateVersion>
+  >
+  _productRateVersionsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.productRateVersions,
+        aliasName: $_aliasNameGenerator(
+          db.products.id,
+          db.productRateVersions.productId,
+        ),
+      );
+
+  $$ProductRateVersionsTableProcessedTableManager get productRateVersionsRefs {
+    final manager = $$ProductRateVersionsTableTableManager(
+      $_db,
+      $_db.productRateVersions,
+    ).filter((f) => f.productId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _productRateVersionsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$ProductsTableFilterComposer
+    extends Composer<_$AppDatabase, $ProductsTable> {
+  $$ProductsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get bankName => $composableBuilder(
+    column: $table.bankName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get productName => $composableBuilder(
+    column: $table.productName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAtUtc => $composableBuilder(
+    column: $table.createdAtUtc,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAtUtc => $composableBuilder(
+    column: $table.updatedAtUtc,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> productRateVersionsRefs(
+    Expression<bool> Function($$ProductRateVersionsTableFilterComposer f) f,
+  ) {
+    final $$ProductRateVersionsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.productRateVersions,
+      getReferencedColumn: (t) => t.productId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductRateVersionsTableFilterComposer(
+            $db: $db,
+            $table: $db.productRateVersions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$ProductsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ProductsTable> {
+  $$ProductsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get bankName => $composableBuilder(
+    column: $table.bankName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get productName => $composableBuilder(
+    column: $table.productName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAtUtc => $composableBuilder(
+    column: $table.createdAtUtc,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAtUtc => $composableBuilder(
+    column: $table.updatedAtUtc,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ProductsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ProductsTable> {
+  $$ProductsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get bankName =>
+      $composableBuilder(column: $table.bankName, builder: (column) => column);
+
+  GeneratedColumn<String> get productName => $composableBuilder(
+    column: $table.productName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAtUtc => $composableBuilder(
+    column: $table.createdAtUtc,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get updatedAtUtc => $composableBuilder(
+    column: $table.updatedAtUtc,
+    builder: (column) => column,
+  );
+
+  Expression<T> productRateVersionsRefs<T extends Object>(
+    Expression<T> Function($$ProductRateVersionsTableAnnotationComposer a) f,
+  ) {
+    final $$ProductRateVersionsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.productRateVersions,
+          getReferencedColumn: (t) => t.productId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$ProductRateVersionsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.productRateVersions,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$ProductsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ProductsTable,
+          Product,
+          $$ProductsTableFilterComposer,
+          $$ProductsTableOrderingComposer,
+          $$ProductsTableAnnotationComposer,
+          $$ProductsTableCreateCompanionBuilder,
+          $$ProductsTableUpdateCompanionBuilder,
+          (Product, $$ProductsTableReferences),
+          Product,
+          PrefetchHooks Function({bool productRateVersionsRefs})
+        > {
+  $$ProductsTableTableManager(_$AppDatabase db, $ProductsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ProductsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ProductsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ProductsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> bankName = const Value.absent(),
+                Value<String> productName = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+                Value<int> createdAtUtc = const Value.absent(),
+                Value<int> updatedAtUtc = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ProductsCompanion(
+                id: id,
+                bankName: bankName,
+                productName: productName,
+                isActive: isActive,
+                createdAtUtc: createdAtUtc,
+                updatedAtUtc: updatedAtUtc,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String bankName,
+                required String productName,
+                Value<bool> isActive = const Value.absent(),
+                required int createdAtUtc,
+                required int updatedAtUtc,
+                Value<int> rowid = const Value.absent(),
+              }) => ProductsCompanion.insert(
+                id: id,
+                bankName: bankName,
+                productName: productName,
+                isActive: isActive,
+                createdAtUtc: createdAtUtc,
+                updatedAtUtc: updatedAtUtc,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$ProductsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({productRateVersionsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (productRateVersionsRefs) db.productRateVersions,
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (productRateVersionsRefs)
+                    await $_getPrefetchedData<
+                      Product,
+                      $ProductsTable,
+                      ProductRateVersion
+                    >(
+                      currentTable: table,
+                      referencedTable: $$ProductsTableReferences
+                          ._productRateVersionsRefsTable(db),
+                      managerFromTypedResult: (p0) => $$ProductsTableReferences(
+                        db,
+                        table,
+                        p0,
+                      ).productRateVersionsRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where((e) => e.productId == item.id),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$ProductsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ProductsTable,
+      Product,
+      $$ProductsTableFilterComposer,
+      $$ProductsTableOrderingComposer,
+      $$ProductsTableAnnotationComposer,
+      $$ProductsTableCreateCompanionBuilder,
+      $$ProductsTableUpdateCompanionBuilder,
+      (Product, $$ProductsTableReferences),
+      Product,
+      PrefetchHooks Function({bool productRateVersionsRefs})
+    >;
+typedef $$ProductRateVersionsTableCreateCompanionBuilder =
+    ProductRateVersionsCompanion Function({
+      required String id,
+      required String productId,
+      required int interestRateScaled,
+      required int ratePrecision,
+      required String effectiveDate,
+      required int createdAtUtc,
+      required int updatedAtUtc,
+      Value<int> rowid,
+    });
+typedef $$ProductRateVersionsTableUpdateCompanionBuilder =
+    ProductRateVersionsCompanion Function({
+      Value<String> id,
+      Value<String> productId,
+      Value<int> interestRateScaled,
+      Value<int> ratePrecision,
+      Value<String> effectiveDate,
+      Value<int> createdAtUtc,
+      Value<int> updatedAtUtc,
+      Value<int> rowid,
+    });
+
+final class $$ProductRateVersionsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $ProductRateVersionsTable,
+          ProductRateVersion
+        > {
+  $$ProductRateVersionsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $ProductsTable _productIdTable(_$AppDatabase db) =>
+      db.products.createAlias(
+        $_aliasNameGenerator(db.productRateVersions.productId, db.products.id),
+      );
+
+  $$ProductsTableProcessedTableManager get productId {
+    final $_column = $_itemColumn<String>('product_id')!;
+
+    final manager = $$ProductsTableTableManager(
+      $_db,
+      $_db.products,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_productIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$ProductRateVersionsTableFilterComposer
+    extends Composer<_$AppDatabase, $ProductRateVersionsTable> {
+  $$ProductRateVersionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get interestRateScaled => $composableBuilder(
+    column: $table.interestRateScaled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get ratePrecision => $composableBuilder(
+    column: $table.ratePrecision,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get effectiveDate => $composableBuilder(
+    column: $table.effectiveDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAtUtc => $composableBuilder(
+    column: $table.createdAtUtc,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAtUtc => $composableBuilder(
+    column: $table.updatedAtUtc,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$ProductsTableFilterComposer get productId {
+    final $$ProductsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.productId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableFilterComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ProductRateVersionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ProductRateVersionsTable> {
+  $$ProductRateVersionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get interestRateScaled => $composableBuilder(
+    column: $table.interestRateScaled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get ratePrecision => $composableBuilder(
+    column: $table.ratePrecision,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get effectiveDate => $composableBuilder(
+    column: $table.effectiveDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAtUtc => $composableBuilder(
+    column: $table.createdAtUtc,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAtUtc => $composableBuilder(
+    column: $table.updatedAtUtc,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$ProductsTableOrderingComposer get productId {
+    final $$ProductsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.productId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableOrderingComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ProductRateVersionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ProductRateVersionsTable> {
+  $$ProductRateVersionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get interestRateScaled => $composableBuilder(
+    column: $table.interestRateScaled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get ratePrecision => $composableBuilder(
+    column: $table.ratePrecision,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get effectiveDate => $composableBuilder(
+    column: $table.effectiveDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get createdAtUtc => $composableBuilder(
+    column: $table.createdAtUtc,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get updatedAtUtc => $composableBuilder(
+    column: $table.updatedAtUtc,
+    builder: (column) => column,
+  );
+
+  $$ProductsTableAnnotationComposer get productId {
+    final $$ProductsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.productId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ProductRateVersionsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ProductRateVersionsTable,
+          ProductRateVersion,
+          $$ProductRateVersionsTableFilterComposer,
+          $$ProductRateVersionsTableOrderingComposer,
+          $$ProductRateVersionsTableAnnotationComposer,
+          $$ProductRateVersionsTableCreateCompanionBuilder,
+          $$ProductRateVersionsTableUpdateCompanionBuilder,
+          (ProductRateVersion, $$ProductRateVersionsTableReferences),
+          ProductRateVersion,
+          PrefetchHooks Function({bool productId})
+        > {
+  $$ProductRateVersionsTableTableManager(
+    _$AppDatabase db,
+    $ProductRateVersionsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ProductRateVersionsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ProductRateVersionsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$ProductRateVersionsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> productId = const Value.absent(),
+                Value<int> interestRateScaled = const Value.absent(),
+                Value<int> ratePrecision = const Value.absent(),
+                Value<String> effectiveDate = const Value.absent(),
+                Value<int> createdAtUtc = const Value.absent(),
+                Value<int> updatedAtUtc = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ProductRateVersionsCompanion(
+                id: id,
+                productId: productId,
+                interestRateScaled: interestRateScaled,
+                ratePrecision: ratePrecision,
+                effectiveDate: effectiveDate,
+                createdAtUtc: createdAtUtc,
+                updatedAtUtc: updatedAtUtc,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String productId,
+                required int interestRateScaled,
+                required int ratePrecision,
+                required String effectiveDate,
+                required int createdAtUtc,
+                required int updatedAtUtc,
+                Value<int> rowid = const Value.absent(),
+              }) => ProductRateVersionsCompanion.insert(
+                id: id,
+                productId: productId,
+                interestRateScaled: interestRateScaled,
+                ratePrecision: ratePrecision,
+                effectiveDate: effectiveDate,
+                createdAtUtc: createdAtUtc,
+                updatedAtUtc: updatedAtUtc,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$ProductRateVersionsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({productId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (productId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.productId,
+                                referencedTable:
+                                    $$ProductRateVersionsTableReferences
+                                        ._productIdTable(db),
+                                referencedColumn:
+                                    $$ProductRateVersionsTableReferences
+                                        ._productIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$ProductRateVersionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ProductRateVersionsTable,
+      ProductRateVersion,
+      $$ProductRateVersionsTableFilterComposer,
+      $$ProductRateVersionsTableOrderingComposer,
+      $$ProductRateVersionsTableAnnotationComposer,
+      $$ProductRateVersionsTableCreateCompanionBuilder,
+      $$ProductRateVersionsTableUpdateCompanionBuilder,
+      (ProductRateVersion, $$ProductRateVersionsTableReferences),
+      ProductRateVersion,
+      PrefetchHooks Function({bool productId})
+    >;
 typedef $$NotificationIdMappingsTableCreateCompanionBuilder =
     NotificationIdMappingsCompanion Function({
       required String entityId,
@@ -8031,6 +9707,10 @@ class $AppDatabaseManager {
       $$DeviceSettingsTableTableManager(_db, _db.deviceSettings);
   $$DepositPresetsTableTableManager get depositPresets =>
       $$DepositPresetsTableTableManager(_db, _db.depositPresets);
+  $$ProductsTableTableManager get products =>
+      $$ProductsTableTableManager(_db, _db.products);
+  $$ProductRateVersionsTableTableManager get productRateVersions =>
+      $$ProductRateVersionsTableTableManager(_db, _db.productRateVersions);
   $$NotificationIdMappingsTableTableManager get notificationIdMappings =>
       $$NotificationIdMappingsTableTableManager(
         _db,

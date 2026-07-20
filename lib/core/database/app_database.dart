@@ -17,6 +17,8 @@ part 'app_database.g.dart';
     BusinessSettings,
     DeviceSettings,
     DepositPresets,
+    Products,
+    ProductRateVersions,
     NotificationIdMappings,
   ],
 )
@@ -27,7 +29,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : this(executor);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -165,6 +167,27 @@ WHERE duplicate_rank > 1
             "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'deposit_presets'",
           ).get();
           if (presetsTable.isEmpty) await migrator.createTable(depositPresets);
+        });
+      }
+      if (from < 7) {
+        await transaction(() async {
+          await migrator.createTable(products);
+          await migrator.createTable(productRateVersions);
+          await customStatement(
+            'CREATE UNIQUE INDEX IF NOT EXISTS '
+            'products_bank_name_product_name_idx '
+            'ON products (lower(trim(bank_name)), lower(trim(product_name)))',
+          );
+          await customStatement(
+            'CREATE UNIQUE INDEX IF NOT EXISTS '
+            'product_rate_versions_product_date_idx '
+            'ON product_rate_versions (product_id, effective_date)',
+          );
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS '
+            'product_rate_versions_product_id_idx '
+            'ON product_rate_versions (product_id)',
+          );
         });
       }
     },

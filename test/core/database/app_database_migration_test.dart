@@ -189,6 +189,51 @@ void main() {
       );
     },
   );
+
+  test(
+    'migrates a real v6 file and creates an empty product catalog',
+    () async {
+      final file = await _createV6File();
+      addTearDown(() => _deleteDatabaseFiles(file));
+
+      final database = AppDatabase.forTesting(NativeDatabase(file));
+      addTearDown(database.close);
+
+      expect(database.schemaVersion, 7);
+      expect(
+        await database.customSelect('SELECT name FROM customers').get(),
+        hasLength(1),
+      );
+      expect(
+        await database.customSelect('SELECT id FROM deposits').get(),
+        hasLength(1),
+      );
+      expect(
+        await database.customSelect('SELECT id FROM deposit_presets').get(),
+        hasLength(1),
+      );
+      final productCount = await database
+          .customSelect('SELECT COUNT(*) AS count FROM products')
+          .getSingle();
+      final rateCount = await database
+          .customSelect('SELECT COUNT(*) AS count FROM product_rate_versions')
+          .getSingle();
+      expect(productCount.read<int>('count'), 0);
+      expect(rateCount.read<int>('count'), 0);
+
+      final indexes = await database
+          .customSelect("SELECT name FROM sqlite_master WHERE type = 'index'")
+          .get();
+      expect(
+        indexes.map((row) => row.read<String>('name')),
+        containsAll(<String>[
+          'products_bank_name_product_name_idx',
+          'product_rate_versions_product_date_idx',
+          'product_rate_versions_product_id_idx',
+        ]),
+      );
+    },
+  );
 }
 
 const _hashA =
@@ -215,6 +260,59 @@ INSERT INTO message_templates VALUES
   ('a', 'A', 'content-a', 1, 1, 1),
   ('b', 'B', 'content-b', 0, 1, 1);
 PRAGMA user_version = 3;
+''');
+  raw.dispose();
+  return file;
+}
+
+Future<File> _createV6File() async {
+  final file = File(
+    '${Directory.systemTemp.path}${Platform.pathSeparator}'
+    'deposit-v6-${const Uuid().v4()}.sqlite',
+  );
+  final raw = sqlite.sqlite3.open(file.path);
+  raw.execute('''
+CREATE TABLE customers (
+  id TEXT NOT NULL PRIMARY KEY,
+  name TEXT NOT NULL,
+  phone TEXT,
+  normalized_name TEXT NOT NULL DEFAULT '',
+  full_pinyin TEXT NOT NULL DEFAULT '',
+  initials TEXT NOT NULL DEFAULT '',
+  normalized_phone TEXT NOT NULL DEFAULT '',
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at_utc INTEGER NOT NULL,
+  updated_at_utc INTEGER NOT NULL
+);
+CREATE TABLE deposits (
+  id TEXT NOT NULL PRIMARY KEY,
+  customer_id TEXT NOT NULL REFERENCES customers(id),
+  amount_cents INTEGER NOT NULL,
+  bank_name TEXT NOT NULL DEFAULT '',
+  product_name TEXT NOT NULL DEFAULT '',
+  term_value INTEGER,
+  term_unit TEXT,
+  interest_rate_scaled INTEGER NOT NULL,
+  rate_precision INTEGER NOT NULL,
+  start_date TEXT NOT NULL,
+  calculated_expiry_date TEXT,
+  final_expiry_date TEXT NOT NULL,
+  lifecycle TEXT NOT NULL,
+  created_at_utc INTEGER NOT NULL,
+  updated_at_utc INTEGER NOT NULL,
+  source_device_id TEXT NOT NULL
+);
+CREATE TABLE deposit_presets (
+  id TEXT NOT NULL PRIMARY KEY,
+  field_type TEXT NOT NULL,
+  value TEXT NOT NULL,
+  created_at_utc INTEGER NOT NULL
+);
+INSERT INTO customers VALUES ('c1', 'Legacy', NULL, '', '', '', '', 1, 1, 1);
+INSERT INTO deposits VALUES ('d1', 'c1', 100, 'Bank', 'Product', NULL, NULL, 10, 2,
+  '2026-01-01', NULL, '2027-01-01', 'active', 1, 1, 'legacy');
+INSERT INTO deposit_presets VALUES ('preset-1', 'bank', 'Bank', 1);
+PRAGMA user_version = 6;
 ''');
   raw.dispose();
   return file;

@@ -231,6 +231,55 @@ class DepositPresets extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+@TableIndex.sql(
+  'CREATE UNIQUE INDEX products_bank_name_product_name_idx '
+  'ON products (lower(trim(bank_name)), lower(trim(product_name)))',
+)
+class Products extends Table {
+  TextColumn get id => text()();
+  TextColumn get bankName => text().check(bankName.length.isBiggerThanValue(0))();
+  TextColumn get productName =>
+      text().check(productName.length.isBiggerThanValue(0))();
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+  IntColumn get createdAtUtc =>
+      integer().check(utcEpochCheck('created_at_utc'))();
+  IntColumn get updatedAtUtc =>
+      integer().check(utcEpochCheck('updated_at_utc'))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+@TableIndex(
+  name: 'product_rate_versions_product_date_idx',
+  columns: {#productId, #effectiveDate},
+  unique: true,
+)
+@TableIndex(
+  name: 'product_rate_versions_product_id_idx',
+  columns: {#productId},
+)
+class ProductRateVersions extends Table {
+  TextColumn get id => text()();
+  TextColumn get productId =>
+      text().references(Products, #id, onDelete: KeyAction.restrict)();
+  IntColumn get interestRateScaled => integer().check(
+    const CustomExpression<bool>('interest_rate_scaled >= 0'),
+  )();
+  IntColumn get ratePrecision => integer().check(
+    const CustomExpression<bool>('rate_precision BETWEEN 0 AND 9'),
+  )();
+  TextColumn get effectiveDate =>
+      text().check(isoDateTextCheck('effective_date'))();
+  IntColumn get createdAtUtc =>
+      integer().check(utcEpochCheck('created_at_utc'))();
+  IntColumn get updatedAtUtc =>
+      integer().check(utcEpochCheck('updated_at_utc'))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
 class NotificationIdMappings extends Table {
   TextColumn get entityId => text()();
   IntColumn get notificationId => integer().unique()();
