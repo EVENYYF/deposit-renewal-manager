@@ -34,6 +34,7 @@ migrate_working_dir/
 /coverage/
 .superpowers/
 .learnings/
+.worktrees/
 
 # Symbolication related
 app.*.symbols

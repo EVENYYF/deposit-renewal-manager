@@ -224,7 +224,7 @@ git -c safe.directory=F:/MY_CHERRY_WORKSPACE/deposit-renewal-manager commit -m "
 - [ ] **步骤 1：格式化并检查工作区**
 
 ```powershell
-flutter format lib test
+F:\DevTools\flutter-stable-final\flutter\bin\cache\dart-sdk\bin\dart.exe format lib test
 git -c safe.directory=F:/MY_CHERRY_WORKSPACE/deposit-renewal-manager diff --check
 ```
 
