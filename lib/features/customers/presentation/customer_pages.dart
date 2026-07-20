@@ -8,6 +8,7 @@ import '../application/customer_history_service.dart';
 import '../domain/customer_repository.dart';
 import '../domain/name_search_index.dart';
 import 'customer_history_formatter.dart';
+import 'customer_detail_page.dart';
 import '../../deposits/domain/deposit.dart';
 import '../../deposits/domain/deposit_repository.dart';
 import '../../deposits/domain/local_date.dart';
@@ -395,6 +396,18 @@ class _CustomerCardState extends ConsumerState<_CustomerCard> {
       onExpansionChanged: (expanded) {
         if (expanded) setState(_loadDeposits);
       },
+      trailing: IconButton(
+        tooltip: '客户详情',
+        icon: const Icon(Icons.chevron_right),
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => CustomerDetailPage(
+              customerId: result.customer.id,
+              initialResult: result,
+            ),
+          ),
+        ),
+      ),
       leading: CircleAvatar(child: Text(result.customer.name.characters.first)),
       title: Text(
         result.customer.name,
