@@ -10,6 +10,7 @@ import '../features/dashboard/presentation/dashboard_page.dart';
 import '../features/deposits/presentation/deposit_form_page.dart';
 import '../features/excel_import/presentation/import_wizard.dart';
 import '../features/settings/presentation/backup_settings_page.dart';
+import '../features/settings/presentation/product_management_page.dart';
 import '../features/statistics/presentation/deposit_statistics_page.dart';
 import '../features/templates/presentation/templates_page.dart';
 import '../features/text_import/presentation/text_import_page.dart';
@@ -186,8 +187,20 @@ class _SettingsPage extends ConsumerWidget {
         trailing: const Icon(Icons.chevron_right),
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute<void>(
-            builder: (_) => TemplatesPage(
-              bindings: ref.read(templateBindingsProvider),
+            builder: (_) =>
+                TemplatesPage(bindings: ref.read(templateBindingsProvider)),
+          ),
+        ),
+      ),
+      ListTile(
+        leading: const Icon(Icons.inventory_2_outlined),
+        title: const Text('产品管理'),
+        subtitle: const Text('管理银行产品和按日期生效的利率版本'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => ProductManagementPage(
+              service: ref.read(productCatalogServiceProvider),
             ),
           ),
         ),

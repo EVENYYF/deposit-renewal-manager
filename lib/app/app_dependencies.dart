@@ -10,6 +10,7 @@ import '../core/database/app_database.dart';
 import '../core/database/daos/customer_dao.dart';
 import '../core/database/daos/deposit_dao.dart';
 import '../core/database/daos/deposit_preset_dao.dart';
+import '../core/database/daos/product_catalog_dao.dart';
 import '../core/notifications/notification_scheduler.dart';
 import '../features/customers/application/customer_controller.dart';
 import '../features/customers/application/customer_history_service.dart';
@@ -19,6 +20,7 @@ import '../features/customers/domain/name_search_index.dart';
 import '../features/dashboard/application/dashboard_controller.dart';
 import '../features/deposits/application/deposit_workflow_controller.dart';
 import '../features/deposits/application/deposit_preset_service.dart';
+import '../features/deposits/application/product_catalog_service.dart';
 import '../features/deposits/domain/deposit.dart' as domain;
 import '../features/deposits/domain/deposit_repository.dart';
 import '../features/deposits/domain/expiry_calculator.dart';
@@ -53,6 +55,10 @@ final snapshotPolicyServiceProvider = Provider<SnapshotPolicyService>(
 
 final depositPresetServiceProvider = Provider<DepositPresetService>(
   (ref) => throw StateError('Deposit presets are not configured'),
+);
+
+final productCatalogServiceProvider = Provider<ProductCatalogService>(
+  (ref) => throw StateError('Product catalog is not configured'),
 );
 
 final excelImportBindingsProvider = Provider<ExcelImportBindings>(
@@ -97,6 +103,9 @@ class ApplicationProviderScope extends StatelessWidget {
       backupServiceProvider.overrideWithValue(backupService),
       depositPresetServiceProvider.overrideWithValue(
         DepositPresetService(DepositPresetDao(database)),
+      ),
+      productCatalogServiceProvider.overrideWithValue(
+        ProductCatalogService(ProductCatalogDao(database)),
       ),
       notificationSchedulerProvider.overrideWithValue(notificationScheduler),
       customerUseCasesProvider.overrideWith(
