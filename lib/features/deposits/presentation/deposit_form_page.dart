@@ -567,6 +567,8 @@ class _DepositFormPageState extends ConsumerState<DepositFormPage> {
         ).showSnackBar(const SnackBar(content: Text('已保存')));
         widget.onSaved?.call();
       }
+    } on DepositNotActiveException {
+      _showError('该存款已被处理，请刷新后重试');
     } on Object catch (error) {
       _showError('保存失败：$error');
     } finally {
@@ -765,14 +767,20 @@ class _RenewalSourceSummary extends StatelessWidget {
         children: [
           Text(_customerLabel, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
+          Text('原银行：${draft.bankName}'),
           Text(
-            '${draft.bankName}${draft.productName.isEmpty ? '' : ' · ${draft.productName}'}',
+            '原产品：${draft.productName}',
+            key: const Key('renewal-original-product'),
           ),
           Text('原金额：${(draft.amountCents / 100).toStringAsFixed(2)} 元'),
           Text(
             '原利率：${(draft.interestRateScaled / _scaleFor(draft.ratePrecision)).toStringAsFixed(draft.ratePrecision)}%',
+            key: const Key('renewal-original-rate'),
           ),
-          Text('原到期日：${draft.finalExpiryDate}'),
+          Text(
+            '原到期日：${draft.finalExpiryDate}',
+            key: const Key('renewal-original-expiry'),
+          ),
         ],
       ),
     ),

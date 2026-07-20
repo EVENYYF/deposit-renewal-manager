@@ -1,5 +1,10 @@
+import 'dart:async';
+
 import 'package:deposit_renewal_manager/core/notifications/notification_scheduler.dart';
+import 'package:deposit_renewal_manager/features/customers/domain/customer_repository.dart';
 import 'package:deposit_renewal_manager/features/dashboard/application/dashboard_controller.dart';
+import 'package:deposit_renewal_manager/features/deposits/application/deposit_workflow_controller.dart';
+import 'package:deposit_renewal_manager/features/deposits/domain/deposit_repository.dart';
 import 'package:deposit_renewal_manager/features/dashboard/presentation/dashboard_page.dart';
 import 'package:deposit_renewal_manager/features/deposits/presentation/deposit_form_page.dart';
 import 'package:flutter/material.dart';
@@ -58,6 +63,39 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('更新存款'), findsOneWidget);
   });
+
+  testWidgets('stop action is disabled while the mutation is pending', (
+    tester,
+  ) async {
+    final workflow = _PendingStopWorkflow();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          dashboardUseCasesProvider.overrideWithValue(const _Cases()),
+          depositWorkflowProvider.overrideWithValue(workflow),
+          notificationSchedulerProvider.overrideWithValue(
+            const UnsupportedNotificationScheduler(),
+          ),
+        ],
+        child: const MaterialApp(home: Scaffold(body: DashboardPage())),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('停止续期'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('确认停止'));
+    await tester.pump();
+
+    final stopButton = tester.widget<TextButton>(
+      find.ancestor(of: find.text('停止续期'), matching: find.byType(TextButton)),
+    );
+    expect(stopButton.onPressed, isNull);
+    expect(workflow.stopCalls, 1);
+
+    workflow.stopCompleter.complete();
+    await tester.pumpAndSettle();
+  });
 }
 
 final class _Cases implements DashboardUseCases {
@@ -82,4 +120,30 @@ final class _Cases implements DashboardUseCases {
   );
   @override
   Future<void> save(DashboardCommand command) async {}
+}
+
+final class _PendingStopWorkflow implements DepositWorkflow {
+  final stopCompleter = Completer<void>();
+  int stopCalls = 0;
+
+  @override
+  Future<void> create(DepositDraft draft) async {}
+
+  @override
+  Future<void> createWithCustomer(
+    DepositDraft draft,
+    CustomerDraft customer,
+  ) async {}
+
+  @override
+  Future<void> renew(String sourceDepositId, DepositDraft draft) async {}
+
+  @override
+  Future<void> stop(String depositId) {
+    stopCalls++;
+    return stopCompleter.future;
+  }
+
+  @override
+  Future<void> update(String depositId, DepositDraft draft) async {}
 }

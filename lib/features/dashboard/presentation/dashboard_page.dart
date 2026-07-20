@@ -174,18 +174,30 @@ class _ReminderSection extends ConsumerWidget {
             child: Padding(padding: EdgeInsets.all(16), child: Text('暂无记录')),
           )
         else
-          ...records.map((record) => _ReminderTile(record: record)),
+          ...records.map(
+            (record) =>
+                _ReminderTile(key: ValueKey(record.depositId), record: record),
+          ),
       ],
     ),
   );
 }
 
-class _ReminderTile extends ConsumerWidget {
-  const _ReminderTile({required this.record});
+class _ReminderTile extends ConsumerStatefulWidget {
+  const _ReminderTile({required this.record, super.key});
   final DashboardReminder record;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Card(
+  ConsumerState<_ReminderTile> createState() => _ReminderTileState();
+}
+
+class _ReminderTileState extends ConsumerState<_ReminderTile> {
+  bool _stopping = false;
+
+  DashboardReminder get record => widget.record;
+
+  @override
+  Widget build(BuildContext context) => Card(
     margin: const EdgeInsets.only(bottom: 8),
     child: Padding(
       padding: const EdgeInsets.all(12),
@@ -218,17 +230,24 @@ class _ReminderTile extends ConsumerWidget {
                 label: const Text('提示语'),
               ),
               FilledButton.tonal(
-                onPressed: () =>
-                    _showDepositForm(context, ref, DepositFormMode.renew),
+                onPressed: _stopping
+                    ? null
+                    : () =>
+                          _showDepositForm(context, ref, DepositFormMode.renew),
                 child: const Text('续期'),
               ),
               TextButton(
-                onPressed: () =>
-                    _showDepositForm(context, ref, DepositFormMode.update),
+                onPressed: _stopping
+                    ? null
+                    : () => _showDepositForm(
+                        context,
+                        ref,
+                        DepositFormMode.update,
+                      ),
                 child: const Text('更新'),
               ),
               TextButton(
-                onPressed: () => _confirmStop(context, ref),
+                onPressed: _stopping ? null : () => _confirmStop(context, ref),
                 child: const Text('停止续期'),
               ),
             ],
@@ -257,8 +276,26 @@ class _ReminderTile extends ConsumerWidget {
       ),
     );
     if (confirmed != true) return;
-    await ref.read(depositWorkflowProvider).stop(record.depositId);
-    await ref.read(dashboardControllerProvider.notifier).retry();
+    if (!mounted) return;
+    setState(() => _stopping = true);
+    try {
+      await ref.read(depositWorkflowProvider).stop(record.depositId);
+      await ref.read(dashboardControllerProvider.notifier).retry();
+    } on DepositNotActiveException {
+      _showStopError('该存款已被处理，请刷新后重试');
+      await ref.read(dashboardControllerProvider.notifier).retry();
+    } on Object {
+      _showStopError('停止续期失败，请稍后重试');
+    } finally {
+      if (mounted) setState(() => _stopping = false);
+    }
+  }
+
+  void _showStopError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _showDepositForm(

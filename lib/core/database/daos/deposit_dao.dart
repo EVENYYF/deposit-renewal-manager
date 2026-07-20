@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:clock/clock.dart';
@@ -208,7 +209,7 @@ final class DepositDao implements DepositRepository {
         revision,
       );
     });
-    await _notify(() => notificationCoordinator?.afterStopOrDelete(id));
+    unawaited(_notify(() => notificationCoordinator?.afterStopOrDelete(id)));
   }
 
   @override

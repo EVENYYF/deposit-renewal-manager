@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:deposit_renewal_manager/core/database/app_database.dart';
 import 'package:deposit_renewal_manager/core/database/daos/customer_dao.dart';
@@ -193,6 +194,57 @@ void main() {
       expect(warnings.single, contains('通知更新失败'));
     },
   );
+
+  test('stop commits before notification cancellation completes', () async {
+    final coordinator = _RecordingNotificationCoordinator(
+      stopCompleter: Completer<void>(),
+    );
+    final repository = _repository(
+      database,
+      notificationCoordinator: coordinator,
+    );
+    await repository.create(_draft('source'));
+
+    var stopCompleted = false;
+    final stopFuture = repository.stopRenewal('source').then((_) {
+      stopCompleted = true;
+    });
+    await Future<void>.delayed(Duration.zero);
+
+    expect(
+      (await repository.get('source'))!.deposit.lifecycle,
+      DepositLifecycle.stopped,
+    );
+    expect(coordinator.stopCompleter!.isCompleted, isFalse);
+    final completedBeforeNotification = stopCompleted;
+    coordinator.stopCompleter!.complete();
+    await stopFuture;
+    expect(completedBeforeNotification, isTrue);
+  });
+
+  test(
+    'stop notification failure warns after the state is committed',
+    () async {
+      final warnings = <String>[];
+      final repository = _repository(
+        database,
+        notificationCoordinator: _RecordingNotificationCoordinator(
+          stopError: StateError('notification failed'),
+        ),
+        notificationWarning: warnings.add,
+      );
+      await repository.create(_draft('source'));
+
+      await repository.stopRenewal('source');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        (await repository.get('source'))!.deposit.lifecycle,
+        DepositLifecycle.stopped,
+      );
+      expect(warnings.single, contains('通知更新失败'));
+    },
+  );
 }
 
 DepositDao _repository(
@@ -213,9 +265,15 @@ DepositDao _repository(
 
 final class _RecordingNotificationCoordinator
     implements NotificationMutationCoordinator {
-  _RecordingNotificationCoordinator({this.fail = false});
+  _RecordingNotificationCoordinator({
+    this.fail = false,
+    this.stopCompleter,
+    this.stopError,
+  });
 
   final bool fail;
+  final Completer<void>? stopCompleter;
+  final Object? stopError;
   final List<String> events = [];
 
   Future<void> _record(String event) async {
@@ -232,8 +290,12 @@ final class _RecordingNotificationCoordinator
       _record('renew:$sourceDepositId:$targetDepositId');
 
   @override
-  Future<void> afterStopOrDelete(String depositId) =>
-      _record('stop:$depositId');
+  Future<void> afterStopOrDelete(String depositId) async {
+    events.add('stop:$depositId');
+    if (stopError case final error?) throw error;
+    if (stopCompleter case final completer?) await completer.future;
+    if (fail) throw StateError('notification failed');
+  }
 
   @override
   Future<void> cancelDeposit(String depositId) => _record('cancel:$depositId');
