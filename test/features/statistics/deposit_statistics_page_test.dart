@@ -31,6 +31,15 @@ void main() {
     expect(find.text('已续期历史'), findsOneWidget);
     expect(find.text('建设银行'), findsOneWidget);
 
+    await tester.tap(find.text('建设银行'));
+    await tester.pumpAndSettle();
+    expect(find.text('银行：建设银行'), findsOneWidget);
+    expect(find.text('张三'), findsOneWidget);
+    expect(find.text('13800000000'), findsOneWidget);
+
+    Navigator.of(tester.element(find.text('银行：建设银行'))).pop();
+    await tester.pumpAndSettle();
+
     await tester.drag(find.byType(ListView), const Offset(0, -500));
     await tester.pumpAndSettle();
     expect(find.text('稳健一年'), findsOneWidget);
@@ -85,4 +94,22 @@ final class _FakeStatisticsUseCases implements DepositStatisticsUseCases {
           ),
         ],
       );
+
+  @override
+  Future<List<DepositStatisticsDetail>> loadDetails(
+    DepositStatisticsDimension dimension,
+    String value,
+  ) async => const [
+    DepositStatisticsDetail(
+      depositId: 'd1',
+      customerName: '张三',
+      customerPhone: '13800000000',
+      bankName: '建设银行',
+      productName: '稳健一年',
+      amountCents: 120000,
+      interestRateScaled: 215,
+      ratePrecision: 2,
+      expiryDate: '2027-07-20',
+    ),
+  ];
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/deposit_statistics.dart';
+import 'deposit_statistics_detail_page.dart';
 
 class DepositStatisticsPage extends ConsumerWidget {
   const DepositStatisticsPage({super.key});
@@ -64,9 +65,17 @@ class _StatisticsBody extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 24),
-      _BreakdownSection(title: '按银行', rows: snapshot.byBank),
+      _BreakdownSection(
+        title: '按银行',
+        dimension: DepositStatisticsDimension.bank,
+        rows: snapshot.byBank,
+      ),
       const SizedBox(height: 24),
-      _BreakdownSection(title: '按产品', rows: snapshot.byProduct),
+      _BreakdownSection(
+        title: '按产品',
+        dimension: DepositStatisticsDimension.product,
+        rows: snapshot.byProduct,
+      ),
     ],
   );
 }
@@ -106,8 +115,13 @@ class _StatusRow extends StatelessWidget {
 }
 
 class _BreakdownSection extends StatelessWidget {
-  const _BreakdownSection({required this.title, required this.rows});
+  const _BreakdownSection({
+    required this.title,
+    required this.dimension,
+    required this.rows,
+  });
   final String title;
+  final DepositStatisticsDimension dimension;
   final List<DepositStatisticsBreakdown> rows;
 
   @override
@@ -123,11 +137,20 @@ class _BreakdownSection extends StatelessWidget {
           (row) => Card(
             margin: const EdgeInsets.only(bottom: 8),
             child: ListTile(
-              title: Text(row.name),
+              key: Key('statistics-${dimension.name}-${row.name}'),
+              title: Text(_displayName(row.name)),
               subtitle: Text(
                 '${row.depositCount} 笔 · ${row.customerCount} 位客户',
               ),
               trailing: Text(_money(row.amountCents)),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => DepositStatisticsDetailPage(
+                    dimension: dimension,
+                    value: row.name,
+                  ),
+                ),
+              ),
             ),
           ),
         ),
@@ -166,3 +189,6 @@ String _money(int cents) {
   );
   return '${negative ? '-' : ''}¥$grouped.${(absolute % 100).toString().padLeft(2, '0')}';
 }
+
+String _displayName(String value) =>
+    value.trim().isEmpty ? '未填写' : value.trim();

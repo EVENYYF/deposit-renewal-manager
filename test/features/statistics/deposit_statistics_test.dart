@@ -94,11 +94,7 @@ void main() {
         snapshot.byBank.map((row) => (row.name, row.amountCents)).toList(),
         [('建设银行', 170000), ('工商银行', 30000)],
       );
-      expect(snapshot.byProduct.map((row) => row.name), [
-        '稳健一年',
-        '通知存款',
-        '未填写',
-      ]);
+      expect(snapshot.byProduct.map((row) => row.name), ['稳健一年', '通知存款', '']);
       expect(snapshot.byBank.first.depositCount, 2);
       expect(snapshot.byBank.first.customerCount, 1);
     },
@@ -112,21 +108,102 @@ void main() {
     expect(snapshot.byBank, isEmpty);
     expect(snapshot.byProduct, isEmpty);
   });
+
+  test(
+    'loads active detail rows with stable sorting and empty categories',
+    () async {
+      await _addCustomer(database, 'c1', '王芳', phone: '13800000001');
+      await _addCustomer(database, 'c2', '李明', phone: '13800000002');
+      await _addCustomer(database, 'c3', '停用客户', isActive: false);
+      await _addDeposit(
+        database,
+        id: 'd2',
+        customerId: 'c1',
+        amountCents: 20000,
+        bank: '建设银行',
+        product: '产品二',
+        expiry: '2027-01-02',
+      );
+      await _addDeposit(
+        database,
+        id: 'd1',
+        customerId: 'c2',
+        amountCents: 10000,
+        bank: '建设银行',
+        product: '产品一',
+        expiry: '2027-01-01',
+      );
+      await _addDeposit(
+        database,
+        id: 'd0',
+        customerId: 'c2',
+        amountCents: 30000,
+        bank: '建设银行',
+        product: '',
+        expiry: '2027-01-01',
+      );
+      await _addDeposit(
+        database,
+        id: 'stopped',
+        customerId: 'c1',
+        amountCents: 40000,
+        bank: '建设银行',
+        product: '停用产品',
+        expiry: '2027-01-01',
+        lifecycle: 'stopped',
+      );
+      await _addDeposit(
+        database,
+        id: 'inactive-customer',
+        customerId: 'c3',
+        amountCents: 50000,
+        bank: '建设银行',
+        product: '停用客户产品',
+        expiry: '2027-01-01',
+      );
+
+      final useCases = SqliteDepositStatisticsUseCases(database);
+      final bankRows = await useCases.loadDetails(
+        DepositStatisticsDimension.bank,
+        '建设银行',
+      );
+      final emptyProductRows = await useCases.loadDetails(
+        DepositStatisticsDimension.product,
+        '',
+      );
+
+      expect(bankRows.map((row) => row.depositId), ['d0', 'd1', 'd2']);
+      expect(bankRows.first.customerName, '李明');
+      expect(bankRows.first.customerPhone, '13800000002');
+      expect(bankRows.first.amountCents, 30000);
+      expect(bankRows.first.interestRateScaled, 200);
+      expect(bankRows.first.ratePrecision, 2);
+      expect(bankRows.first.expiryDate, '2027-01-01');
+      expect(emptyProductRows.map((row) => row.depositId), ['d0']);
+    },
+  );
 }
 
 const _epoch = 1784515200000000;
 
-Future<void> _addCustomer(AppDatabase database, String id, String name) =>
-    database
-        .into(database.customers)
-        .insert(
-          CustomersCompanion.insert(
-            id: id,
-            name: name,
-            createdAtUtc: _epoch,
-            updatedAtUtc: _epoch,
-          ),
-        );
+Future<void> _addCustomer(
+  AppDatabase database,
+  String id,
+  String name, {
+  String? phone,
+  bool isActive = true,
+}) => database
+    .into(database.customers)
+    .insert(
+      CustomersCompanion.insert(
+        id: id,
+        name: name,
+        phone: Value(phone),
+        isActive: Value(isActive),
+        createdAtUtc: _epoch,
+        updatedAtUtc: _epoch,
+      ),
+    );
 
 Future<void> _addDeposit(
   AppDatabase database, {
