@@ -368,10 +368,20 @@ class _CustomerCardState extends ConsumerState<_CustomerCard> {
 
   CustomerSearchResult get result => widget.result;
 
+  @override
+  void didUpdateWidget(covariant _CustomerCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_chains != null && oldWidget.result != widget.result) {
+      _chains = _loadDepositChains();
+    }
+  }
+
+  Future<List<CustomerDepositChain>> _loadDepositChains() => ref
+      .read(customerDepositHistoryUseCasesProvider)
+      .load(widget.result);
+
   void _loadDeposits() {
-    _chains ??= ref
-        .read(customerDepositHistoryUseCasesProvider)
-        .load(widget.result);
+    _chains ??= _loadDepositChains();
   }
 
   @override
@@ -404,9 +414,7 @@ class _CustomerCardState extends ConsumerState<_CustomerCard> {
                     tooltip: '重试',
                     icon: const Icon(Icons.refresh),
                     onPressed: () => setState(() {
-                      _chains = ref
-                          .read(customerDepositHistoryUseCasesProvider)
-                          .load(widget.result);
+                      _chains = _loadDepositChains();
                     }),
                   ),
                 );

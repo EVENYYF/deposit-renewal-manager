@@ -118,6 +118,64 @@ void main() {
     expect(find.text('编辑'), findsOneWidget);
   });
 
+  testWidgets('refresh reloads deposit chains for an expanded customer', (
+    tester,
+  ) async {
+    final cases = _ChangingDepositCases();
+    final history = _ChangingDepositHistory();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          customerUseCasesProvider.overrideWithValue(cases),
+          customerDepositHistoryUseCasesProvider.overrideWithValue(history),
+        ],
+        child: const MaterialApp(home: Scaffold(body: CustomerDirectoryPage())),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('张三'));
+    await tester.pumpAndSettle();
+
+    expect(history.loadCalls, 1);
+    expect(find.text('已续期'), findsNothing);
+    expect(find.text('生效中'), findsOneWidget);
+
+    final refresh = tester.widget<RefreshIndicator>(
+      find.byType(RefreshIndicator),
+    );
+    await refresh.onRefresh();
+    await tester.pumpAndSettle();
+
+    expect(history.loadCalls, 2);
+    expect(find.text('已续期'), findsOneWidget);
+    expect(find.text('生效中'), findsOneWidget);
+  });
+
+  testWidgets('refresh does not preload chains for a collapsed customer', (
+    tester,
+  ) async {
+    final cases = _ChangingDepositCases();
+    final history = _ChangingDepositHistory();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          customerUseCasesProvider.overrideWithValue(cases),
+          customerDepositHistoryUseCasesProvider.overrideWithValue(history),
+        ],
+        child: const MaterialApp(home: Scaffold(body: CustomerDirectoryPage())),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final refresh = tester.widget<RefreshIndicator>(
+      find.byType(RefreshIndicator),
+    );
+    await refresh.onRefresh();
+    await tester.pumpAndSettle();
+
+    expect(history.loadCalls, 0);
+  });
+
   testWidgets('refresh failure keeps customers and shows feedback', (
     tester,
   ) async {
@@ -268,6 +326,73 @@ final class _DepositHistory implements CustomerDepositHistoryUseCases {
           ],
         ),
       ];
+}
+
+final class _ChangingDepositCases implements CustomerUseCases {
+  int loadCalls = 0;
+
+  @override
+  Future<List<CustomerSearchResult>> load(String query) async {
+    loadCalls++;
+    return [
+      CustomerSearchResult(
+        customer: const CustomerRecord(
+          id: 'c1',
+          name: '张三',
+          phone: '13800000000',
+          isActive: true,
+        ),
+        deposits: [
+          CustomerSearchDeposit(
+            id: 'd1',
+            bankName: '中国银行',
+            productName: '稳健存款',
+            finalExpiryDate: LocalDate(2027, 7, 1),
+            lifecycle: loadCalls == 1
+                ? DepositLifecycle.active
+                : DepositLifecycle.renewed,
+          ),
+        ],
+      ),
+    ];
+  }
+
+  @override
+  Future<void> save(CustomerDraft draft) async {}
+}
+
+final class _ChangingDepositHistory implements CustomerDepositHistoryUseCases {
+  int loadCalls = 0;
+
+  @override
+  Future<List<CustomerDepositChain>> load(CustomerSearchResult result) async {
+    loadCalls++;
+    final renewed = result.deposits.single.lifecycle == DepositLifecycle.renewed;
+    return [
+      CustomerDepositChain(
+        versions: [
+          CustomerDepositVersion(
+            id: 'd1',
+            bankName: '中国银行',
+            productName: '稳健存款',
+            finalExpiryDate: LocalDate(2027, 7, 1),
+            lifecycle: renewed
+                ? DepositLifecycle.renewed
+                : DepositLifecycle.active,
+          ),
+          if (renewed)
+            CustomerDepositVersion(
+              id: 'd2',
+              bankName: '中国银行',
+              productName: '稳健存款',
+              finalExpiryDate: LocalDate(2027, 7, 1),
+              lifecycle: DepositLifecycle.active,
+              renewalSourceId: 'd1',
+            ),
+        ],
+      ),
+    ];
+  }
 }
 
 CustomerSearchResult _customerWithDeposit({
