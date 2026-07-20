@@ -52,8 +52,7 @@ void main() {
   );
 
   test('open settings failure is exposed to the capability state', () async {
-    final scheduler = _PermissionScheduler()
-      ..settingsError = StateError('no activity');
+    final scheduler = _PermissionScheduler()..settingsResult = false;
     final container = ProviderContainer(
       overrides: [notificationSchedulerProvider.overrideWithValue(scheduler)],
     );
@@ -65,7 +64,7 @@ void main() {
 
     expect(
       container.read(notificationCapabilityControllerProvider).message,
-      contains('no activity'),
+      '打开系统通知设置失败',
     );
   });
 
@@ -182,6 +181,7 @@ void main() {
 final class _PermissionScheduler implements NotificationScheduler {
   bool allowed = false;
   Object? settingsError;
+  bool settingsResult = true;
   int permissionRequests = 0;
   int reconcileCalls = 0;
 
@@ -216,8 +216,9 @@ final class _PermissionScheduler implements NotificationScheduler {
   Future<NotificationReconcileResult> cancelDeposit(String depositId) =>
       reconcileAll();
   @override
-  Future<void> openSettings() async {
+  Future<bool> openSettings() async {
     if (settingsError case final error?) throw error;
+    return settingsResult;
   }
 
   @override

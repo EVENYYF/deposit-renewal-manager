@@ -102,6 +102,8 @@ final class NotificationInitializationException implements Exception {
 final class AndroidNotificationGateway implements NotificationGateway {
   AndroidNotificationGateway({this.onTap});
 
+  static const notificationIcon = 'ic_notification';
+
   final NotificationTapCallback? onTap;
   final FlutterLocalNotificationsPlugin plugin =
       FlutterLocalNotificationsPlugin();
@@ -116,7 +118,7 @@ final class AndroidNotificationGateway implements NotificationGateway {
   Future<void> initialize() async {
     await plugin.initialize(
       settings: const InitializationSettings(
-        android: AndroidInitializationSettings('@drawable/ic_notification'),
+        android: AndroidInitializationSettings(notificationIcon),
       ),
       onDidReceiveNotificationResponse: (response) =>
           _handlePayload(response.payload),
@@ -163,10 +165,20 @@ final class AndroidNotificationGateway implements NotificationGateway {
       await android?.requestExactAlarmsPermission() ?? false;
 
   @override
-  Future<void> openSettings() => openApplicationSettings();
+  Future<bool> openSettings() => openApplicationSettings();
 
-  static Future<void> openApplicationSettings() =>
-      _settingsChannel.invokeMethod<void>('openAppSettings');
+  static Future<bool> openApplicationSettings() async {
+    try {
+      final result = await _settingsChannel.invokeMethod<bool>(
+        'openAppSettings',
+      );
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
 
   @override
   Future<void> schedule(ScheduledNotificationRequest request) {
@@ -186,7 +198,7 @@ final class AndroidNotificationGateway implements NotificationGateway {
           channelDescription: 'Deposit renewal reminders',
           importance: Importance.high,
           priority: Priority.high,
-          icon: '@drawable/ic_notification',
+          icon: notificationIcon,
         ),
       ),
       androidScheduleMode: mode,
@@ -208,7 +220,7 @@ final class AndroidNotificationGateway implements NotificationGateway {
         channelDescription: 'Deposit renewal reminders',
         importance: Importance.high,
         priority: Priority.high,
-        icon: '@drawable/ic_notification',
+        icon: notificationIcon,
       ),
     ),
     payload: const NotificationPayload(customerId: '', depositId: '').toJson(),

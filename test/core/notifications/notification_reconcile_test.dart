@@ -184,7 +184,7 @@ final class _Gateway implements NotificationGateway {
       cancelled.add(notificationId);
 
   @override
-  Future<void> openSettings() async {}
+  Future<bool> openSettings() async => true;
 
   @override
   Future<bool> requestExactAlarmPermission() async => canExact;

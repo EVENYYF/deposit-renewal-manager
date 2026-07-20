@@ -113,7 +113,7 @@ abstract interface class NotificationGateway {
 
   Future<bool> requestExactAlarmPermission();
 
-  Future<void> openSettings();
+  Future<bool> openSettings();
 
   Future<void> schedule(ScheduledNotificationRequest request);
 
@@ -169,7 +169,7 @@ abstract interface class NotificationScheduler {
 
   Future<bool> requestExactAlarmPermission();
 
-  Future<void> openSettings();
+  Future<bool> openSettings();
 }
 
 final notificationSchedulerProvider = Provider<NotificationScheduler>(
@@ -186,7 +186,7 @@ final class RecoverableNotificationScheduler implements NotificationScheduler {
   });
 
   final Future<NotificationScheduler> Function() create;
-  final Future<void> Function()? openSettingsFallback;
+  final Future<bool> Function()? openSettingsFallback;
   NotificationScheduler? _delegate;
   Future<NotificationScheduler>? _creating;
   Object? _lastError;
@@ -277,13 +277,12 @@ final class RecoverableNotificationScheduler implements NotificationScheduler {
   }
 
   @override
-  Future<void> openSettings() async {
+  Future<bool> openSettings() async {
     try {
       if (openSettingsFallback != null) {
-        await openSettingsFallback!();
-        return;
+        return await openSettingsFallback!();
       }
-      await (await _ready()).openSettings();
+      return await (await _ready()).openSettings();
     } catch (error) {
       _lastError = error;
       rethrow;
@@ -323,7 +322,7 @@ final class UnsupportedNotificationScheduler implements NotificationScheduler {
   Future<bool> requestNotificationPermission() async => false;
 
   @override
-  Future<void> openSettings() async {}
+  Future<bool> openSettings() async => false;
 
   Future<NotificationReconcileResult> _result() async =>
       NotificationReconcileResult(
@@ -430,11 +429,16 @@ final class NotificationCapabilityController
     }
   }
 
-  Future<void> openSettings() async {
+  Future<bool> openSettings() async {
     try {
-      await _scheduler.openSettings();
+      final opened = await _scheduler.openSettings();
+      if (!opened) {
+        state = state.copyWith(message: '打开系统通知设置失败');
+      }
+      return opened;
     } catch (error) {
       state = state.copyWith(message: '打开系统通知设置失败：$error');
+      return false;
     }
   }
 
@@ -737,7 +741,7 @@ class NotificationReconciler implements NotificationScheduler {
       gateway.requestExactAlarmPermission();
 
   @override
-  Future<void> openSettings() => gateway.openSettings();
+  Future<bool> openSettings() => gateway.openSettings();
 
   Future<_ScheduleOutcome> _schedulePlan(
     NotificationPlan plan,
