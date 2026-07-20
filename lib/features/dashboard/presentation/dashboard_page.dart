@@ -94,7 +94,9 @@ class NotificationStatusBanner extends ConsumerWidget {
         capability?.isSupported == true &&
         capability?.notificationsAllowed == true &&
         capability?.canScheduleExact == true;
-    if (!state.busy && state.message == null && (capability == null || healthy)) {
+    if (!state.busy &&
+        state.message == null &&
+        (capability == null || healthy)) {
       return const SizedBox.shrink();
     }
     final controller = ref.read(
@@ -403,36 +405,62 @@ class _ReminderTileState extends ConsumerState<_ReminderTile> {
       ),
       values,
     );
-    final editor = TextEditingController(text: rendered);
-    await showDialog<void>(
+    final copied = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('续期提示语'),
-        content: TextField(controller: editor, maxLines: 6, autofocus: true),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('关闭'),
-          ),
-          FilledButton.icon(
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: editor.text));
-              if (dialogContext.mounted) {
-                Navigator.pop(dialogContext);
-              }
-              if (context.mounted) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text('已复制')));
-              }
-            },
-            icon: const Icon(Icons.copy),
-            label: const Text('复制'),
-          ),
-        ],
-      ),
+      builder: (_) => _PromptEditorDialog(initialText: rendered),
     );
-    editor.dispose();
+    if (copied == true && context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('已复制')));
+    }
+  }
+}
+
+class _PromptEditorDialog extends StatefulWidget {
+  const _PromptEditorDialog({required this.initialText});
+
+  final String initialText;
+
+  @override
+  State<_PromptEditorDialog> createState() => _PromptEditorDialogState();
+}
+
+class _PromptEditorDialogState extends State<_PromptEditorDialog> {
+  late final TextEditingController _editor;
+
+  @override
+  void initState() {
+    super.initState();
+    _editor = TextEditingController(text: widget.initialText);
+  }
+
+  @override
+  void dispose() {
+    _editor.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('续期提示语'),
+    content: TextField(controller: _editor, maxLines: 6, autofocus: true),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context, false),
+        child: const Text('关闭'),
+      ),
+      FilledButton.icon(
+        onPressed: _copy,
+        icon: const Icon(Icons.copy),
+        label: const Text('复制'),
+      ),
+    ],
+  );
+
+  Future<void> _copy() async {
+    await Clipboard.setData(ClipboardData(text: _editor.text));
+    if (mounted) Navigator.pop(context, true);
   }
 }
 

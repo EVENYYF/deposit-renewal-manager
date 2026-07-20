@@ -9,6 +9,7 @@ import 'package:deposit_renewal_manager/features/dashboard/presentation/dashboar
 import 'package:deposit_renewal_manager/features/deposits/presentation/deposit_form_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -119,6 +120,57 @@ void main() {
     expect(find.text('更新存款'), findsOneWidget);
   });
 
+  testWidgets('copying an edited prompt closes safely and shows feedback', (
+    tester,
+  ) async {
+    String? clipboardText;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          clipboardText =
+              (call.arguments as Map<Object?, Object?>)['text'] as String?;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          dashboardUseCasesProvider.overrideWithValue(const _Cases()),
+          notificationSchedulerProvider.overrideWithValue(
+            const UnsupportedNotificationScheduler(),
+          ),
+        ],
+        child: const MaterialApp(home: Scaffold(body: DashboardPage())),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('提示语'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '自定义续期提示');
+    await tester.tap(find.text('复制'));
+    await tester.pumpAndSettle();
+
+    expect(clipboardText, '自定义续期提示');
+    expect(find.text('续期提示语'), findsNothing);
+    expect(find.text('已复制'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('提示语'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('关闭'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('stop action is disabled while the mutation is pending', (
     tester,
   ) async {
@@ -196,7 +248,9 @@ Future<void> _pumpNotificationBanner(
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: const MaterialApp(home: Scaffold(body: NotificationStatusBanner())),
+      child: const MaterialApp(
+        home: Scaffold(body: NotificationStatusBanner()),
+      ),
     ),
   );
   await tester.pump();
@@ -291,8 +345,9 @@ final class _CapabilityScheduler implements NotificationScheduler {
   Future<NotificationReconcileResult> reconcileAll() async => _result;
 
   @override
-  Future<NotificationReconcileResult> reconcileDeposit(String depositId) async =>
-      _result;
+  Future<NotificationReconcileResult> reconcileDeposit(
+    String depositId,
+  ) async => _result;
 
   @override
   Future<NotificationReconcileResult> reconcileSummary() async => _result;
