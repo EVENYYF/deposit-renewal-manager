@@ -12,6 +12,7 @@ import '../domain/deposit_preset_repository.dart';
 import '../domain/deposit_repository.dart';
 import '../domain/expiry_calculator.dart';
 import '../domain/local_date.dart';
+import '../domain/product_catalog_repository.dart';
 
 enum DepositFormMode { create, update, renew }
 
@@ -60,6 +61,12 @@ class _DepositFormPageState extends ConsumerState<DepositFormPage> {
   bool _searchingCustomers = false;
   int _customerSearchGeneration = 0;
   late int _ratePrecision;
+  List<String> _catalogBanks = const [];
+  List<ProductRecord> _catalogProducts = const [];
+  String? _selectedProductId;
+  bool _rateManuallyEdited = false;
+  String? _rateMatchMessage;
+  int _catalogGeneration = 0;
 
   @override
   void initState() {
@@ -89,6 +96,7 @@ class _DepositFormPageState extends ConsumerState<DepositFormPage> {
     _term = TextEditingController(text: initial?.termValue?.toString() ?? '12');
     _termUnit = initial?.termUnit ?? DepositTermUnit.month;
     Future<void>.microtask(_loadPresets);
+    Future<void>.microtask(_loadCatalog);
   }
 
   @override
@@ -154,12 +162,19 @@ class _DepositFormPageState extends ConsumerState<DepositFormPage> {
           required: true,
           keyboard: const TextInputType.numberWithOptions(decimal: true),
         ),
-        _presetField(_bank, '银行', DepositPresetField.bank),
+        _presetField(
+          _bank,
+          '银行',
+          DepositPresetField.bank,
+          onChanged: _onBankChanged,
+          onCandidateSelected: _selectBank,
+        ),
         _presetField(
           _product,
           '产品名称',
           DepositPresetField.product,
-          onChanged: (_) => setState(() {}),
+          onChanged: _onProductChanged,
+          onCandidateSelected: _selectProductByName,
         ),
         if (_similarProducts.isNotEmpty)
           Padding(
@@ -175,8 +190,17 @@ class _DepositFormPageState extends ConsumerState<DepositFormPage> {
           '年利率（%）',
           DepositPresetField.rate,
           keyboard: const TextInputType.numberWithOptions(decimal: true),
+          onChanged: _markRateEdited,
         ),
-        _dateField(_start, '存入日期', onSelected: (_) => _calculateExpiry()),
+        if (_rateMatchMessage != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              _rateMatchMessage!,
+              key: const Key('catalog-rate-message'),
+            ),
+          ),
+        _dateField(_start, '存入日期', onSelected: _onStartDateChanged),
         if (_automatic) ...[
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -316,6 +340,7 @@ class _DepositFormPageState extends ConsumerState<DepositFormPage> {
     bool required = false,
     TextInputType? keyboard,
     ValueChanged<String>? onChanged,
+    ValueChanged<String>? onCandidateSelected,
   }) {
     final values = _orderedCandidates(field, controller.text);
     return Padding(
@@ -353,7 +378,7 @@ class _DepositFormPageState extends ConsumerState<DepositFormPage> {
                           controller.selection = TextSelection.collapsed(
                             offset: value.length,
                           );
-                          onChanged?.call(value);
+                          (onCandidateSelected ?? onChanged)?.call(value);
                           setState(() {});
                         },
                       ),
@@ -394,6 +419,11 @@ class _DepositFormPageState extends ConsumerState<DepositFormPage> {
         controller.text = local.toString();
         onSelected(local);
       },
+      onChanged: (_) {
+        try {
+          onSelected(_parseDate(controller.text));
+        } catch (_) {}
+      },
       validator: (value) =>
           value == null || value.trim().isEmpty ? '请选择$label' : null,
     ),
@@ -420,6 +450,111 @@ class _DepositFormPageState extends ConsumerState<DepositFormPage> {
     } catch (_) {
       // 预设不可用不应阻止存款录入。
     }
+  }
+
+  Future<void> _loadCatalog() async {
+    try {
+      final service = ref.read(productCatalogServiceProvider);
+      final banks = await service.activeBanks();
+      if (!mounted) return;
+      setState(() => _catalogBanks = banks);
+      if (_bank.text.trim().isNotEmpty) {
+        await _loadProductsForBank(_bank.text, associateOnly: true);
+      }
+    } catch (_) {
+      // 产品目录不可用时仍保留原有手工录入。
+    }
+  }
+
+  Future<void> _loadProductsForBank(
+    String bankName, {
+    bool associateOnly = false,
+  }) async {
+    final generation = ++_catalogGeneration;
+    try {
+      final products = await ref
+          .read(productCatalogServiceProvider)
+          .activeProductsForBank(bankName);
+      if (!mounted || generation != _catalogGeneration) return;
+      final selected = products.where(
+        (item) =>
+            item.productName.toLowerCase() ==
+            _product.text.trim().toLowerCase(),
+      );
+      setState(() {
+        _catalogProducts = products;
+        _selectedProductId = selected.isEmpty ? null : selected.first.id;
+        if (!associateOnly) _rateMatchMessage = null;
+      });
+    } catch (_) {
+      if (mounted && generation == _catalogGeneration) {
+        setState(() {
+          _catalogProducts = const [];
+          _selectedProductId = null;
+        });
+      }
+    }
+  }
+
+  void _onBankChanged(String value) {
+    _selectedProductId = null;
+    _rateMatchMessage = null;
+    _loadProductsForBank(value);
+  }
+
+  void _selectBank(String value) {
+    _bank.text = value;
+    _onBankChanged(value);
+  }
+
+  void _onProductChanged(String value) {
+    final matches = _catalogProducts.where(
+      (item) => item.productName.toLowerCase() == value.trim().toLowerCase(),
+    );
+    _selectedProductId = matches.isEmpty ? null : matches.first.id;
+    _matchCatalogRate(allowOverwrite: !_rateManuallyEdited);
+  }
+
+  void _selectProductByName(String value) {
+    _product.text = value;
+    _rateManuallyEdited = false;
+    _onProductChanged(value);
+    _matchCatalogRate(allowOverwrite: true);
+  }
+
+  void _markRateEdited(String value) {
+    _rateManuallyEdited = true;
+    setState(() => _rateMatchMessage = null);
+  }
+
+  void _onStartDateChanged(LocalDate value) {
+    _calculateExpiry();
+    _matchCatalogRate(allowOverwrite: !_rateManuallyEdited);
+  }
+
+  Future<void> _matchCatalogRate({required bool allowOverwrite}) async {
+    final productId = _selectedProductId;
+    if (productId == null) return;
+    try {
+      final start = _parseDate(_start.text);
+      final matched = await ref
+          .read(productCatalogServiceProvider)
+          .matchRate(productId, start);
+      if (!mounted || productId != _selectedProductId) return;
+      setState(() {
+        if (matched == null) {
+          _rateMatchMessage = '该存入日期没有可用的产品利率，请手动填写';
+          return;
+        }
+        _rateMatchMessage = '已匹配 ${matched.effectiveDate} 生效的产品利率';
+        if (allowOverwrite) {
+          _ratePrecision = matched.ratePrecision;
+          _rate.text =
+              (matched.interestRateScaled / _scaleFor(matched.ratePrecision))
+                  .toStringAsFixed(matched.ratePrecision);
+        }
+      });
+    } catch (_) {}
   }
 
   Future<void> _searchCustomers(String query) async {
@@ -647,7 +782,15 @@ class _DepositFormPageState extends ConsumerState<DepositFormPage> {
   }
 
   List<String> _orderedCandidates(DepositPresetField field, String query) {
-    final values = _presets[field] ?? const [];
+    final catalog = switch (field) {
+      DepositPresetField.bank => _catalogBanks,
+      DepositPresetField.product =>
+        _catalogProducts
+            .map((product) => product.productName)
+            .toList(growable: false),
+      _ => const <String>[],
+    };
+    final values = <String>{...catalog, ...?_presets[field]}.toList();
     if (field != DepositPresetField.product || query.trim().isEmpty) {
       return values;
     }
