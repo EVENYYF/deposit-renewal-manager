@@ -20,6 +20,7 @@ import '../features/customers/domain/name_search_index.dart';
 import '../features/dashboard/application/dashboard_controller.dart';
 import '../features/deposits/application/deposit_workflow_controller.dart';
 import '../features/deposits/application/deposit_preset_service.dart';
+import '../features/deposits/application/deposit_details_service.dart';
 import '../features/deposits/application/product_catalog_service.dart';
 import '../features/deposits/domain/deposit.dart' as domain;
 import '../features/deposits/domain/deposit_repository.dart';
@@ -136,6 +137,12 @@ class ApplicationProviderScope extends StatelessWidget {
           customers,
         );
       }),
+      depositDetailsUseCasesProvider.overrideWithValue(
+        RepositoryDepositDetailsUseCases(
+          DepositDao(database, sourceDeviceId: localSourceDeviceId),
+          CustomerDao(database, sourceDeviceId: localSourceDeviceId),
+        ),
+      ),
       dashboardUseCasesProvider.overrideWith(
         (ref) => SqliteDashboardUseCases(database),
       ),
