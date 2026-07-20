@@ -335,6 +335,8 @@ WHERE duplicate_rank > 1
       'audit_history': 'id',
       'message_templates': 'id',
       'import_batches': 'id',
+      'products': 'id',
+      'product_rate_versions': 'id',
       'business_settings': 'singleton_id',
     };
     return transaction(() async {
@@ -430,9 +432,13 @@ WHERE duplicate_rank > 1
       'audit_history',
       'message_templates',
       'import_batches',
+      'products',
+      'product_rate_versions',
       'business_settings',
     ];
     for (final table in const [
+      'product_rate_versions',
+      'products',
       'renewals',
       'audit_history',
       'deposits',

@@ -68,14 +68,14 @@ class BackupManifest {
       schemaVersion: json['schemaVersion'] as int,
       sourceDevice: sourceDevice,
       createdAtUtc: createdAt,
-      counts: _parseCounts(counts),
+      counts: _parseCounts(counts, json['schemaVersion'] as int),
       payloadSha256: hash,
     );
   }
 
-  static Map<String, int> _parseCounts(Object? value) {
+  static Map<String, int> _parseCounts(Object? value, int schemaVersion) {
     if (value is! Map) throw const FormatException('Invalid counts');
-    const tables = {
+    const legacyTables = {
       'customers',
       'deposits',
       'renewals',
@@ -84,6 +84,10 @@ class BackupManifest {
       'import_batches',
       'business_settings',
     };
+    const productTables = {'products', 'product_rate_versions'};
+    final tables = schemaVersion >= 7
+        ? {...legacyTables, ...productTables}
+        : legacyTables;
     if (value.keys.any((k) => k is! String || !tables.contains(k)) ||
         value.length != tables.length) {
       throw const FormatException('Invalid count keys');

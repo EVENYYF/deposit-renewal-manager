@@ -197,7 +197,13 @@ class BackupService {
       if (manifest.formatVersion != 1) {
         throw const BackupIntegrityException('Unsupported format version');
       }
-      if (!{3, 4, 5, database.schemaVersion}.contains(manifest.schemaVersion)) {
+      if (!{
+        3,
+        4,
+        5,
+        6,
+        database.schemaVersion,
+      }.contains(manifest.schemaVersion)) {
         throw const BackupIntegrityException('Unsupported schema version');
       }
       final payload = entries['data.json']!;
@@ -220,7 +226,7 @@ class BackupService {
             Map<String, Object?>.from(row as Map),
         ];
       }
-      const expected = {
+      const legacyTables = {
         'customers',
         'deposits',
         'renewals',
@@ -229,14 +235,22 @@ class BackupService {
         'import_batches',
         'business_settings',
       };
-      if (!data.keys.toSet().containsAll(expected) ||
-          data.keys.any((k) => !expected.contains(k))) {
+      const productTables = {'products', 'product_rate_versions'};
+      final inputTables = manifest.schemaVersion >= 7
+          ? {...legacyTables, ...productTables}
+          : legacyTables;
+      if (!data.keys.toSet().containsAll(inputTables) ||
+          data.keys.any((k) => !inputTables.contains(k))) {
         throw const BackupIntegrityException('Unexpected tables');
       }
-      for (final table in expected) {
+      for (final table in inputTables) {
         if (manifest.counts[table] != data[table]!.length) {
           throw const BackupIntegrityException('Row count mismatch');
         }
+      }
+      if (manifest.schemaVersion < 7) {
+        data['products'] = [];
+        data['product_rate_versions'] = [];
       }
       if (manifest.schemaVersion == 3) {
         for (final row in data['message_templates']!) {
@@ -308,6 +322,8 @@ class BackupService {
       'audit_history': 'id',
       'message_templates': 'id',
       'import_batches': 'id',
+      'products': 'id',
+      'product_rate_versions': 'id',
       'business_settings': 'singleton_id',
     };
     late Map<String, List<Map<String, Object?>>> current;
@@ -465,6 +481,23 @@ class BackupService {
         'imported_at_utc',
         'source_device_id',
       },
+      'products': {
+        'id',
+        'bank_name',
+        'product_name',
+        'is_active',
+        'created_at_utc',
+        'updated_at_utc',
+      },
+      'product_rate_versions': {
+        'id',
+        'product_id',
+        'interest_rate_scaled',
+        'rate_precision',
+        'effective_date',
+        'created_at_utc',
+        'updated_at_utc',
+      },
       'business_settings': {'singleton_id', 'business_revision'},
     };
     for (final table in columns.entries) {
@@ -556,6 +589,17 @@ class BackupService {
         if (value != null && !_validDate(value as String)) return false;
       }
     }
+    if (table == 'products' &&
+        (((row['bank_name'] as String).trim().isEmpty) ||
+            ((row['product_name'] as String).trim().isEmpty))) {
+      return false;
+    }
+    if (table == 'product_rate_versions') {
+      final precision = row['rate_precision'];
+      if (precision is! int || precision < 0 || precision > 9) return false;
+      if ((row['interest_rate_scaled'] as int) < 0) return false;
+      if (!_validDate(row['effective_date'] as String)) return false;
+    }
     if (table == 'customers' && ((row['name'] as String).trim().isEmpty)) {
       return false;
     }
@@ -564,6 +608,7 @@ class BackupService {
       'customer_id',
       'source_deposit_id',
       'target_deposit_id',
+      'product_id',
     ]) {
       final value = row[key];
       if (value is String && value.isEmpty) return false;

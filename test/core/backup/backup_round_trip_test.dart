@@ -7,7 +7,10 @@ import 'package:deposit_renewal_manager/core/backup/backup_manifest.dart';
 import 'package:deposit_renewal_manager/core/backup/safe_zip_reader.dart';
 import 'package:deposit_renewal_manager/core/database/app_database.dart';
 import 'package:deposit_renewal_manager/core/database/daos/customer_dao.dart';
+import 'package:deposit_renewal_manager/core/database/daos/product_catalog_dao.dart';
 import 'package:deposit_renewal_manager/features/customers/domain/customer_repository.dart';
+import 'package:deposit_renewal_manager/features/deposits/domain/local_date.dart';
+import 'package:deposit_renewal_manager/features/deposits/domain/product_catalog_repository.dart';
 import 'package:drift/native.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
@@ -85,6 +88,95 @@ void main() {
     },
   );
 
+  test('round trips products and multiple rate versions', () async {
+    final catalog = ProductCatalogDao(
+      source,
+      nowUtc: () => DateTime.utc(2026, 7, 19),
+    );
+    await catalog.saveProduct(
+      const ProductDraft(id: 'p1', bankName: 'Bank', productName: 'Fixed'),
+    );
+    await catalog.saveRate(
+      ProductRateDraft(
+        id: 'r1',
+        productId: 'p1',
+        interestRateScaled: 210,
+        ratePrecision: 4,
+        effectiveDate: LocalDate(2026, 1, 1),
+      ),
+    );
+    await catalog.saveRate(
+      ProductRateDraft(
+        id: 'r2',
+        productId: 'p1',
+        interestRateScaled: 230,
+        ratePrecision: 4,
+        effectiveDate: LocalDate(2026, 7, 1),
+      ),
+    );
+
+    final service = BackupService(
+      database: source,
+      sourceDevice: 'Android',
+      snapshotsDirectory: temp,
+    );
+    final path = (await service.exportBackup(
+      outputPath: '${temp.path}${Platform.pathSeparator}products.drbackup',
+    )).path;
+    final importer = BackupService(
+      database: target,
+      sourceDevice: 'Windows',
+      snapshotsDirectory: temp,
+    );
+    final inspected = await importer.inspectBackup(path);
+    expect(inspected.data['products'], hasLength(1));
+    expect(inspected.data['product_rate_versions'], hasLength(2));
+
+    await importer.restore(inspected);
+    final restored = ProductCatalogDao(target);
+    expect((await restored.listProducts()).single.productName, 'Fixed');
+    expect(await restored.listRates('p1'), hasLength(2));
+    expect(
+      (await restored.matchRate(
+        'p1',
+        LocalDate(2026, 8, 1),
+      ))!.interestRateScaled,
+      230,
+    );
+  });
+
+  test('restores a schema v6 backup with empty product catalog', () async {
+    final service = BackupService(
+      database: source,
+      sourceDevice: 'Android',
+      snapshotsDirectory: temp,
+    );
+    final path = (await service.exportBackup(
+      outputPath: '${temp.path}${Platform.pathSeparator}legacy-v6.drbackup',
+    )).path;
+    await _rewriteBackup(
+      path,
+      mutateManifest: (manifest) => manifest['schemaVersion'] = 6,
+      mutateDecodedData: (data) {
+        data.remove('products');
+        data.remove('product_rate_versions');
+      },
+      repairHash: true,
+      repairCounts: true,
+    );
+
+    final importer = BackupService(
+      database: target,
+      sourceDevice: 'Windows',
+      snapshotsDirectory: temp,
+    );
+    final inspected = await importer.inspectBackup(path);
+    expect(inspected.data['products'], isEmpty);
+    expect(inspected.data['product_rate_versions'], isEmpty);
+    await importer.restore(inspected);
+    expect(await ProductCatalogDao(target).listProducts(), isEmpty);
+  });
+
   test('builds a validated archive for platform saveFile bytes', () async {
     final service = BackupService(
       database: source,
@@ -130,6 +222,8 @@ void main() {
       path,
       mutateManifest: (manifest) => manifest['schemaVersion'] = 3,
       mutateDecodedData: (data) {
+        data.remove('products');
+        data.remove('product_rate_versions');
         for (final row in data['message_templates'] as List) {
           (row as Map<String, dynamic>).remove('is_default');
         }
@@ -138,6 +232,7 @@ void main() {
         }
       },
       repairHash: true,
+      repairCounts: true,
     );
 
     final importer = BackupService(
@@ -170,11 +265,14 @@ void main() {
       path,
       mutateManifest: (manifest) => manifest['schemaVersion'] = 4,
       mutateDecodedData: (data) {
+        data.remove('products');
+        data.remove('product_rate_versions');
         for (final row in data['deposits'] as List) {
           (row as Map<String, dynamic>).remove('product_name');
         }
       },
       repairHash: true,
+      repairCounts: true,
     );
 
     final importer = BackupService(
@@ -204,6 +302,8 @@ void main() {
       path,
       mutateManifest: (manifest) => manifest['schemaVersion'] = 5,
       mutateDecodedData: (data) {
+        data.remove('products');
+        data.remove('product_rate_versions');
         for (final row in data['deposits'] as List) {
           final deposit = row as Map<String, dynamic>;
           deposit.remove('term_value');
@@ -211,6 +311,7 @@ void main() {
         }
       },
       repairHash: true,
+      repairCounts: true,
     );
 
     final importer = BackupService(
@@ -234,6 +335,13 @@ void main() {
         sourceDeviceId: 'windows',
         nowUtc: () => DateTime.utc(2026, 7, 20),
       ).create(const CustomerDraft(id: 'local-only', name: '本机客户'));
+      await ProductCatalogDao(target).saveProduct(
+        const ProductDraft(
+          id: 'local-product',
+          bankName: 'Bank',
+          productName: 'Local',
+        ),
+      );
       final exporter = BackupService(
         database: source,
         sourceDevice: 'Android',
@@ -254,7 +362,8 @@ void main() {
       expect(impact.lostRecords['customers'], 1);
       expect(impact.lostRecords['audit_history'], 1);
       expect(impact.lostRecords['business_settings'], 0);
-      expect(impact.totalLost, 2);
+      expect(impact.lostRecords['products'], 1);
+      expect(impact.totalLost, 3);
     },
   );
 
