@@ -237,7 +237,8 @@ class DepositPresets extends Table {
 )
 class Products extends Table {
   TextColumn get id => text()();
-  TextColumn get bankName => text().check(bankName.length.isBiggerThanValue(0))();
+  TextColumn get bankName =>
+      text().check(bankName.length.isBiggerThanValue(0))();
   TextColumn get productName =>
       text().check(productName.length.isBiggerThanValue(0))();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
@@ -255,10 +256,7 @@ class Products extends Table {
   columns: {#productId, #effectiveDate},
   unique: true,
 )
-@TableIndex(
-  name: 'product_rate_versions_product_id_idx',
-  columns: {#productId},
-)
+@TableIndex(name: 'product_rate_versions_product_id_idx', columns: {#productId})
 class ProductRateVersions extends Table {
   TextColumn get id => text()();
   TextColumn get productId =>
