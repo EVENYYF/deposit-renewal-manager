@@ -11,6 +11,7 @@ import '../../deposits/presentation/deposit_form_page.dart';
 import '../application/customer_controller.dart';
 import '../domain/customer_repository.dart';
 import 'customer_edit_dialog.dart';
+import 'customer_history_dialog.dart';
 
 class CustomerDetailPage extends ConsumerWidget {
   const CustomerDetailPage({
@@ -83,6 +84,16 @@ class CustomerDetailPage extends ConsumerWidget {
             ),
             icon: const Icon(Icons.add),
             label: const Text('新增存款'),
+          ),
+          OutlinedButton.icon(
+            onPressed: () => showCustomerHistoryDialog(
+              context,
+              ref,
+              customerId: result.customer.id,
+              customerName: result.customer.name,
+            ),
+            icon: const Icon(Icons.history),
+            label: const Text('修改记录'),
           ),
           const SizedBox(height: 16),
           const Text('存款'),

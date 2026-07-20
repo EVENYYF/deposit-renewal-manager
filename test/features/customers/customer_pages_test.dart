@@ -69,6 +69,40 @@ void main() {
     expect(after.style?.color, const Color(0xFF2E7D32));
   });
 
+  testWidgets('客户详情可编辑手机号并查看修改记录', (tester) async {
+    final cases = _RecordingCases();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          customerUseCasesProvider.overrideWithValue(cases),
+          customerHistoryUseCasesProvider.overrideWithValue(const _History()),
+        ],
+        child: const MaterialApp(home: Scaffold(body: CustomerDirectoryPage())),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('客户详情'));
+    await tester.pumpAndSettle();
+    expect(find.text('编辑客户资料'), findsOneWidget);
+    expect(find.byTooltip('复制手机号'), findsOneWidget);
+
+    await tester.tap(find.text('编辑客户资料'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextField, '手机号（选填）'),
+      '13900000000',
+    );
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    expect(cases.saved?.phone, '13900000000');
+
+    await tester.tap(find.text('修改记录'));
+    await tester.pumpAndSettle();
+    expect(find.text('张三的修改记录'), findsOneWidget);
+    expect(find.text('手机号：'), findsOneWidget);
+  });
+
   testWidgets('filters customers by bank and product', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -374,6 +408,17 @@ final class _Cases implements CustomerUseCases {
   ];
   @override
   Future<void> save(CustomerDraft draft) async {}
+}
+
+final class _RecordingCases implements CustomerUseCases {
+  CustomerDraft? saved;
+
+  @override
+  Future<List<CustomerSearchResult>> load(String query) =>
+      const _Cases().load(query);
+
+  @override
+  Future<void> save(CustomerDraft draft) async => saved = draft;
 }
 
 final class _RefreshFailureCases implements CustomerUseCases {

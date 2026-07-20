@@ -101,29 +101,41 @@ void main() {
       final useCases = SqliteDepositStatisticsUseCases(database);
       expect(
         (await useCases.loadDetails(
-          DepositStatisticsDimension.bank,
-          '__status:active',
+          const DepositStatisticsDetailQuery(
+            DepositStatisticsDimension.bank,
+            '生效中',
+            kind: DepositStatisticsDetailKind.active,
+          ),
         )).map((row) => row.depositId),
         ['active', 'renewed-target'],
       );
       expect(
         (await useCases.loadDetails(
-          DepositStatisticsDimension.bank,
-          '__status:overdue',
+          const DepositStatisticsDetailQuery(
+            DepositStatisticsDimension.bank,
+            '已到期',
+            kind: DepositStatisticsDetailKind.overdue,
+          ),
         )).map((row) => row.depositId),
         ['overdue'],
       );
       expect(
         (await useCases.loadDetails(
-          DepositStatisticsDimension.bank,
-          '__status:renewed',
+          const DepositStatisticsDetailQuery(
+            DepositStatisticsDimension.bank,
+            '已续期',
+            kind: DepositStatisticsDetailKind.renewed,
+          ),
         )).map((row) => row.depositId),
         ['renewed-source'],
       );
       expect(
         (await useCases.loadDetails(
-          DepositStatisticsDimension.bank,
-          '__status:stopped',
+          const DepositStatisticsDetailQuery(
+            DepositStatisticsDimension.bank,
+            '已停止',
+            kind: DepositStatisticsDetailKind.stopped,
+          ),
         )).map((row) => row.depositId),
         ['stopped'],
       );
@@ -194,12 +206,16 @@ void main() {
 
       final useCases = SqliteDepositStatisticsUseCases(database);
       final bankRows = await useCases.loadDetails(
-        DepositStatisticsDimension.bank,
-        '建设银行',
+        const DepositStatisticsDetailQuery(
+          DepositStatisticsDimension.bank,
+          '建设银行',
+        ),
       );
       final emptyProductRows = await useCases.loadDetails(
-        DepositStatisticsDimension.product,
-        '',
+        const DepositStatisticsDetailQuery(
+          DepositStatisticsDimension.product,
+          '',
+        ),
       );
 
       expect(bankRows.map((row) => row.depositId), ['d0', 'd1', 'd2']);

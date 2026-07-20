@@ -97,8 +97,7 @@ final class _FakeStatisticsUseCases implements DepositStatisticsUseCases {
 
   @override
   Future<List<DepositStatisticsDetail>> loadDetails(
-    DepositStatisticsDimension dimension,
-    String value,
+    DepositStatisticsDetailQuery query,
   ) async => const [
     DepositStatisticsDetail(
       depositId: 'd1',

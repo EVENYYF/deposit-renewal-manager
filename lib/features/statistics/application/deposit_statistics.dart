@@ -105,8 +105,7 @@ abstract interface class DepositStatisticsUseCases {
   Future<DepositStatisticsSnapshot> load({DateTime? now});
 
   Future<List<DepositStatisticsDetail>> loadDetails(
-    DepositStatisticsDimension dimension,
-    String value,
+    DepositStatisticsDetailQuery query,
   );
 }
 
@@ -120,8 +119,7 @@ final class EmptyDepositStatisticsUseCases
 
   @override
   Future<List<DepositStatisticsDetail>> loadDetails(
-    DepositStatisticsDimension dimension,
-    String value,
+    DepositStatisticsDetailQuery query,
   ) async => const [];
 }
 
@@ -140,10 +138,7 @@ final depositStatisticsDetailProvider = FutureProvider.autoDispose
       query,
     ) {
       final useCases = ref.read(depositStatisticsUseCasesProvider);
-      return useCases.loadDetails(
-        query.dimension,
-        query.kind == null ? query.value : '__status:${query.kind!.name}',
-      );
+      return useCases.loadDetails(query);
     });
 
 /// Statistics intentionally use current active records for principal and
@@ -202,16 +197,10 @@ WHERE c.is_active = 1
 
   @override
   Future<List<DepositStatisticsDetail>> loadDetails(
-    DepositStatisticsDimension dimension,
-    String value,
+    DepositStatisticsDetailQuery query,
   ) async {
-    if (value.startsWith('__status:')) {
-      final kind = DepositStatisticsDetailKind.values.byName(
-        value.substring('__status:'.length),
-      );
-      return _loadStatusDetails(kind);
-    }
-    final column = _columns[dimension]!;
+    if (query.kind != null) return _loadStatusDetails(query.kind!);
+    final column = _columns[query.dimension]!;
     final rows = await _database
         .customSelect(
           '''
@@ -233,7 +222,7 @@ ORDER BY d.final_expiry_date,
          c.name COLLATE NOCASE,
          d.id
 ''',
-          variables: [Variable.withString(value.trim())],
+          variables: [Variable.withString(query.value.trim())],
           readsFrom: {_database.deposits, _database.customers},
         )
         .get();

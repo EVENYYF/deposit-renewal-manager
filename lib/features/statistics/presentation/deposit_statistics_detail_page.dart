@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../deposits/application/deposit_details_service.dart';
+import '../../deposits/application/deposit_workflow_controller.dart';
+import '../../deposits/domain/deposit_repository.dart';
+import '../../deposits/presentation/deposit_form_page.dart';
 import '../../deposits/presentation/deposit_details_view.dart';
 import '../application/deposit_statistics.dart';
 
@@ -49,8 +52,11 @@ class DepositStatisticsDetailPage extends ConsumerWidget {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                   itemCount: rows.length,
-                  itemBuilder: (context, index) =>
-                      _DetailTile(detail: rows[index]),
+                  itemBuilder: (context, index) => _DetailTile(
+                    detail: rows[index],
+                    onChanged: () =>
+                        ref.invalidate(depositStatisticsDetailProvider(query)),
+                  ),
                 ),
         ),
       ),
@@ -59,9 +65,10 @@ class DepositStatisticsDetailPage extends ConsumerWidget {
 }
 
 class _DetailTile extends ConsumerWidget {
-  const _DetailTile({required this.detail});
+  const _DetailTile({required this.detail, required this.onChanged});
 
   final DepositStatisticsDetail detail;
+  final VoidCallback onChanged;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -74,11 +81,42 @@ class _DetailTile extends ConsumerWidget {
               .read(depositDetailsUseCasesProvider)
               .load(detail.depositId);
           if (record != null && context.mounted) {
-            await showDepositDetailsDialog(
+            final action = await showDepositDetailsDialog(
               context,
               data: record.data,
               allowActions: record.editableDraft != null,
             );
+            if (!context.mounted ||
+                action == null ||
+                record.editableDraft == null) {
+              return;
+            }
+            switch (action) {
+              case DepositDetailsAction.stop:
+                final confirmed = await _confirmStop(context);
+                if (!confirmed || !context.mounted) return;
+                try {
+                  await ref
+                      .read(depositWorkflowProvider)
+                      .stop(detail.depositId);
+                  onChanged();
+                } on DepositNotActiveException {
+                  if (context.mounted) {
+                    _showError(context, '该存款已被处理，请刷新后重试');
+                  }
+                } on Object {
+                  if (context.mounted) {
+                    _showError(context, '停止续期失败，请稍后重试');
+                  }
+                }
+                return;
+              case DepositDetailsAction.renew:
+                await _showForm(context, ref, record, DepositFormMode.renew);
+                return;
+              case DepositDetailsAction.edit:
+                await _showForm(context, ref, record, DepositFormMode.update);
+                return;
+            }
           }
         },
         child: Padding(
@@ -115,6 +153,59 @@ class _DetailTile extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _showForm(
+    BuildContext context,
+    WidgetRef ref,
+    DepositDetailsRecord record,
+    DepositFormMode mode,
+  ) async {
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        child: SizedBox(
+          width: 560,
+          height: 700,
+          child: DepositFormPage(
+            mode: mode,
+            sourceDepositId: detail.depositId,
+            initial: record.editableDraft,
+            initialCustomerName: record.data.customerName,
+            initialCustomerPhone: record.data.customerPhone,
+            onSaved: () => Navigator.pop(dialogContext, true),
+          ),
+        ),
+      ),
+    );
+    if (saved == true) onChanged();
+  }
+
+  Future<bool> _confirmStop(BuildContext context) async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('停止续期？'),
+          content: const Text('停止后该笔存款不再进入提醒。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('确认停止'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+
+  void _showError(BuildContext context, String message) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
 

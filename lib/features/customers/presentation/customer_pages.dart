@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
-import 'package:intl/intl.dart';
 
 import '../application/customer_controller.dart';
 import '../application/customer_history_service.dart';
 import '../domain/customer_repository.dart';
 import '../domain/name_search_index.dart';
-import 'customer_history_formatter.dart';
 import 'customer_detail_page.dart';
+import 'customer_history_dialog.dart';
 import '../../deposits/domain/deposit.dart';
 import '../../deposits/domain/deposit_repository.dart';
 import '../../deposits/domain/local_date.dart';
@@ -453,7 +452,12 @@ class _CustomerCardState extends ConsumerState<_CustomerCard> {
         OverflowBar(
           children: [
             TextButton.icon(
-              onPressed: () => _showHistory(context, ref),
+              onPressed: () => showCustomerHistoryDialog(
+                context,
+                ref,
+                customerId: result.customer.id,
+                customerName: result.customer.name,
+              ),
               icon: const Icon(Icons.history),
               label: const Text('修改记录'),
             ),
@@ -739,121 +743,6 @@ class _CustomerCardState extends ConsumerState<_CustomerCard> {
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
   }
-
-  Future<void> _showHistory(BuildContext context, WidgetRef ref) async {
-    final history = await ref
-        .read(customerHistoryUseCasesProvider)
-        .load(result.customer.id);
-    if (!context.mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('${result.customer.name}的修改记录'),
-        content: SizedBox(
-          width: 480,
-          child: history.isEmpty
-              ? const Text('暂无修改记录')
-              : ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: history.length,
-                  separatorBuilder: (_, _) => const Divider(),
-                  itemBuilder: (context, index) {
-                    final entry = history[index];
-                    final changes = CustomerHistoryFormatter.formatEntry(entry);
-                    return ListTile(
-                      leading: const Icon(Icons.history),
-                      title: Text(
-                        entry.entityType == null
-                            ? _operationLabel(entry.operation)
-                            : '${_entityLabel(entry.entityType)} · '
-                                  '${_operationLabel(entry.operation)}',
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            DateFormat(
-                              'yyyy-MM-dd HH:mm',
-                            ).format(entry.occurredAt),
-                          ),
-                          for (
-                            var changeIndex = 0;
-                            changeIndex < changes.length;
-                            changeIndex++
-                          )
-                            _historyChange(
-                              context,
-                              changes[changeIndex],
-                              changeIndex,
-                            ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('关闭'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static String _operationLabel(String value) => switch (value) {
-    'create' => '新建',
-    'update' => '更新',
-    'renew' => '续期',
-    'create_from_renewal' => '续期生成新存款',
-    'stop' => '停止续期',
-    'deactivate' => '停用客户',
-    _ => value,
-  };
-
-  static String _entityLabel(String? value) => switch (value) {
-    'customer' => '客户',
-    'deposit' => '存款',
-    _ => '记录',
-  };
-
-  Widget _historyChange(
-    BuildContext context,
-    FormattedHistoryChange change,
-    int index,
-  ) => Padding(
-    padding: const EdgeInsets.only(top: 4),
-    child: Wrap(
-      crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: 6,
-      runSpacing: 2,
-      children: [
-        Text(
-          '${change.label}：',
-          key: Key('history-field-$index'),
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.primary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        Text(
-          change.before,
-          key: Key('history-before-$index'),
-          style: TextStyle(color: Theme.of(context).colorScheme.error),
-        ),
-        const Icon(Icons.arrow_forward, size: 14),
-        Text(
-          change.after,
-          key: Key('history-after-$index'),
-          style: const TextStyle(
-            color: Color(0xFF2E7D32),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    ),
-  );
 }
 
 final class _DepositAppearance {
