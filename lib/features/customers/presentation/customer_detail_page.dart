@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../deposits/presentation/deposit_details_view.dart';
 import '../../deposits/application/deposit_details_service.dart';
+import '../../deposits/application/deposit_workflow_controller.dart';
+import '../../deposits/presentation/deposit_form_page.dart';
 import '../application/customer_controller.dart';
 import '../domain/customer_repository.dart';
 import 'customer_edit_dialog.dart';
@@ -67,6 +69,21 @@ class CustomerDetailPage extends ConsumerWidget {
             icon: const Icon(Icons.edit_outlined),
             label: const Text('编辑客户资料'),
           ),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => DepositFormPage(
+                  initialCustomerId: result.customer.id,
+                  initialCustomerName: result.customer.name,
+                  initialCustomerPhone: result.customer.phone,
+                  onSaved: () =>
+                      ref.read(customerControllerProvider.notifier).retry(),
+                ),
+              ),
+            ),
+            icon: const Icon(Icons.add),
+            label: const Text('新增存款'),
+          ),
           const SizedBox(height: 16),
           const Text('存款'),
           for (final deposit in result.deposits)
@@ -83,12 +100,39 @@ class CustomerDetailPage extends ConsumerWidget {
                 final record = await ref
                     .read(depositDetailsUseCasesProvider)
                     .load(deposit.id);
-                if (record != null && context.mounted)
-                  await showDepositDetailsDialog(
+                if (record != null && context.mounted) {
+                  final action = await showDepositDetailsDialog(
                     context,
                     data: record.data,
                     allowActions: record.editableDraft != null,
                   );
+                  if (!context.mounted ||
+                      action == null ||
+                      record.editableDraft == null)
+                    return;
+                  if (action == DepositDetailsAction.stop) {
+                    await ref.read(depositWorkflowProvider).stop(deposit.id);
+                    await ref.read(customerControllerProvider.notifier).retry();
+                    return;
+                  }
+                  await Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => DepositFormPage(
+                        mode: action == DepositDetailsAction.renew
+                            ? DepositFormMode.renew
+                            : DepositFormMode.update,
+                        sourceDepositId: deposit.id,
+                        initial: record.editableDraft,
+                        initialCustomerId: result.customer.id,
+                        initialCustomerName: result.customer.name,
+                        initialCustomerPhone: result.customer.phone,
+                        onSaved: () => ref
+                            .read(customerControllerProvider.notifier)
+                            .retry(),
+                      ),
+                    ),
+                  );
+                }
               },
             ),
         ],
