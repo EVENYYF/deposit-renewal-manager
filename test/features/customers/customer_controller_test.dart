@@ -168,6 +168,61 @@ void main() {
       'new',
     );
   });
+
+  test('retry keeps previous customers during refresh', () async {
+    final pending = Completer<List<CustomerSearchResult>>();
+    final useCases = _FakeCustomerUseCases()
+      ..responses[''] = [
+        Future.value([_result('old')]),
+        pending.future,
+      ];
+    final container = ProviderContainer(
+      overrides: [customerUseCasesProvider.overrideWithValue(useCases)],
+    );
+    addTearDown(container.dispose);
+    await container.read(customerControllerProvider.future);
+
+    final retry = container.read(customerControllerProvider.notifier).retry();
+
+    final refreshing = container.read(customerControllerProvider);
+    expect(refreshing.hasValue, isTrue);
+    expect(refreshing.value?.results.single.customer.id, 'old');
+    pending.complete([_result('new')]);
+    await retry;
+    expect(
+      container
+          .read(customerControllerProvider)
+          .value
+          ?.results
+          .single
+          .customer
+          .id,
+      'new',
+    );
+  });
+
+  test('retry failure keeps previous customers', () async {
+    final failure = Completer<List<CustomerSearchResult>>();
+    final useCases = _FakeCustomerUseCases()
+      ..responses[''] = [
+        Future.value([_result('old')]),
+        failure.future,
+      ];
+    final container = ProviderContainer(
+      overrides: [customerUseCasesProvider.overrideWithValue(useCases)],
+    );
+    addTearDown(container.dispose);
+    await container.read(customerControllerProvider.future);
+
+    final retry = container.read(customerControllerProvider.notifier).retry();
+    failure.completeError(StateError('offline'));
+    await retry;
+
+    final failed = container.read(customerControllerProvider);
+    expect(failed.hasError, isFalse);
+    expect(failed.value?.results.single.customer.id, 'old');
+    expect(container.read(customerRefreshMessageProvider), isNotNull);
+  });
 }
 
 final class _FakeMutationCoordinator

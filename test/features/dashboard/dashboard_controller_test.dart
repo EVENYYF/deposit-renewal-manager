@@ -150,6 +150,48 @@ void main() {
 
     expect(container.read(dashboardControllerProvider).value?.customerCount, 8);
   });
+
+  test('retry keeps the previous dashboard during refresh', () async {
+    final pending = Completer<DashboardSnapshot>();
+    final useCases = _FakeDashboardUseCases()
+      ..loadResults.add(Future.value(const DashboardSnapshot(dueSoonCount: 1)))
+      ..loadResults.add(pending.future);
+    final container = ProviderContainer(
+      overrides: [dashboardUseCasesProvider.overrideWithValue(useCases)],
+    );
+    addTearDown(container.dispose);
+    await container.read(dashboardControllerProvider.future);
+
+    final retry = container.read(dashboardControllerProvider.notifier).retry();
+
+    final refreshing = container.read(dashboardControllerProvider);
+    expect(refreshing.hasValue, isTrue);
+    expect(refreshing.value?.dueSoonCount, 1);
+    pending.complete(const DashboardSnapshot(dueSoonCount: 2));
+    await retry;
+    expect(container.read(dashboardControllerProvider).value?.dueSoonCount, 2);
+  });
+
+  test('retry failure keeps the previous dashboard', () async {
+    final failure = Completer<DashboardSnapshot>();
+    final useCases = _FakeDashboardUseCases()
+      ..loadResults.add(Future.value(const DashboardSnapshot(customerCount: 3)))
+      ..loadResults.add(failure.future);
+    final container = ProviderContainer(
+      overrides: [dashboardUseCasesProvider.overrideWithValue(useCases)],
+    );
+    addTearDown(container.dispose);
+    await container.read(dashboardControllerProvider.future);
+
+    final retry = container.read(dashboardControllerProvider.notifier).retry();
+    failure.completeError(StateError('offline'));
+    await retry;
+
+    final failed = container.read(dashboardControllerProvider);
+    expect(failed.hasError, isFalse);
+    expect(failed.value?.customerCount, 3);
+    expect(container.read(dashboardRefreshMessageProvider), isNotNull);
+  });
 }
 
 final class _FakeMutationCoordinator

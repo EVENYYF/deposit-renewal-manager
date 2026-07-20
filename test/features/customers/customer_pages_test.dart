@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:deposit_renewal_manager/features/customers/application/customer_controller.dart';
 import 'package:deposit_renewal_manager/features/customers/domain/customer_repository.dart';
 import 'package:deposit_renewal_manager/features/customers/domain/name_search_index.dart';
@@ -19,6 +21,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    expect(find.byType(RefreshIndicator), findsOneWidget);
     await tester.enterText(find.byType(SearchBar), 'zhangsan');
     await tester.pumpAndSettle();
     expect(find.text('张三'), findsOneWidget);
@@ -74,6 +77,14 @@ void main() {
     await tester.tap(find.text('稳健存款').last);
     await tester.pumpAndSettle();
     expect(find.text('李四'), findsOneWidget);
+
+    final refresh = tester.widget<RefreshIndicator>(
+      find.byType(RefreshIndicator),
+    );
+    await refresh.onRefresh();
+    await tester.pumpAndSettle();
+    expect(find.text('李四'), findsOneWidget);
+    expect(find.text('张三'), findsNothing);
   });
 
   testWidgets('renders renewal versions and deposit details', (tester) async {
@@ -105,6 +116,30 @@ void main() {
     expect(find.text('¥1000.00'), findsOneWidget);
     expect(find.text('2.15%'), findsOneWidget);
     expect(find.text('编辑'), findsOneWidget);
+  });
+
+  testWidgets('refresh failure keeps customers and shows feedback', (
+    tester,
+  ) async {
+    final cases = _RefreshFailureCases();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [customerUseCasesProvider.overrideWithValue(cases)],
+        child: const MaterialApp(home: Scaffold(body: CustomerDirectoryPage())),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final refresh = tester.widget<RefreshIndicator>(
+      find.byType(RefreshIndicator),
+    );
+    final pendingRefresh = refresh.onRefresh();
+    cases.refresh.completeError(StateError('offline'));
+    await pendingRefresh;
+    await tester.pump();
+
+    expect(find.text('张三'), findsOneWidget);
+    expect(find.text('客户列表刷新失败，请稍后重试'), findsOneWidget);
   });
 
   test('audit JSON is converted to changed fields and tolerates old data', () {
@@ -153,6 +188,20 @@ final class _Cases implements CustomerUseCases {
       deposits: const [],
     ),
   ];
+  @override
+  Future<void> save(CustomerDraft draft) async {}
+}
+
+final class _RefreshFailureCases implements CustomerUseCases {
+  final refresh = Completer<List<CustomerSearchResult>>();
+  int loadCalls = 0;
+
+  @override
+  Future<List<CustomerSearchResult>> load(String query) {
+    loadCalls++;
+    return loadCalls == 1 ? const _Cases().load(query) : refresh.future;
+  }
+
   @override
   Future<void> save(CustomerDraft draft) async {}
 }

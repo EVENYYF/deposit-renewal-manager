@@ -34,6 +34,20 @@ final customerUseCasesProvider = Provider<CustomerUseCases>(
   (ref) => const EmptyCustomerUseCases(),
 );
 
+final customerRefreshMessageProvider =
+    NotifierProvider<CustomerRefreshMessageController, String?>(
+      CustomerRefreshMessageController.new,
+    );
+
+final class CustomerRefreshMessageController extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void clear() => state = null;
+
+  void showFailure() => state = '客户列表刷新失败，请稍后重试';
+}
+
 final customerControllerProvider =
     AsyncNotifierProvider<CustomerController, CustomerDirectoryState>(
       CustomerController.new,
@@ -58,10 +72,10 @@ final class CustomerController extends AsyncNotifier<CustomerDirectoryState> {
   Future<void> search(String query) async {
     final normalized = query.trim();
     _query = normalized;
-    await _refresh(normalized);
+    await _refresh(normalized, preservePrevious: false);
   }
 
-  Future<void> retry() => _refresh(_query);
+  Future<void> retry() => _refresh(_query, preservePrevious: true);
 
   Future<void> saveAndRefresh(CustomerDraft draft) async {
     var generation = ++_requestGeneration;
@@ -86,14 +100,26 @@ final class CustomerController extends AsyncNotifier<CustomerDirectoryState> {
     return _isCurrent(generation) ? loaded : (state.value ?? loaded);
   }
 
-  Future<void> _refresh(String query) async {
+  Future<void> _refresh(String query, {required bool preservePrevious}) async {
     final generation = ++_requestGeneration;
     if (_disposed) return;
-    state = const AsyncLoading<CustomerDirectoryState>();
+    final previous = state;
+    final previousValue = previous.value;
+    ref.read(customerRefreshMessageProvider.notifier).clear();
+    if (!preservePrevious || previousValue == null) {
+      state = const AsyncLoading<CustomerDirectoryState>();
+    }
     try {
       await _load(generation, query);
     } catch (error, stack) {
-      if (_isCurrent(generation)) state = AsyncError(error, stack);
+      if (_isCurrent(generation)) {
+        if (preservePrevious && previousValue != null) {
+          state = AsyncData(previousValue);
+          ref.read(customerRefreshMessageProvider.notifier).showFailure();
+        } else {
+          state = AsyncError(error, stack);
+        }
+      }
     }
   }
 

@@ -25,6 +25,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    expect(find.byType(RefreshIndicator), findsOneWidget);
     expect(find.text('今日到期'), findsOneWidget);
     expect(find.text('三天内'), findsOneWidget);
     expect(find.text('本周内'), findsOneWidget);
@@ -96,6 +97,35 @@ void main() {
     workflow.stopCompleter.complete();
     await tester.pumpAndSettle();
   });
+
+  testWidgets('refresh failure keeps dashboard content and shows feedback', (
+    tester,
+  ) async {
+    final cases = _RefreshFailureCases();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          dashboardUseCasesProvider.overrideWithValue(cases),
+          notificationSchedulerProvider.overrideWithValue(
+            const UnsupportedNotificationScheduler(),
+          ),
+        ],
+        child: const MaterialApp(home: Scaffold(body: DashboardPage())),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final refresh = tester.widget<RefreshIndicator>(
+      find.byType(RefreshIndicator),
+    );
+    final pendingRefresh = refresh.onRefresh();
+    cases.refresh.completeError(StateError('offline'));
+    await pendingRefresh;
+    await tester.pump();
+
+    expect(find.text('张三'), findsOneWidget);
+    expect(find.text('首页刷新失败，请稍后重试'), findsOneWidget);
+  });
 }
 
 final class _Cases implements DashboardUseCases {
@@ -118,6 +148,20 @@ final class _Cases implements DashboardUseCases {
       ),
     ],
   );
+  @override
+  Future<void> save(DashboardCommand command) async {}
+}
+
+final class _RefreshFailureCases implements DashboardUseCases {
+  final refresh = Completer<DashboardSnapshot>();
+  int loadCalls = 0;
+
+  @override
+  Future<DashboardSnapshot> load() {
+    loadCalls++;
+    return loadCalls == 1 ? const _Cases().load() : refresh.future;
+  }
+
   @override
   Future<void> save(DashboardCommand command) async {}
 }

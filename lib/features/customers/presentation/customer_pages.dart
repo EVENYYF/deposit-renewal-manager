@@ -33,6 +33,13 @@ class _CustomerDirectoryPageState extends ConsumerState<CustomerDirectoryPage> {
   @override
   Widget build(BuildContext context) {
     final directory = ref.watch(customerControllerProvider);
+    ref.listen(customerRefreshMessageProvider, (previous, next) {
+      if (next != null && next != previous) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(next)));
+      }
+    });
     return Column(
       children: [
         Padding(
@@ -83,30 +90,64 @@ class _CustomerDirectoryPageState extends ConsumerState<CustomerDirectoryPage> {
           ),
         ),
         Expanded(
-          child: directory.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, stack) => Center(
-              child: FilledButton.icon(
-                onPressed: () =>
-                    ref.read(customerControllerProvider.notifier).retry(),
-                icon: const Icon(Icons.refresh),
-                label: const Text('重新加载'),
+          child: RefreshIndicator(
+            onRefresh: () =>
+                ref.read(customerControllerProvider.notifier).retry(),
+            child: directory.when(
+              skipLoadingOnRefresh: true,
+              skipError: true,
+              loading: () => ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: const [
+                  SizedBox(
+                    height: 320,
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                ],
               ),
+              error: (error, stack) => ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(
+                    height: 320,
+                    child: Center(
+                      child: FilledButton.icon(
+                        onPressed: () => ref
+                            .read(customerControllerProvider.notifier)
+                            .retry(),
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('重新加载'),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              data: (state) {
+                final results = _filter(state.results);
+                return results.isEmpty
+                    ? ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          SizedBox(
+                            height: 320,
+                            child: Center(
+                              child: Text(
+                                state.query.isEmpty ? '暂无客户' : '没有匹配的客户',
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : ListView.separated(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                        itemCount: results.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
+                        itemBuilder: (context, index) =>
+                            _CustomerCard(result: results[index]),
+                      );
+              },
             ),
-            data: (state) {
-              final results = _filter(state.results);
-              return results.isEmpty
-                  ? Center(
-                      child: Text(state.query.isEmpty ? '暂无客户' : '没有匹配的客户'),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                      itemCount: results.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 8),
-                      itemBuilder: (context, index) =>
-                          _CustomerCard(result: results[index]),
-                    );
-            },
           ),
         ),
       ],

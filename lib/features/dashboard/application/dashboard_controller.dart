@@ -84,6 +84,20 @@ final dashboardUseCasesProvider = Provider<DashboardUseCases>(
   (ref) => const EmptyDashboardUseCases(),
 );
 
+final dashboardRefreshMessageProvider =
+    NotifierProvider<DashboardRefreshMessageController, String?>(
+      DashboardRefreshMessageController.new,
+    );
+
+final class DashboardRefreshMessageController extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void clear() => state = null;
+
+  void showFailure() => state = '首页刷新失败，请稍后重试';
+}
+
 final dashboardControllerProvider =
     AsyncNotifierProvider<DashboardController, DashboardSnapshot>(
       DashboardController.new,
@@ -103,7 +117,7 @@ final class DashboardController extends AsyncNotifier<DashboardSnapshot> {
     return _load(generation);
   }
 
-  Future<void> retry() => _refresh();
+  Future<void> retry() => _refresh(preservePrevious: true);
 
   Future<void> saveAndRefresh(DashboardCommand command) async {
     var generation = ++_requestGeneration;
@@ -123,14 +137,26 @@ final class DashboardController extends AsyncNotifier<DashboardSnapshot> {
     }
   }
 
-  Future<void> _refresh() async {
+  Future<void> _refresh({required bool preservePrevious}) async {
     final generation = ++_requestGeneration;
     if (_disposed) return;
-    state = const AsyncLoading<DashboardSnapshot>();
+    final previous = state;
+    final previousValue = previous.value;
+    ref.read(dashboardRefreshMessageProvider.notifier).clear();
+    if (!preservePrevious || previousValue == null) {
+      state = const AsyncLoading<DashboardSnapshot>();
+    }
     try {
       await _load(generation);
     } catch (error, stack) {
-      if (_isCurrent(generation)) state = AsyncError(error, stack);
+      if (_isCurrent(generation)) {
+        if (preservePrevious && previousValue != null) {
+          state = AsyncData(previousValue);
+          ref.read(dashboardRefreshMessageProvider.notifier).showFailure();
+        } else {
+          state = AsyncError(error, stack);
+        }
+      }
     }
   }
 

@@ -18,48 +18,67 @@ class DashboardPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final value = ref.watch(dashboardControllerProvider);
-    return CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
-          sliver: SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('存款续期', style: Theme.of(context).textTheme.headlineSmall),
-                const SizedBox(height: 12),
-                const NotificationStatusBanner(),
-              ],
+    ref.listen(dashboardRefreshMessageProvider, (previous, next) {
+      if (next != null && next != previous) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(next)));
+      }
+    });
+    return RefreshIndicator(
+      onRefresh: () => ref.read(dashboardControllerProvider.notifier).retry(),
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+            sliver: SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '存款续期',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 12),
+                  const NotificationStatusBanner(),
+                ],
+              ),
             ),
           ),
-        ),
-        value.when(
-          loading: () => const SliverFillRemaining(
-            child: Center(child: CircularProgressIndicator()),
-          ),
-          error: (error, stack) => SliverFillRemaining(
-            child: _StateMessage(
-              title: '暂时无法加载首页',
-              actionLabel: '重试',
-              onAction: () =>
-                  ref.read(dashboardControllerProvider.notifier).retry(),
+          value.when(
+            skipLoadingOnRefresh: true,
+            skipError: true,
+            loading: () => const SliverFillRemaining(
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (error, stack) => SliverFillRemaining(
+              child: _StateMessage(
+                title: '暂时无法加载首页',
+                actionLabel: '重试',
+                onAction: () =>
+                    ref.read(dashboardControllerProvider.notifier).retry(),
+              ),
+            ),
+            data: (snapshot) => SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              sliver: SliverList.list(
+                children: [
+                  _Summary(snapshot: snapshot),
+                  const SizedBox(height: 16),
+                  _ReminderSection(title: '今日到期', records: snapshot.today),
+                  _ReminderSection(
+                    title: '三天内',
+                    records: snapshot.nextThreeDays,
+                  ),
+                  _ReminderSection(title: '本周内', records: snapshot.thisWeek),
+                  _ReminderSection(title: '到期待处理', records: snapshot.overdue),
+                ],
+              ),
             ),
           ),
-          data: (snapshot) => SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-            sliver: SliverList.list(
-              children: [
-                _Summary(snapshot: snapshot),
-                const SizedBox(height: 16),
-                _ReminderSection(title: '今日到期', records: snapshot.today),
-                _ReminderSection(title: '三天内', records: snapshot.nextThreeDays),
-                _ReminderSection(title: '本周内', records: snapshot.thisWeek),
-                _ReminderSection(title: '到期待处理', records: snapshot.overdue),
-              ],
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
