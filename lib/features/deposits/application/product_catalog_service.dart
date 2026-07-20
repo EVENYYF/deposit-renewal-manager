@@ -45,4 +45,17 @@ final class ProductCatalogService {
     String productId,
     LocalDate startDate,
   ) => repository.matchRate(productId, startDate);
+
+  Future<Map<String, ProductRateVersion?>> matchRates(
+    Iterable<ProductRecord> products,
+    LocalDate startDate,
+  ) async {
+    final entries = await Future.wait(
+      products.map(
+        (product) async =>
+            MapEntry(product.id, await matchRate(product.id, startDate)),
+      ),
+    );
+    return Map.unmodifiable(Map.fromEntries(entries));
+  }
 }

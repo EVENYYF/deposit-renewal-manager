@@ -65,12 +65,51 @@ void main() {
 
     expect(products.map((product) => product.productName), ['One']);
   });
+
+  test('matches a dated rate for every product id', () async {
+    final date = LocalDate(2026, 7, 1);
+    final products = const [
+      ProductRecord(
+        id: 'p1',
+        bankName: '甲银行',
+        productName: '稳健存款',
+        isActive: true,
+      ),
+      ProductRecord(
+        id: 'p2',
+        bankName: '甲银行',
+        productName: '通知存款',
+        isActive: true,
+      ),
+    ];
+    final service = ProductCatalogService(
+      _FakeCatalog(
+        products,
+        rates: {
+          'p1': ProductRateVersion(
+            id: 'r1',
+            productId: 'p1',
+            interestRateScaled: 230,
+            ratePrecision: 2,
+            effectiveDate: date,
+          ),
+        },
+      ),
+    );
+
+    final rates = await service.matchRates(products, date);
+
+    expect(rates.keys.toSet(), {'p1', 'p2'});
+    expect(rates['p1']?.interestRateScaled, 230);
+    expect(rates['p2'], isNull);
+  });
 }
 
 final class _FakeCatalog implements ProductCatalogRepository {
-  _FakeCatalog(this.products);
+  _FakeCatalog(this.products, {this.rates = const {}});
 
   final List<ProductRecord> products;
+  final Map<String, ProductRateVersion> rates;
 
   @override
   Future<List<ProductRecord>> listProducts({
@@ -87,7 +126,7 @@ final class _FakeCatalog implements ProductCatalogRepository {
   Future<ProductRateVersion?> matchRate(
     String productId,
     LocalDate startDate,
-  ) async => null;
+  ) async => rates[productId];
 
   @override
   Future<ProductRecord> saveProduct(ProductDraft draft) =>

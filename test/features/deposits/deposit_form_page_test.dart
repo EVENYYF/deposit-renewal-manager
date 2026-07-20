@@ -51,16 +51,32 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(ActionChip, '甲银行'));
-    await tester.pumpAndSettle();
-    expect(find.widgetWithText(ActionChip, '稳健存款'), findsOneWidget);
-    await tester.tap(find.widgetWithText(ActionChip, '稳健存款'));
     await tester.scrollUntilVisible(
       find.byKey(const Key('start-date')),
       300,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.enterText(find.byKey(const Key('start-date')), '2026-07-01');
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('deposit-bank')),
+      -300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byTooltip('展开银行选项'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('甲银行').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('展开产品名称选项'));
+    await tester.pumpAndSettle();
+    expect(find.text('适用年利率 2.30%'), findsOneWidget);
+    final optionFinder = find.byKey(const Key('catalog-option-p1'));
+    final option = tester.widget<Text>(optionFinder);
+    expect(
+      option.style?.color,
+      Theme.of(tester.element(optionFinder)).colorScheme.primary,
+    );
+    await tester.tap(find.text('稳健存款').last);
     await tester.pumpAndSettle();
     expect(
       tester
@@ -69,6 +85,64 @@ void main() {
           .text,
       '2.30',
     );
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('start-date')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.enterText(find.byKey(const Key('start-date')), '2025-07-01');
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TextFormField>(find.byKey(const Key('deposit-rate')))
+          .controller!
+          .text,
+      '1.80',
+    );
+  });
+
+  testWidgets('手工修改的利率不被日期变化覆盖', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          productCatalogServiceProvider.overrideWithValue(
+            ProductCatalogService(_Catalog()),
+          ),
+        ],
+        child: const MaterialApp(home: Scaffold(body: DepositFormPage())),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('展开银行选项'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('甲银行').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('展开产品名称选项'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('稳健存款').last);
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('deposit-rate')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.enterText(find.byKey(const Key('deposit-rate')), '9.99');
+    final rateController = tester
+        .widget<TextFormField>(find.byKey(const Key('deposit-rate')))
+        .controller!;
+    expect(rateController.text, '9.99');
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('start-date')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.enterText(find.byKey(const Key('start-date')), '2025-07-01');
+    await tester.pumpAndSettle();
+
+    expect(rateController.text, '9.99');
   });
 
   testWidgets('displays interest rate with its stored precision', (
@@ -310,7 +384,13 @@ final class _Catalog implements ProductCatalogRepository {
     String productId,
     LocalDate startDate,
   ) async => startDate.isBefore(LocalDate(2026, 6, 1))
-      ? null
+      ? ProductRateVersion(
+          id: 'r0',
+          productId: productId,
+          interestRateScaled: 180,
+          ratePrecision: 2,
+          effectiveDate: LocalDate(2025, 6, 1),
+        )
       : ProductRateVersion(
           id: 'r1',
           productId: productId,
