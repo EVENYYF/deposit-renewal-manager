@@ -34,7 +34,7 @@
 - `flutter analyze --no-pub`：通过，零问题。
 - `flutter test --no-pub`：267 项全部通过。
 - Android Debug APK：构建成功，并由用户完成当前版本手机主要流程验收。
-- 正式发布签名、安装包体积优化和首个正式版 APK 留待下一轮处理。
+- 首个正式版源提交为 `ec757ac`；签名 APK 和验收记录已完成，Tag 与 GitHub Release 待单独确认。
 
 ## [1.0.0+1] - 2026-07-18
 
