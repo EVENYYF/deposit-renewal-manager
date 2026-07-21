@@ -35,6 +35,27 @@ void main() {
     expect(find.byKey(const Key('customer-name')), findsOneWidget);
   });
 
+  testWidgets('客户详情新增存款保存后返回客户详情', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [customerUseCasesProvider.overrideWithValue(const _Cases())],
+        child: const MaterialApp(home: Scaffold(body: CustomerDirectoryPage())),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('客户详情'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('新增存款'));
+    await tester.pumpAndSettle();
+
+    final form = tester.widget<DepositFormPage>(find.byType(DepositFormPage));
+    form.onSaved!.call();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DepositFormPage), findsNothing);
+    expect(find.text('编辑客户资料'), findsOneWidget);
+  });
+
   testWidgets('history action displays persisted audit entries', (
     tester,
   ) async {

@@ -71,17 +71,23 @@ class CustomerDetailPage extends ConsumerWidget {
             label: const Text('编辑客户资料'),
           ),
           OutlinedButton.icon(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => DepositFormPage(
-                  initialCustomerId: result.customer.id,
-                  initialCustomerName: result.customer.name,
-                  initialCustomerPhone: result.customer.phone,
-                  onSaved: () =>
-                      ref.read(customerControllerProvider.notifier).retry(),
+            onPressed: () async {
+              await Navigator.of(context).push<void>(
+                MaterialPageRoute<void>(
+                  builder: (formContext) => Scaffold(
+                    body: DepositFormPage(
+                      initialCustomerId: result.customer.id,
+                      initialCustomerName: result.customer.name,
+                      initialCustomerPhone: result.customer.phone,
+                      onSaved: () => Navigator.of(formContext).pop(),
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              );
+              if (context.mounted) {
+                await ref.read(customerControllerProvider.notifier).retry();
+              }
+            },
             icon: const Icon(Icons.add),
             label: const Text('新增存款'),
           ),
@@ -128,18 +134,20 @@ class CustomerDetailPage extends ConsumerWidget {
                   }
                   await Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => DepositFormPage(
-                        mode: action == DepositDetailsAction.renew
-                            ? DepositFormMode.renew
-                            : DepositFormMode.update,
-                        sourceDepositId: deposit.id,
-                        initial: record.editableDraft,
-                        initialCustomerId: result.customer.id,
-                        initialCustomerName: result.customer.name,
-                        initialCustomerPhone: result.customer.phone,
-                        onSaved: () => ref
-                            .read(customerControllerProvider.notifier)
-                            .retry(),
+                      builder: (_) => Scaffold(
+                        body: DepositFormPage(
+                          mode: action == DepositDetailsAction.renew
+                              ? DepositFormMode.renew
+                              : DepositFormMode.update,
+                          sourceDepositId: deposit.id,
+                          initial: record.editableDraft,
+                          initialCustomerId: result.customer.id,
+                          initialCustomerName: result.customer.name,
+                          initialCustomerPhone: result.customer.phone,
+                          onSaved: () => ref
+                              .read(customerControllerProvider.notifier)
+                              .retry(),
+                        ),
                       ),
                     ),
                   );

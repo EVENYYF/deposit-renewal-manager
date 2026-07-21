@@ -1,0 +1,6 @@
+# Copy this file to key.properties and replace every value locally.
+# Never commit key.properties or the referenced keystore.
+storePassword=REPLACE_LOCALLY
+keyPassword=REPLACE_LOCALLY
+keyAlias=REPLACE_LOCALLY
+storeFile=REPLACE_WITH_LOCAL_KEYSTORE_PATH

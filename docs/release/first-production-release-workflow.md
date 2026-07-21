@@ -42,9 +42,14 @@ Release 签名与发布记录，并在发布后整理本地项目，使下一轮
 
 ```powershell
 flutter build apk --debug --no-pub
+flutter build apk --release
 flutter build apk --release --no-pub
 flutter build apk --release --split-per-abi --no-pub
 ```
+
+当前 Flutter 版本在 `--no-pub` 时不会重新生成平台插件注册器。Debug 构建或集成
+测试可能留下包含 `integration_test` 的 Android 注册器，因此先执行一次正常
+Release 构建刷新 Release 插件集合，再使用 `--no-pub` 命令取得可审计基线。
 
 必要时使用 Flutter 的 `--analyze-size` 生成体积分析数据。记录以下内容：
 
@@ -77,8 +82,13 @@ flutter build apk --release --split-per-abi --no-pub
 dart format --output=none --set-exit-if-changed lib test integration_test
 flutter analyze --no-pub
 flutter test --no-pub
+flutter build apk --release
 flutter build apk --release --no-pub
 ```
+
+如果候选包构建前执行过集成测试或 Debug 构建，上述正常 Release 构建不得省略；
+它用于移除 Release classpath 不包含的测试插件注册项。正式记录仍以随后成功的
+`--no-pub` 构建为准。
 
 如果决定发布分 ABI APK，同时执行：
 
