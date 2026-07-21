@@ -125,7 +125,7 @@ lib/
 - `rc2` 已完成 Android 真机验收：通知初始化、权限申请、客户详情新增存款返回和数据刷新均通过。
 - Windows Release 使用当前代码重新构建后可从上述目录运行。
 
-`1.0.0+2` 正式版源提交为 `ec757ac`；Tag 和 GitHub Release 仍需单独确认后创建。
+`1.0.0+2` 正式版源提交为 `ec757ac`，Tag 为 `v1.0.0`，GitHub Release 已发布并附上通用 APK。
 
 ## 已知限制
 

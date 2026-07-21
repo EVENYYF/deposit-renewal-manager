@@ -21,6 +21,8 @@
 ## 正式版记录
 
 - 源码提交：`ec757ac`
+- Tag：`v1.0.0`
+- GitHub Release：`https://github.com/EVENYYF/deposit-renewal-manager/releases/tag/v1.0.0`
 - 候选包：`deposit-renewal-manager-v1.0.0+2-universal-rc2.apk`
 - SHA-256：`FEF32297EE60B1D4EE0EE63C50312B63E84F7CF8D89D21B0756FE7575E6198F3`
 
